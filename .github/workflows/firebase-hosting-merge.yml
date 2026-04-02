@@ -7,9 +7,15 @@ jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - name: Fix git identity
+        run: |
+          git config --global user.name "asemits"
+          git config --global user.email ""
+
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STARLIGHT_28E40 }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DELTA_28E40 }}
           channelId: live
-          projectId: starlight-28e40
+          projectId: delta-42a39
