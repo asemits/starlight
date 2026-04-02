@@ -1,2 +1,2 @@
 # starlight
-Starlight game site
+starlight game site
