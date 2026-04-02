@@ -7,8 +7,7 @@
       "hosting": {
         "main": ["starlight-28e40"],
         "site1": ["starlight-2wl28"],
-        "site2": ["starlight-32el2"],
-        "staging": ["starlight-nightly"]  
+        "site2": ["starlight-32el2"]
       }
     }
   }
