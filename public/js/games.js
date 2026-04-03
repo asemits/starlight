@@ -205,6 +205,16 @@
 		return state.statsCache.get(path) || { plays: 0, uniqueClicks: 0, thumbsUp: 0, thumbsDown: 0, myRating: 0 };
 	}
 
+	async function createGameBlobUrl(gamePath) {
+		const sourceUrl = `${CDN_BASE}${encodeURI(gamePath)}`;
+		const response = await fetch(sourceUrl, { cache: "no-store" });
+		if (!response.ok) {
+			throw new Error(`Failed to load game source: ${response.status}`);
+		}
+		const html = await response.text();
+		return URL.createObjectURL(new Blob([html], { type: "text/html" }));
+	}
+
 	async function ensureStats(paths) {
 		const authReady = await ensureAuthReady();
 		if (!authReady) {
@@ -559,11 +569,20 @@
 		}
 
 		state.activeGame = game;
+		let frameUrl = `${CDN_BASE}${encodeURI(game.path)}`;
+		let frameBlobUrl = null;
+		try {
+			frameBlobUrl = await createGameBlobUrl(game.path);
+			frameUrl = frameBlobUrl;
+		} catch (error) {
+			console.warn("Falling back to direct game URL", error);
+		}
+
 		const overlay = document.createElement("div");
 		overlay.className = "game-overlay";
 		overlay.innerHTML = `
 			<div class="game-frame-wrap" id="game-frame-wrap">
-				<iframe class="game-frame" src="${CDN_BASE}${encodeURI(game.path)}" allowfullscreen></iframe>
+				<iframe class="game-frame" src="${frameUrl}" allowfullscreen></iframe>
 			</div>
 			<div class="game-bottom-bar">
 				<div class="bar-left">
@@ -625,13 +644,14 @@
 			cleanup();
 		});
 
-		overlay.querySelector("#new-tab").addEventListener("click", () => {
-			const targetUrl = `${CDN_BASE}${encodeURI(game.path)}`;
-			const blobHtml = `<!doctype html><html><body style="margin:0;background:#000;"><iframe src="${targetUrl}" style="border:0;width:100vw;height:100vh" allowfullscreen></iframe></body></html>`;
-			const blob = new Blob([blobHtml], { type: "text/html" });
-			const blobUrl = URL.createObjectURL(blob);
-			window.open(blobUrl, "_blank", "noopener,noreferrer");
-			setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+		overlay.querySelector("#new-tab").addEventListener("click", async () => {
+			try {
+				const newTabBlobUrl = await createGameBlobUrl(game.path);
+				window.open(newTabBlobUrl, "_blank", "noopener,noreferrer");
+				setTimeout(() => URL.revokeObjectURL(newTabBlobUrl), 120000);
+			} catch (_err) {
+				window.open(`${CDN_BASE}${encodeURI(game.path)}`, "_blank", "noopener,noreferrer");
+			}
 		});
 
 		overlay.querySelector("#full-screen").addEventListener("click", async () => {
@@ -658,6 +678,9 @@
 		function cleanup() {
 			if (unsubscribe) {
 				unsubscribe();
+			}
+			if (frameBlobUrl) {
+				URL.revokeObjectURL(frameBlobUrl);
 			}
 			cancelAnimationFrame(rafId);
 			overlay.remove();
