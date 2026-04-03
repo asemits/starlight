@@ -50,6 +50,10 @@
 
         let html = await response.text();
         const baseTag = '<base href="' + CDN_BASE + '">';
+        html = html.replace(
+          /<script[^>]*src=["'][^"']*game-interface\.js[^"']*["'][^>]*>\s*<\/script>/gi,
+          '<script>window.GameInterface=window.GameInterface||{init:function(){},trackEvent:function(){},setGameData:function(){},showInterstitial:function(){},showRewarded:function(){}};<\/script>'
+        );
 
         if (/<head[^>]*>/i.test(html)) {
           html = html.replace(/<head([^>]*)>/i, '<head$1>' + baseTag);
