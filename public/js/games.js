@@ -215,6 +215,15 @@
 		return URL.createObjectURL(new Blob([html], { type: "text/html" }));
 	}
 
+	async function fetchGameHtml(gamePath) {
+		const sourceUrl = `${CDN_BASE}${encodeURI(gamePath)}`;
+		const response = await fetch(sourceUrl, { cache: "no-store" });
+		if (!response.ok) {
+			throw new Error(`Failed to load game source: ${response.status}`);
+		}
+		return response.text();
+	}
+
 	async function ensureStats(paths) {
 		const authReady = await ensureAuthReady();
 		if (!authReady) {
@@ -570,10 +579,9 @@
 
 		state.activeGame = game;
 		let frameUrl = `${CDN_BASE}${encodeURI(game.path)}`;
-		let frameBlobUrl = null;
+		let frameSrcDoc = "";
 		try {
-			frameBlobUrl = await createGameBlobUrl(game.path);
-			frameUrl = frameBlobUrl;
+			frameSrcDoc = await fetchGameHtml(game.path);
 		} catch (error) {
 			console.warn("Falling back to direct game URL", error);
 		}
@@ -582,7 +590,7 @@
 		overlay.className = "game-overlay";
 		overlay.innerHTML = `
 			<div class="game-frame-wrap" id="game-frame-wrap">
-				<iframe class="game-frame" src="${frameUrl}" allowfullscreen></iframe>
+				<iframe class="game-frame" ${frameSrcDoc ? "" : `src=\"${frameUrl}\"`} allowfullscreen></iframe>
 			</div>
 			<div class="game-bottom-bar">
 				<div class="bar-left">
@@ -599,6 +607,12 @@
 			</div>
 		`;
 		document.body.appendChild(overlay);
+		if (frameSrcDoc) {
+			const frame = overlay.querySelector(".game-frame");
+			if (frame) {
+				frame.srcdoc = frameSrcDoc;
+			}
+		}
 
 		const refs = statRefs(game.path);
 		let unsubscribe = null;
@@ -678,9 +692,6 @@
 		function cleanup() {
 			if (unsubscribe) {
 				unsubscribe();
-			}
-			if (frameBlobUrl) {
-				URL.revokeObjectURL(frameBlobUrl);
 			}
 			cancelAnimationFrame(rafId);
 			overlay.remove();
