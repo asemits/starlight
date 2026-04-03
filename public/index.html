@@ -34,6 +34,22 @@
     <link href="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/style.css" rel="stylesheet">
 </head>
 <body class="bg-black text-white">
+    <style>
+      #global-particles {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: 0.55;
+      }
+
+      #sidebar,
+      #app-content {
+        position: relative;
+        z-index: 1;
+      }
+    </style>
+    <canvas id="global-particles"></canvas>
     <nav class="sidebar" id="sidebar">
       <img src="logos/logo.png" class="sidebar-logo">
         <ul>
@@ -126,6 +142,9 @@
       function changeGamesParticlesBonds(newValue) {
         const value = newValue === 'on' ? 'on' : 'off';
         localStorage.setItem('games-particles-bonds', value);
+        if (window.updateGlobalParticlesSettings) {
+          window.updateGlobalParticlesSettings();
+        }
         if (window.location.pathname === '/games' && window.StarlightGames) {
           window.StarlightGames.render();
         }
@@ -134,10 +153,124 @@
       function changeGamesParticlesColor(newColor) {
         const valid = /^#[0-9a-fA-F]{6}$/.test(newColor) ? newColor : '#ffffff';
         localStorage.setItem('games-particles-color', valid);
+        if (window.updateGlobalParticlesSettings) {
+          window.updateGlobalParticlesSettings();
+        }
         if (window.location.pathname === '/games' && window.StarlightGames) {
           window.StarlightGames.render();
         }
       }
+
+      (function initGlobalParticles() {
+        const canvas = document.getElementById('global-particles');
+        if (!canvas) {
+          return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        const particles = [];
+        const maxDistance = 120;
+        let width = 0;
+        let height = 0;
+        let rafId = 0;
+
+        function ensureHexColor(input) {
+          const value = String(input || '').trim();
+          return /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#ffffff';
+        }
+
+        function currentSettings() {
+          return {
+            color: ensureHexColor(localStorage.getItem('games-particles-color') || '#ffffff'),
+            bondsOn: localStorage.getItem('games-particles-bonds') === 'on'
+          };
+        }
+
+        const settings = currentSettings();
+
+        function toRgba(hex, alpha) {
+          const clean = ensureHexColor(hex).slice(1);
+          const r = Number.parseInt(clean.slice(0, 2), 16);
+          const g = Number.parseInt(clean.slice(2, 4), 16);
+          const b = Number.parseInt(clean.slice(4, 6), 16);
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function makeParticles() {
+          const count = Math.max(42, Math.floor((width * height) / 18000));
+          particles.length = 0;
+          for (let i = 0; i < count; i += 1) {
+            particles.push({
+              x: Math.random() * width,
+              y: Math.random() * height,
+              vx: (Math.random() - 0.5) * 0.35,
+              vy: (Math.random() - 0.5) * 0.35,
+              r: 0.8 + Math.random() * 2.2
+            });
+          }
+        }
+
+        function resize() {
+          width = window.innerWidth;
+          height = window.innerHeight;
+          canvas.width = width;
+          canvas.height = height;
+          makeParticles();
+        }
+
+        function draw() {
+          ctx.clearRect(0, 0, width, height);
+
+          for (const particle of particles) {
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            if (particle.x < 0 || particle.x > width) {
+              particle.vx *= -1;
+            }
+            if (particle.y < 0 || particle.y > height) {
+              particle.vy *= -1;
+            }
+
+            ctx.beginPath();
+            ctx.fillStyle = toRgba(settings.color, 0.85);
+            ctx.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          if (settings.bondsOn) {
+            for (let i = 0; i < particles.length; i += 1) {
+              const p1 = particles[i];
+              for (let j = i + 1; j < particles.length; j += 1) {
+                const p2 = particles[j];
+                const dx = p1.x - p2.x;
+                const dy = p1.y - p2.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance <= maxDistance) {
+                  const alpha = 0.2 * (1 - distance / maxDistance);
+                  ctx.beginPath();
+                  ctx.strokeStyle = toRgba(settings.color, alpha);
+                  ctx.lineWidth = 1;
+                  ctx.moveTo(p1.x, p1.y);
+                  ctx.lineTo(p2.x, p2.y);
+                  ctx.stroke();
+                }
+              }
+            }
+          }
+
+          rafId = requestAnimationFrame(draw);
+        }
+
+        window.updateGlobalParticlesSettings = function updateGlobalParticlesSettings() {
+          const next = currentSettings();
+          settings.color = next.color;
+          settings.bondsOn = next.bondsOn;
+        };
+
+        resize();
+        draw();
+        window.addEventListener('resize', resize);
+      })();
 
         const appContent = document.getElementById('app-content');
         // page content for each route
@@ -174,14 +307,14 @@
                     </select>
                 </div>
                 <div class="bg-white/5 p-6 rounded-2xl border border-white/10 max-w-md mt-4" style="text-align: center;">
-                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Games Particle Bonds</label>
+                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Particle Bonds</label>
                     <select onchange="changeGamesParticlesBonds(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
                       <option value="off" ${localStorage.getItem('games-particles-bonds') === 'on' ? '' : 'selected'}>Off</option>
                       <option value="on" ${localStorage.getItem('games-particles-bonds') === 'on' ? 'selected' : ''}>On</option>
                     </select>
                 </div>
                 <div class="bg-white/5 p-6 rounded-2xl border border-white/10 max-w-md mt-4" style="text-align: center;">
-                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Games Particle Color</label>
+                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Particle Color</label>
                     <input type="color" value="${localStorage.getItem('games-particles-color') || '#ffffff'}" onchange="changeGamesParticlesColor(this.value)" class="w-full h-12 bg-black border border-white/20 rounded-xl text-white outline-none">
                 </div>
               </div>

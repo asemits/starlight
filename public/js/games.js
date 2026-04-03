@@ -16,7 +16,6 @@
 		popularLoadedAt: 0,
 		overlayCleanup: null,
 		presenceCleanup: null,
-		particlesCleanup: null,
 		renderQueued: false
 	};
 
@@ -34,22 +33,6 @@
 	function getPaginationMode() {
 		const mode = localStorage.getItem("games-pagination-mode");
 		return mode === "alphabetical" ? "alphabetical" : "numbered";
-	}
-
-	function getParticleColor() {
-		return localStorage.getItem("games-particles-color") || "#ffffff";
-	}
-
-	function getParticlesBondsEnabled() {
-		return localStorage.getItem("games-particles-bonds") === "on";
-	}
-
-	function ensureHexColor(input) {
-		const value = String(input || "").trim();
-		if (/^#[0-9a-fA-F]{6}$/.test(value)) {
-			return value;
-		}
-		return "#ffffff";
 	}
 
 	async function ensureAuthReady() {
@@ -158,8 +141,44 @@
 		return url.toString();
 	}
 
+	function normalizePath(path) {
+		return decodeURIComponent(String(path || "").trim()).replace(/^\/+/, "");
+	}
+
+	function normalizeName(name) {
+		return String(name || "").trim().toLowerCase();
+	}
+
+	function normalizeImageUrl(image) {
+		const raw = String(image || "").trim();
+		if (!raw) {
+			return "";
+		}
+		if (/^(https?:|data:|blob:)/i.test(raw)) {
+			return raw;
+		}
+		try {
+			return new URL(raw, CDN_BASE).toString();
+		} catch (_error) {
+			return raw;
+		}
+	}
+
+	function thumbFallback(path) {
+		const clean = normalizePath(path).replace(/\.html$/i, "");
+		const encoded = encodeURIComponent(clean);
+		return [
+			`${CDN_BASE}${encoded}.png`,
+			`${CDN_BASE}${encoded}.jpg`,
+			"/logos/logo.png"
+		].join("|");
+	}
+
 	function findGameByPath(path) {
-		return state.games.find((game) => game.path === path) || state.popularGames.find((game) => game.path === path) || null;
+		const normalized = normalizePath(path);
+		return state.games.find((game) => normalizePath(game.path) === normalized)
+			|| state.popularGames.find((game) => normalizePath(game.path) === normalized)
+			|| null;
 	}
 
 	async function loadGames() {
@@ -181,8 +200,8 @@
 		state.games = (window.GAMES_LIST || [])
 			.map((item) => ({
 				name: item.title,
-				path: item.url,
-				image: item.image || ""
+				path: normalizePath(item.url),
+				image: normalizeImageUrl(item.image || "")
 			}))
 			.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -210,12 +229,13 @@
 				.limit(POPULAR_LIMIT)
 				.get();
 
-			const byPath = new Map(state.games.map((game) => [game.path, game]));
+			const byPath = new Map(state.games.map((game) => [normalizePath(game.path), game]));
+			const byName = new Map(state.games.map((game) => [normalizeName(game.name), game]));
 			const popular = [];
 
 			snapshot.forEach((doc) => {
 				const data = doc.data() || {};
-				const path = String(data.path || "").trim();
+				const path = normalizePath(data.path || "");
 				if (!path) {
 					return;
 				}
@@ -224,10 +244,15 @@
 					popular.push(fromList);
 					return;
 				}
+				const byGameName = byName.get(normalizeName(data.name || ""));
+				if (byGameName) {
+					popular.push(byGameName);
+					return;
+				}
 				popular.push({
 					name: String(data.name || path),
 					path,
-					image: String(data.image || "")
+					image: normalizeImageUrl(String(data.image || ""))
 				});
 			});
 
@@ -481,11 +506,12 @@
 	function gameCardMarkup(game) {
 		const stats = statsForPath(game.path);
 		const image = game.image || "";
+		const fallbacks = thumbFallback(game.path);
 		return `
 			<article class="game-card game-open-trigger" data-path="${escapeHtml(game.path)}">
 				<div class="game-card-inner">
 					<div class="game-thumb-wrap">
-						${image ? `<img class="game-thumb" src="${image}" alt="${escapeHtml(game.name)}">` : `<div class="game-thumb placeholder"></div>`}
+						${image ? `<img class="game-thumb" src="${image}" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">` : `<img class="game-thumb" src="/logos/logo.png" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">`}
 					</div>
 					<h3 class="game-name">${escapeHtml(game.name)}</h3>
 					<div class="game-mini-stats">
@@ -505,10 +531,11 @@
 	function popularCardMarkup(game, rank) {
 		const stats = statsForPath(game.path);
 		const image = game.image || "";
+		const fallbacks = thumbFallback(game.path);
 		return `
 			<article class="game-pop-card game-open-trigger" data-path="${escapeHtml(game.path)}">
 				<div class="game-pop-rank">#${rank + 1}</div>
-				${image ? `<img class="game-pop-thumb" src="${image}" alt="${escapeHtml(game.name)}">` : `<div class="game-pop-thumb"></div>`}
+				${image ? `<img class="game-pop-thumb" src="${image}" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">` : `<img class="game-pop-thumb" src="/logos/logo.png" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">`}
 				<div class="game-pop-meta">
 					<p class="game-pop-name">${escapeHtml(game.name)}</p>
 					<div class="game-pop-stats">
@@ -557,10 +584,11 @@
 		}
 
 		const stats = statsForPath(heroGame.path);
+		const heroFallbacks = thumbFallback(heroGame.path);
 		heroWrap.innerHTML = `
 			<article class="games-hero-card game-open-trigger" data-path="${escapeHtml(heroGame.path)}">
 				<div class="games-hero-media">
-					${heroGame.image ? `<img src="${heroGame.image}" class="games-hero-thumb" alt="${escapeHtml(heroGame.name)}">` : `<div class="games-hero-thumb"></div>`}
+					${heroGame.image ? `<img src="${heroGame.image}" class="games-hero-thumb" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">` : `<img src="/logos/logo.png" class="games-hero-thumb" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">`}
 					<h2 class="games-hero-name">${escapeHtml(heroGame.name)}</h2>
 				</div>
 				<div class="games-hero-stats">
@@ -760,113 +788,6 @@
 		state.overlayCleanup = cleanup;
 	}
 
-	function setupParticles(root) {
-		if (state.particlesCleanup) {
-			state.particlesCleanup();
-			state.particlesCleanup = null;
-		}
-
-		const host = root.querySelector(".games-page");
-		if (!host) {
-			return;
-		}
-
-		const canvas = document.createElement("canvas");
-		canvas.className = "games-particles";
-		host.prepend(canvas);
-		const ctx = canvas.getContext("2d");
-
-		const particles = [];
-		const maxDistance = 120;
-		let width = 0;
-		let height = 0;
-		let rafId = 0;
-
-		function makeParticles() {
-			const count = Math.max(36, Math.floor((width * height) / 18000));
-			particles.length = 0;
-			for (let i = 0; i < count; i += 1) {
-				particles.push({
-					x: Math.random() * width,
-					y: Math.random() * height,
-					vx: (Math.random() - 0.5) * 0.35,
-					vy: (Math.random() - 0.5) * 0.35,
-					r: 0.8 + Math.random() * 2.2
-				});
-			}
-		}
-
-		function resize() {
-			width = window.innerWidth;
-			height = Math.max(window.innerHeight, host.scrollHeight);
-			canvas.width = width;
-			canvas.height = height;
-			makeParticles();
-		}
-
-		function toRgba(hex, alpha) {
-			const clean = ensureHexColor(hex).slice(1);
-			const r = Number.parseInt(clean.slice(0, 2), 16);
-			const g = Number.parseInt(clean.slice(2, 4), 16);
-			const b = Number.parseInt(clean.slice(4, 6), 16);
-			return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-		}
-
-		function draw() {
-			const color = ensureHexColor(getParticleColor());
-			const bondsOn = getParticlesBondsEnabled();
-			ctx.clearRect(0, 0, width, height);
-
-			for (const p of particles) {
-				p.x += p.vx;
-				p.y += p.vy;
-				if (p.x < 0 || p.x > width) {
-					p.vx *= -1;
-				}
-				if (p.y < 0 || p.y > height) {
-					p.vy *= -1;
-				}
-				ctx.beginPath();
-				ctx.fillStyle = toRgba(color, 0.85);
-				ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-				ctx.fill();
-			}
-
-			if (bondsOn) {
-				for (let i = 0; i < particles.length; i += 1) {
-					const p1 = particles[i];
-					for (let j = i + 1; j < particles.length; j += 1) {
-						const p2 = particles[j];
-						const dx = p1.x - p2.x;
-						const dy = p1.y - p2.y;
-						const distance = Math.sqrt(dx * dx + dy * dy);
-						if (distance <= maxDistance) {
-							const alpha = 0.2 * (1 - distance / maxDistance);
-							ctx.beginPath();
-							ctx.strokeStyle = toRgba(color, alpha);
-							ctx.lineWidth = 1;
-							ctx.moveTo(p1.x, p1.y);
-							ctx.lineTo(p2.x, p2.y);
-							ctx.stroke();
-						}
-					}
-				}
-			}
-
-			rafId = requestAnimationFrame(draw);
-		}
-
-		resize();
-		draw();
-		window.addEventListener("resize", resize);
-
-		state.particlesCleanup = function cleanupParticles() {
-			cancelAnimationFrame(rafId);
-			window.removeEventListener("resize", resize);
-			canvas.remove();
-		};
-	}
-
 	function baseMarkup() {
 		return `
 			<style>
@@ -879,14 +800,7 @@
 				position: relative;
 				font-family: 'Geist', 'Oxanium', 'Montserrat', sans-serif;
 				color: var(--ink);
-				isolation: isolate;
-			}
-			.games-particles {
-				position: fixed;
-				inset: 0;
-				z-index: -1;
-				pointer-events: none;
-				opacity: 0.55;
+				z-index: 1;
 			}
 			.games-hero {
 				margin-bottom: 16px;
@@ -1110,6 +1024,7 @@
 				gap: 5px;
 				flex-wrap: wrap;
 				margin-top: 10px;
+				justify-content: center;
 			}
 			.games-page-btn {
 				border: 1px solid var(--border);
@@ -1251,8 +1166,40 @@
 				if (game) {
 					await openGame(game);
 				}
+				return;
+			}
+
+			const imageNode = target.closest("img[data-fallbacks]");
+			if (imageNode) {
+				return;
 			}
 		});
+
+		root.addEventListener("error", (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLImageElement)) {
+				return;
+			}
+			const chain = (target.dataset.fallbacks || "")
+				.split("|")
+				.map((item) => item.trim())
+				.filter(Boolean);
+			if (!chain.length) {
+				return;
+			}
+			const current = target.src;
+			const next = chain.find((candidate) => {
+				try {
+					return new URL(candidate, window.location.origin).toString() !== current;
+				} catch (_error) {
+					return candidate !== current;
+				}
+			});
+			if (next) {
+				target.dataset.fallbacks = chain.filter((item) => item !== next).join("|");
+				target.src = next;
+			}
+		}, true);
 	}
 
 	async function render() {
@@ -1294,7 +1241,6 @@
 		renderHero(root);
 		renderPopular(root);
 		renderCards(root);
-		setupParticles(root);
 	}
 
 	function mount(selector) {
