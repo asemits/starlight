@@ -61,8 +61,6 @@
 
     <script>
         const appContent = document.getElementById('app-content');
-
-        // These keys MUST match the hrefs exactly
         const pages = {
             '/': `<h1 class="text-3xl font-bold">Welcome Home</h1>`,
             '/games': `<h1 class="text-3xl font-bold">Games Section</h1>`,
@@ -134,7 +132,6 @@ h1.tools-title, .titles {
     background 0.4s ease;
 }
 
-/* Top highlight edge */
 .tool-card::after {
   content: '';
   position: absolute;
@@ -145,7 +142,6 @@ h1.tools-title, .titles {
   transition: opacity 0.4s ease;
 }
 
-/* Scanline sweep */
 .tool-card::before {
   content: '';
   position: absolute;
@@ -172,7 +168,6 @@ h1.tools-title, .titles {
     0 1px 0 rgba(255,255,255,0.15) inset;
 }
 
-/* Corner bracket top-right */
 .tool-card .corner {
   position: absolute;
   top: 12px; right: 12px;
@@ -187,7 +182,6 @@ h1.tools-title, .titles {
   border-color: rgba(255,255,255,0.7);
 }
 
-/* Corner bracket bottom-left */
 .tool-card .corner-bl {
   position: absolute;
   bottom: 12px; left: 12px;
@@ -202,7 +196,6 @@ h1.tools-title, .titles {
   border-color: rgba(255,255,255,0.7);
 }
 
-/* Bottom glow bar */
 .tool-card .glow-bar {
   position: absolute;
   bottom: 0; left: 20%; right: 20%;
@@ -287,15 +280,13 @@ h1.tools-title, .titles {
 <h1 class="tools-title"><i class="fa-solid fa-shapes"></i>‎ ‎ Apps</h1>
 
 <br>
- 
-<h1 class="titles">Trending 🔥</h1>
 
 <div class="cards-container">
 
     <a href="soundboard.html" class="tool-card" style="animation-delay: 0.35s;">
         <i class="fa-solid fa-volume-high"></i>
         <h2>Soundboard</h2>
-        <p class="card-desc">Trigger custom sound effects on demand. Perfect for calls, streams, or just fun.</p>
+        <p class="card-desc">Play sound effects</p>
         <div class="glow-bar"></div>
     </a>
 </div>`,
@@ -311,14 +302,14 @@ h1.tools-title, .titles {
     <br>
     <h1 style="display:flex; justify-content:center;">10000 SOUNDS!</h1>
     <div id="controls">
-        <button id="toggleFavorites" class="control-button favorites-toggle">⭐ Favorites: OFF</button>
-        <button id="toggleButton" class="control-button overlap-toggle">🔇 Overlap: OFF</button>
-        <button id="stopButton" class="control-button stop-button">⏹️ Stop All Sounds</button>
-        <input id="searchInput" type="text" placeholder="Search Our Buttons">
+        <button id="toggleFavorites" class="control-button favorites-toggle">Favorites: OFF</button>
+        <button id="toggleButton" class="control-button overlap-toggle">Overlap: OFF</button>
+        <button id="stopButton" class="control-button stop-button">Stop All Sounds</button>
+        <input id="searchInput" type="text" placeholder="Search buttons">
     </div>
     <div id="soundboard"></div>`,
 
-            '404': `<h1 class="text-3xl font-bold text-red-500">404 - Not Found</h1>`
+            '404': `<h1 class="text-3xl font-bold text-red-500">404 Not Found</h1>`
         };
 
         function router() {
@@ -334,18 +325,14 @@ h1.tools-title, .titles {
                 e.preventDefault(); 
                 const url = link.getAttribute('href');
 
-                // Update the URL bar
                 window.history.pushState({}, '', url);
                 
-                // Update the content
                 router();
             }
         });
 
-        // Listen for back/forward buttons
         window.addEventListener('popstate', router);
 
-        // Initial page load
         window.addEventListener('DOMContentLoaded', router);
     </script>
 </body>
