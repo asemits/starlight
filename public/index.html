@@ -83,6 +83,7 @@
         }
 
         const appContent = document.getElementById('app-content');
+        // page content for each route
         const pages = {
             '/': `
               <h1 class="text-3xl font-bold">Home</h1>
@@ -355,28 +356,22 @@
           <h1 class="text-3xl font-bold text-red-500">404 Not Found</h1>
           `
         };
-
         function router() {
             const path = window.location.pathname;
             console.log("Current Pathname:", path);
             appContent.innerHTML = pages[path] || pages['404'];
         }
-
         document.addEventListener('click', (e) => {
             const link = e.target.closest('.nav-link');
-            
             if (link) {
                 e.preventDefault(); 
                 const url = link.getAttribute('href');
                 window.history.pushState({}, '', url);
-                
                 router();
             }
         });
-
         window.addEventListener('popstate', router);
-
         window.addEventListener('DOMContentLoaded', router);
     </script>
-</body>
+  </body>
 </html>
