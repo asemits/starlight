@@ -108,13 +108,13 @@ body[data-side="right"] .sidebar .sidebar-logo {
   padding: 0 8px;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 10px;
 }
 
 body[data-side="left"] .sidebar ul, 
 body[data-side="right"] .sidebar ul {
   flex-direction: column;
-  gap: 2px;
+  gap: 10px;
 }
 
 body[data-side="left"] .sidebar li a,
