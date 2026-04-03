@@ -43,7 +43,6 @@
         opacity: 0.55;
       }
 
-      #sidebar,
       #app-content {
         position: relative;
         z-index: 1;
@@ -270,6 +269,17 @@
         resize();
         draw();
         window.addEventListener('resize', resize);
+      })();
+
+      (function registerCachingServiceWorker() {
+        if (!('serviceWorker' in navigator)) {
+          return;
+        }
+        const isDev = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+        const swPath = isDev ? '/public/sw.js' : '/sw.js';
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register(swPath).catch(() => {});
+        });
       })();
 
         const appContent = document.getElementById('app-content');

@@ -3,6 +3,7 @@
 	const PAGE_SIZE = 18;
 	const POPULAR_LIMIT = 10;
 	const POPULAR_REFRESH_MS = 15000;
+	const GAME_LIST_CACHE_KEY = "starlight-games-list-v1";
 
 	const state = {
 		mountSelector: "#games-root",
@@ -18,6 +19,8 @@
 		presenceCleanup: null,
 		renderQueued: false
 	};
+
+	let gameListRefreshPromise = null;
 
 	function queueRender() {
 		if (state.renderQueued) {
@@ -164,6 +167,80 @@
 		}
 	}
 
+	function readCachedGameList() {
+		try {
+			const raw = localStorage.getItem(GAME_LIST_CACHE_KEY);
+			if (!raw) {
+				return null;
+			}
+			const parsed = JSON.parse(raw);
+			if (!Array.isArray(parsed) || parsed.length === 0) {
+				return null;
+			}
+			return parsed;
+		} catch (_error) {
+			return null;
+		}
+	}
+
+	function writeCachedGameList(list) {
+		try {
+			const compact = list.map((item) => {
+				const safeImage = typeof item.image === "string" && item.image.startsWith("data:") ? "" : (item.image || "");
+				return {
+					title: item.title || item.name || "",
+					url: item.url || item.path || "",
+					image: safeImage
+				};
+			});
+			localStorage.setItem(GAME_LIST_CACHE_KEY, JSON.stringify(compact));
+		} catch (_error) {
+		}
+	}
+
+	function applyGameList(list) {
+		state.games = (list || [])
+			.map((item) => ({
+				name: item.title || item.name || "",
+				path: normalizePath(item.url || item.path),
+				image: normalizeImageUrl(item.image || "")
+			}))
+			.filter((item) => item.name && item.path)
+			.sort((a, b) => a.name.localeCompare(b.name));
+		state.ready = state.games.length > 0;
+	}
+
+	function loadGameListScript() {
+		return new Promise((resolve, reject) => {
+			const script = document.createElement("script");
+			const isDev = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
+			script.src = isDev ? "/public/gameslist.js" : "/gameslist.js";
+			script.onload = resolve;
+			script.onerror = reject;
+			document.head.appendChild(script);
+		});
+	}
+
+	function refreshGameListInBackground() {
+		if (gameListRefreshPromise) {
+			return;
+		}
+
+		gameListRefreshPromise = loadGameListScript()
+			.then(() => {
+				if (Array.isArray(window.GAMES_LIST) && window.GAMES_LIST.length > 0) {
+					applyGameList(window.GAMES_LIST);
+					writeCachedGameList(window.GAMES_LIST);
+					queueRender();
+				}
+			})
+			.catch(() => {
+			})
+			.finally(() => {
+				gameListRefreshPromise = null;
+			});
+	}
+
 	function thumbFallback(path) {
 		const clean = normalizePath(path).replace(/\.html$/i, "");
 		const encoded = encodeURIComponent(clean);
@@ -186,26 +263,22 @@
 			return;
 		}
 
-		if (!window.GAMES_LIST) {
-			await new Promise((resolve, reject) => {
-				const script = document.createElement("script");
-				const isDev = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
-				script.src = isDev ? "/public/gameslist.js" : "/gameslist.js";
-				script.onload = resolve;
-				script.onerror = reject;
-				document.head.appendChild(script);
-			});
+		if (Array.isArray(window.GAMES_LIST) && window.GAMES_LIST.length > 0) {
+			applyGameList(window.GAMES_LIST);
+			writeCachedGameList(window.GAMES_LIST);
+			return;
 		}
 
-		state.games = (window.GAMES_LIST || [])
-			.map((item) => ({
-				name: item.title,
-				path: normalizePath(item.url),
-				image: normalizeImageUrl(item.image || "")
-			}))
-			.sort((a, b) => a.name.localeCompare(b.name));
+		const cached = readCachedGameList();
+		if (cached && cached.length > 0) {
+			applyGameList(cached);
+			refreshGameListInBackground();
+			return;
+		}
 
-		state.ready = true;
+		await loadGameListScript();
+		applyGameList(window.GAMES_LIST || []);
+		writeCachedGameList(window.GAMES_LIST || []);
 	}
 
 	async function loadPopularGames(force) {
