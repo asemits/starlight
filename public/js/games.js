@@ -205,14 +205,8 @@
 		return state.statsCache.get(path) || { plays: 0, uniqueClicks: 0, thumbsUp: 0, thumbsDown: 0, myRating: 0 };
 	}
 
-	async function createGameBlobUrl(gamePath) {
-		const sourceUrl = `${CDN_BASE}${encodeURI(gamePath)}`;
-		const response = await fetch(sourceUrl, { cache: "no-store" });
-		if (!response.ok) {
-			throw new Error(`Failed to load game source: ${response.status}`);
-		}
-		const html = await response.text();
-		return URL.createObjectURL(new Blob([html], { type: "text/html" }));
+	function createGameRunnerUrl(gamePath) {
+		return `/game-runner.html?path=${encodeURIComponent(gamePath)}`;
 	}
 
 	async function ensureStats(paths) {
@@ -569,14 +563,7 @@
 		}
 
 		state.activeGame = game;
-		let frameUrl = `${CDN_BASE}${encodeURI(game.path)}`;
-		let frameBlobUrl = null;
-		try {
-			frameBlobUrl = await createGameBlobUrl(game.path);
-			frameUrl = frameBlobUrl;
-		} catch (error) {
-			console.warn("Falling back to direct game URL", error);
-		}
+		const frameUrl = createGameRunnerUrl(game.path);
 
 		const overlay = document.createElement("div");
 		overlay.className = "game-overlay";
@@ -644,14 +631,8 @@
 			cleanup();
 		});
 
-		overlay.querySelector("#new-tab").addEventListener("click", async () => {
-			try {
-				const newTabBlobUrl = await createGameBlobUrl(game.path);
-				window.open(newTabBlobUrl, "_blank", "noopener,noreferrer");
-				setTimeout(() => URL.revokeObjectURL(newTabBlobUrl), 120000);
-			} catch (_err) {
-				window.open(`${CDN_BASE}${encodeURI(game.path)}`, "_blank", "noopener,noreferrer");
-			}
+		overlay.querySelector("#new-tab").addEventListener("click", () => {
+			window.open(createGameRunnerUrl(game.path), "_blank", "noopener,noreferrer");
 		});
 
 		overlay.querySelector("#full-screen").addEventListener("click", async () => {
@@ -678,9 +659,6 @@
 		function cleanup() {
 			if (unsubscribe) {
 				unsubscribe();
-			}
-			if (frameBlobUrl) {
-				URL.revokeObjectURL(frameBlobUrl);
 			}
 			cancelAnimationFrame(rafId);
 			overlay.remove();

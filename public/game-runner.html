@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Runner</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+    }
+    .runner-error {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      text-align: center;
+      padding: 24px;
+      box-sizing: border-box;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="runner-error" id="runner-status">Loading game...</div>
+  <script>
+    (async function () {
+      const CDN_BASE = "https://cdn.jsdelivr.net/gh/asemits/starlight-games@main/";
+      const status = document.getElementById("runner-status");
+      const params = new URLSearchParams(window.location.search);
+      const gamePath = params.get("path") || "";
+
+      if (!gamePath || !/^[A-Za-z0-9 _().,'!+\-]+\.html$/.test(gamePath)) {
+        status.textContent = "Invalid game path.";
+        return;
+      }
+
+      try {
+        const sourceUrl = CDN_BASE + encodeURI(gamePath);
+        const response = await fetch(sourceUrl, { cache: "no-store" });
+        if (!response.ok) {
+          status.textContent = "Failed to load game source.";
+          return;
+        }
+
+        let html = await response.text();
+        const baseTag = '<base href="' + CDN_BASE + '">';
+
+        if (/<head[^>]*>/i.test(html)) {
+          html = html.replace(/<head([^>]*)>/i, '<head$1>' + baseTag);
+        } else {
+          html = '<head>' + baseTag + '</head>' + html;
+        }
+
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (_error) {
+        status.textContent = "Unable to start this game right now.";
+      }
+    })();
+  </script>
+</body>
+</html>
