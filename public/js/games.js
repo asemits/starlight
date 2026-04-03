@@ -6,7 +6,7 @@
 	const PAGE_SIZE = 18;
 	const POPULAR_LIMIT = 10;
 	const POPULAR_REFRESH_MS = 15000;
-	const GAME_LIST_CACHE_KEY = "starlight-games-list-v3";
+	const GAME_LIST_CACHE_KEY = "starlight-games-list-v4";
 
 	const state = {
 		mountSelector: "#games-root",
@@ -172,6 +172,12 @@
 		return String(name || "").trim().toLowerCase();
 	}
 
+	function gameIdentity(path, sourceBase) {
+		const normalizedPath = normalizePath(path).toLowerCase();
+		const normalizedBase = normalizeSourceBase(sourceBase);
+		return `${normalizedBase}|${normalizedPath}`;
+	}
+
 	function normalizeSourceBase(sourceBase) {
 		const input = String(sourceBase || "").trim();
 		const found = CDN_BASES.find((base) => base === input || base.replace(/\/$/, "") === input.replace(/\/$/, ""));
@@ -210,23 +216,23 @@
 	}
 
 	function dedupeGames(list) {
-		const byPath = new Map();
+		const byIdentity = new Map();
 		for (const game of list || []) {
 			const rawPath = game ? (game.url || game.path) : "";
 			if (!rawPath) {
 				continue;
 			}
-			const key = normalizePath(rawPath).toLowerCase();
-			if (!byPath.has(key)) {
-				byPath.set(key, game);
+			const key = gameIdentity(rawPath, game.sourceBase);
+			if (!byIdentity.has(key)) {
+				byIdentity.set(key, game);
 				continue;
 			}
-			const existing = byPath.get(key);
+			const existing = byIdentity.get(key);
 			if (!existing.image && game.image) {
-				byPath.set(key, game);
+				byIdentity.set(key, game);
 			}
 		}
-		return Array.from(byPath.values());
+		return Array.from(byIdentity.values());
 	}
 
 	function readCachedGameList() {
@@ -388,10 +394,10 @@
 		});
 	}
 
-	function findGameByPath(path) {
-		const normalized = normalizePath(path);
-		return state.games.find((game) => normalizePath(game.path) === normalized)
-			|| state.popularGames.find((game) => normalizePath(game.path) === normalized)
+	function findGame(path, sourceBase) {
+		const target = gameIdentity(path, sourceBase);
+		return state.games.find((game) => gameIdentity(game.path, game.sourceBase) === target)
+			|| state.popularGames.find((game) => gameIdentity(game.path, game.sourceBase) === target)
 			|| null;
 	}
 
@@ -717,7 +723,7 @@
 		const image = game.image || "";
 		const fallbacks = thumbFallback(game.path, game.sourceBase);
 		return `
-			<article class="game-card game-open-trigger" data-path="${escapeHtml(game.path)}">
+			<article class="game-card game-open-trigger" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}">
 				<div class="game-card-inner">
 					<div class="game-thumb-wrap">
 						${image ? `<img class="game-thumb" src="${image}" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">` : `<img class="game-thumb" src="/logos/logo.png" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">`}
@@ -729,8 +735,8 @@
 						${statIcon("fa-user-group", stats.currentPlayers, "Currently Playing")}
 					</div>
 					<div class="game-card-actions">
-						<button type="button" class="rate-btn ${stats.myRating === 1 ? "active" : ""}" data-action="rate" data-path="${escapeHtml(game.path)}" data-rate="1"><i class="fa-solid fa-thumbs-up"></i><span>${stats.thumbsUp}</span></button>
-						<button type="button" class="rate-btn ${stats.myRating === -1 ? "active" : ""}" data-action="rate" data-path="${escapeHtml(game.path)}" data-rate="-1"><i class="fa-solid fa-thumbs-down"></i><span>${stats.thumbsDown}</span></button>
+						<button type="button" class="rate-btn ${stats.myRating === 1 ? "active" : ""}" data-action="rate" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}" data-rate="1"><i class="fa-solid fa-thumbs-up"></i><span>${stats.thumbsUp}</span></button>
+						<button type="button" class="rate-btn ${stats.myRating === -1 ? "active" : ""}" data-action="rate" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}" data-rate="-1"><i class="fa-solid fa-thumbs-down"></i><span>${stats.thumbsDown}</span></button>
 					</div>
 				</div>
 			</article>
@@ -742,7 +748,7 @@
 		const image = game.image || "";
 		const fallbacks = thumbFallback(game.path, game.sourceBase);
 		return `
-			<article class="game-pop-card game-open-trigger" data-path="${escapeHtml(game.path)}">
+			<article class="game-pop-card game-open-trigger" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}">
 				<div class="game-pop-rank">#${rank + 1}</div>
 				${image ? `<img class="game-pop-thumb" src="${image}" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">` : `<img class="game-pop-thumb" src="/logos/logo.png" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">`}
 				<div class="game-pop-meta">
@@ -795,7 +801,7 @@
 		const stats = statsForPath(heroGame.path);
 		const heroFallbacks = thumbFallback(heroGame.path, heroGame.sourceBase);
 		heroWrap.innerHTML = `
-			<article class="games-hero-card game-open-trigger" data-path="${escapeHtml(heroGame.path)}">
+			<article class="games-hero-card game-open-trigger" data-path="${escapeHtml(heroGame.path)}" data-base="${escapeHtml(normalizeSourceBase(heroGame.sourceBase))}">
 				<div class="games-hero-media">
 					${heroGame.image ? `<img src="${heroGame.image}" class="games-hero-thumb" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">` : `<img src="/logos/logo.png" class="games-hero-thumb" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">`}
 					<h2 class="games-hero-name">${escapeHtml(heroGame.name)}</h2>
@@ -885,9 +891,18 @@
 	}
 
 	async function openGame(game) {
-		await trackPlay(game);
-		await ensureStats([game.path]);
-		await loadPopularGames(true);
+		try {
+			await trackPlay(game);
+		} catch (_error) {
+		}
+		try {
+			await ensureStats([game.path]);
+		} catch (_error) {
+		}
+		try {
+			await loadPopularGames(true);
+		} catch (_error) {
+		}
 
 		if (state.overlayCleanup) {
 			state.overlayCleanup();
@@ -1366,8 +1381,9 @@
 			if (rateButton) {
 				event.stopPropagation();
 				const path = rateButton.getAttribute("data-path") || "";
+				const sourceBase = rateButton.getAttribute("data-base") || PRIMARY_CDN_BASE;
 				const rating = Number(rateButton.getAttribute("data-rate") || "0");
-				const game = findGameByPath(path);
+				const game = findGame(path, sourceBase);
 				if (game) {
 					await setRating(game, rating);
 					renderHero(root);
@@ -1394,9 +1410,13 @@
 			const openTrigger = target.closest(".game-open-trigger");
 			if (openTrigger) {
 				const path = openTrigger.getAttribute("data-path") || "";
-				const game = findGameByPath(path);
+				const sourceBase = openTrigger.getAttribute("data-base") || PRIMARY_CDN_BASE;
+				const game = findGame(path, sourceBase);
 				if (game) {
-					await openGame(game);
+					try {
+						await openGame(game);
+					} catch (_error) {
+					}
 				}
 				return;
 			}
