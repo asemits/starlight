@@ -134,17 +134,29 @@
 </div>
   <script>
     (async function () {
-      const CDN_BASE = "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy/";
+      const DEFAULT_CDN_BASE = "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy@main/";
+      const ALLOWED_CDN_BASES = [
+        "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy@main/",
+        "https://cdn.jsdelivr.net/gh/asemits/starlight-games@main/"
+      ];
       const status = document.getElementById("runner-status");
       const params = new URLSearchParams(window.location.search);
       const gamePath = params.get("path") || "";
+      const requestedBase = params.get("base") || DEFAULT_CDN_BASE;
+
+      function normalizeBase(base) {
+        const input = String(base || "").trim().replace(/\/+$/, "") + "/";
+        return ALLOWED_CDN_BASES.find((allowed) => allowed === input) || DEFAULT_CDN_BASE;
+      }
+
+      const CDN_BASE = normalizeBase(requestedBase);
 
       function buildGameInterfaceShim(baseHref) {
         const safeBase = JSON.stringify(baseHref || CDN_BASE);
         return '<script>(function(){if(window.GameInterface&&typeof window.GameInterface.init==="function"){return;}var baseHref=' + safeBase + ';function absoluteUrl(file){try{return new URL(file,baseHref).toString();}catch(_e){return file;}}function loadFiles(files){var list=Array.isArray(files)?files:[files];return list.reduce(function(chain,file){return chain.then(function(){if(!file){return Promise.resolve();}var name=String(file);if(/\.css(\?|#|$)/i.test(name)){return new Promise(function(resolve){var link=document.createElement("link");link.rel="stylesheet";link.href=absoluteUrl(name);link.onload=function(){resolve();};link.onerror=function(){resolve();};document.head.appendChild(link);});}return new Promise(function(resolve){var script=document.createElement("script");script.src=absoluteUrl(name);script.onload=function(){resolve();};script.onerror=function(){resolve();};document.head.appendChild(script);});});},Promise.resolve());}window.GameInterface={init:function(files){return loadFiles(files);},trackEvent:function(){return Promise.resolve();},setGameData:function(){return Promise.resolve();},showInterstitial:function(){return Promise.resolve(false);},showRewarded:function(){return Promise.resolve(false);},gameReady:function(){return Promise.resolve();},gameStart:function(){return Promise.resolve();},gameComplete:function(){return Promise.resolve();},gameOver:function(){return Promise.resolve();},gamePause:function(){return Promise.resolve();},gameResume:function(){return Promise.resolve();},sendScore:function(){return Promise.resolve();},onAudioStateChange:function(){return Promise.resolve();},onMuteStateChange:function(){return Promise.resolve();},onPauseStateChange:function(){return Promise.resolve();},isMuted:function(){return false;},isPaused:function(){return false;}};})();<\/script>';
       }
 
-      if (!gamePath || !/^[A-Za-z0-9 _().,'!+\-]+\.html$/.test(gamePath)) {
+      if (!gamePath || gamePath.includes("..") || !/^[A-Za-z0-9/_ ().,'!+\-]+\.html$/.test(gamePath)) {
         status.textContent = "Invalid game path.";
         return;
       }

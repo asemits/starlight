@@ -1,9 +1,12 @@
 (function () {
-	const CDN_BASE = "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy@main/";
+	const PRIMARY_CDN_BASE = "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy@main/";
+	const SECONDARY_CDN_BASE = "https://cdn.jsdelivr.net/gh/asemits/starlight-games@main/";
+	const CDN_BASES = [PRIMARY_CDN_BASE, SECONDARY_CDN_BASE];
+	const SECONDARY_TREE_API = "https://api.github.com/repos/asemits/starlight-games/git/trees/main?recursive=1";
 	const PAGE_SIZE = 18;
 	const POPULAR_LIMIT = 10;
 	const POPULAR_REFRESH_MS = 15000;
-	const GAME_LIST_CACHE_KEY = "starlight-games-list-v1";
+	const GAME_LIST_CACHE_KEY = "starlight-games-list-v2";
 
 	const state = {
 		mountSelector: "#games-root",
@@ -137,11 +140,12 @@
 		};
 	}
 
-	function createGameRunnerUrl(gamePath) {
+	function createGameRunnerUrl(gamePath, sourceBase) {
 		const isDev = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
 		const base = isDev ? "/public/loader.html" : "/loader.html";
 		const url = new URL(base, window.location.origin);
 		url.searchParams.set("path", gamePath);
+		url.searchParams.set("base", sourceBase || PRIMARY_CDN_BASE);
 		return url.toString();
 	}
 
@@ -153,19 +157,60 @@
 		return String(name || "").trim().toLowerCase();
 	}
 
-	function normalizeImageUrl(image) {
+	function normalizeSourceBase(sourceBase) {
+		const input = String(sourceBase || "").trim();
+		const found = CDN_BASES.find((base) => base === input || base.replace(/\/$/, "") === input.replace(/\/$/, ""));
+		return found || PRIMARY_CDN_BASE;
+	}
+
+	function normalizeImageUrl(image, sourceBase) {
 		const raw = String(image || "").trim();
 		if (!raw) {
 			return "";
+		}
+		if (raw.startsWith("/")) {
+			return raw;
 		}
 		if (/^(https?:|data:|blob:)/i.test(raw)) {
 			return raw;
 		}
 		try {
-			return new URL(raw, CDN_BASE).toString();
+			return new URL(raw, normalizeSourceBase(sourceBase)).toString();
 		} catch (_error) {
 			return raw;
 		}
+	}
+
+	function filenameToTitle(filePath) {
+		const file = String(filePath || "").split("/").pop() || "";
+		const base = file.replace(/\.html$/i, "");
+		const decoded = decodeURIComponent(base).replaceAll(/[_-]+/g, " ").trim();
+		if (!decoded) {
+			return "Untitled Game";
+		}
+		return decoded
+			.split(" ")
+			.map((word) => (word ? word.charAt(0).toUpperCase() + word.slice(1) : ""))
+			.join(" ");
+	}
+
+	function dedupeGames(list) {
+		const byPath = new Map();
+		for (const game of list || []) {
+			if (!game || !game.path) {
+				continue;
+			}
+			const key = normalizePath(game.path).toLowerCase();
+			if (!byPath.has(key)) {
+				byPath.set(key, game);
+				continue;
+			}
+			const existing = byPath.get(key);
+			if (!existing.image && game.image) {
+				byPath.set(key, game);
+			}
+		}
+		return Array.from(byPath.values());
 	}
 
 	function readCachedGameList() {
@@ -191,7 +236,8 @@
 				return {
 					title: item.title || item.name || "",
 					url: item.url || item.path || "",
-					image: safeImage
+					image: safeImage,
+					sourceBase: normalizeSourceBase(item.sourceBase)
 				};
 			});
 			localStorage.setItem(GAME_LIST_CACHE_KEY, JSON.stringify(compact));
@@ -200,11 +246,12 @@
 	}
 
 	function applyGameList(list) {
-		state.games = (list || [])
+		state.games = dedupeGames(list || [])
 			.map((item) => ({
 				name: item.title || item.name || "",
 				path: normalizePath(item.url || item.path),
-				image: normalizeImageUrl(item.image || "")
+				sourceBase: normalizeSourceBase(item.sourceBase),
+				image: normalizeImageUrl(item.image || "", item.sourceBase)
 			}))
 			.filter((item) => item.name && item.path)
 			.sort((a, b) => a.name.localeCompare(b.name));
@@ -222,16 +269,56 @@
 		});
 	}
 
+	async function fetchSecondaryGames() {
+		try {
+			const response = await fetch(SECONDARY_TREE_API, { cache: "force-cache" });
+			if (!response.ok) {
+				return [];
+			}
+			const data = await response.json();
+			const tree = Array.isArray(data.tree) ? data.tree : [];
+			return tree
+				.filter((item) => item && item.type === "blob" && /\.html$/i.test(item.path || ""))
+				.filter((item) => !/\/(?:index|404)\.html$/i.test(item.path || "") && !/^(?:index|404)\.html$/i.test(item.path || ""))
+				.map((item) => ({
+					title: filenameToTitle(item.path),
+					url: normalizePath(item.path),
+					image: "",
+					sourceBase: SECONDARY_CDN_BASE
+				}));
+		} catch (_error) {
+			return [];
+		}
+	}
+
+	async function buildCombinedGameList() {
+		let primary = [];
+		try {
+			await loadGameListScript();
+			primary = (Array.isArray(window.GAMES_LIST) ? window.GAMES_LIST : []).map((item) => ({
+				title: item.title,
+				url: item.url,
+				image: item.image || "",
+				sourceBase: PRIMARY_CDN_BASE
+			}));
+		} catch (_error) {
+			primary = [];
+		}
+
+		const secondary = await fetchSecondaryGames();
+		return dedupeGames([...primary, ...secondary]);
+	}
+
 	function refreshGameListInBackground() {
 		if (gameListRefreshPromise) {
 			return;
 		}
 
-		gameListRefreshPromise = loadGameListScript()
-			.then(() => {
-				if (Array.isArray(window.GAMES_LIST) && window.GAMES_LIST.length > 0) {
-					applyGameList(window.GAMES_LIST);
-					writeCachedGameList(window.GAMES_LIST);
+		gameListRefreshPromise = buildCombinedGameList()
+			.then((combined) => {
+				if (combined.length > 0) {
+					applyGameList(combined);
+					writeCachedGameList(combined);
 					queueRender();
 				}
 			})
@@ -242,12 +329,16 @@
 			});
 	}
 
-	function thumbFallback(path) {
+	function thumbFallback(path, sourceBase) {
 		const clean = normalizePath(path).replace(/\.html$/i, "");
 		const encoded = encodeURIComponent(clean);
+		const primary = normalizeSourceBase(sourceBase);
+		const secondary = CDN_BASES.find((base) => base !== primary) || SECONDARY_CDN_BASE;
 		return [
-			`${CDN_BASE}${encoded}.png`,
-			`${CDN_BASE}${encoded}.jpg`,
+			`${primary}${encoded}.png`,
+			`${primary}${encoded}.jpg`,
+			`${secondary}${encoded}.png`,
+			`${secondary}${encoded}.jpg`,
 			"/logos/logo.png"
 		].join("|");
 	}
@@ -272,7 +363,7 @@
 			if (game.image) {
 				warmImageUrl(game.image);
 			}
-			const fallbackChain = thumbFallback(game.path)
+			const fallbackChain = thumbFallback(game.path, game.sourceBase)
 				.split("|")
 				.map((item) => item.trim())
 				.filter(Boolean)
@@ -293,12 +384,6 @@
 			return;
 		}
 
-		if (Array.isArray(window.GAMES_LIST) && window.GAMES_LIST.length > 0) {
-			applyGameList(window.GAMES_LIST);
-			writeCachedGameList(window.GAMES_LIST);
-			return;
-		}
-
 		const cached = readCachedGameList();
 		if (cached && cached.length > 0) {
 			applyGameList(cached);
@@ -306,9 +391,9 @@
 			return;
 		}
 
-		await loadGameListScript();
-		applyGameList(window.GAMES_LIST || []);
-		writeCachedGameList(window.GAMES_LIST || []);
+		const combined = await buildCombinedGameList();
+		applyGameList(combined);
+		writeCachedGameList(combined);
 	}
 
 	async function loadPopularGames(force) {
@@ -355,7 +440,8 @@
 				popular.push({
 					name: String(data.name || path),
 					path,
-					image: normalizeImageUrl(String(data.image || ""))
+					sourceBase: normalizeSourceBase(data.sourceBase),
+					image: normalizeImageUrl(String(data.image || ""), data.sourceBase)
 				});
 			});
 
@@ -432,6 +518,7 @@
 				tx.set(refs.statsRef, {
 					name: game.name,
 					path: game.path,
+					sourceBase: normalizeSourceBase(game.sourceBase),
 					image: game.image,
 					plays: 0,
 					uniqueClicks: 0,
@@ -448,6 +535,7 @@
 				updatedAt: now,
 				name: game.name,
 				path: game.path,
+				sourceBase: normalizeSourceBase(game.sourceBase),
 				image: game.image
 			}, { merge: true });
 
@@ -486,6 +574,7 @@
 				tx.set(refs.statsRef, {
 					name: game.name,
 					path: game.path,
+					sourceBase: normalizeSourceBase(game.sourceBase),
 					image: game.image,
 					plays: 0,
 					uniqueClicks: 0,
@@ -501,6 +590,7 @@
 			const increment = firebase.firestore.FieldValue.increment;
 
 			tx.set(refs.statsRef, {
+				sourceBase: normalizeSourceBase(game.sourceBase),
 				thumbsUp: increment(thumbsUpDelta),
 				thumbsDown: increment(thumbsDownDelta),
 				updatedAt: now
@@ -609,7 +699,7 @@
 	function gameCardMarkup(game) {
 		const stats = statsForPath(game.path);
 		const image = game.image || "";
-		const fallbacks = thumbFallback(game.path);
+		const fallbacks = thumbFallback(game.path, game.sourceBase);
 		return `
 			<article class="game-card game-open-trigger" data-path="${escapeHtml(game.path)}">
 				<div class="game-card-inner">
@@ -634,7 +724,7 @@
 	function popularCardMarkup(game, rank) {
 		const stats = statsForPath(game.path);
 		const image = game.image || "";
-		const fallbacks = thumbFallback(game.path);
+		const fallbacks = thumbFallback(game.path, game.sourceBase);
 		return `
 			<article class="game-pop-card game-open-trigger" data-path="${escapeHtml(game.path)}">
 				<div class="game-pop-rank">#${rank + 1}</div>
@@ -687,7 +777,7 @@
 		}
 
 		const stats = statsForPath(heroGame.path);
-		const heroFallbacks = thumbFallback(heroGame.path);
+		const heroFallbacks = thumbFallback(heroGame.path, heroGame.sourceBase);
 		heroWrap.innerHTML = `
 			<article class="games-hero-card game-open-trigger" data-path="${escapeHtml(heroGame.path)}">
 				<div class="games-hero-media">
@@ -787,7 +877,7 @@
 			state.overlayCleanup();
 		}
 
-		const frameUrl = createGameRunnerUrl(game.path);
+		const frameUrl = createGameRunnerUrl(game.path, game.sourceBase);
 		const overlay = document.createElement("div");
 		overlay.className = "game-overlay";
 		overlay.innerHTML = `
@@ -867,7 +957,7 @@
 		});
 
 		overlay.querySelector("#new-tab").addEventListener("click", () => {
-			window.open(createGameRunnerUrl(game.path), "_blank", "noopener,noreferrer");
+			window.open(createGameRunnerUrl(game.path, game.sourceBase), "_blank", "noopener,noreferrer");
 		});
 
 		overlay.querySelector("#full-screen").addEventListener("click", async () => {
@@ -1335,10 +1425,6 @@
 		}
 
 		const authReady = await ensureAuthReady();
-		if (!authReady) {
-			root.innerHTML = '<div class="text-2xl text-red-400">Enable Anonymous sign-in in Firebase Authentication to use ratings and stats.</div>';
-			return;
-		}
 
 		if (!state.ready) {
 			root.innerHTML = '<div class="text-2xl">Loading games...</div>';
