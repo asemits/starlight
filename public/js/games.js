@@ -197,10 +197,11 @@
 	function dedupeGames(list) {
 		const byPath = new Map();
 		for (const game of list || []) {
-			if (!game || !game.path) {
+			const rawPath = game ? (game.url || game.path) : "";
+			if (!rawPath) {
 				continue;
 			}
-			const key = normalizePath(game.path).toLowerCase();
+			const key = normalizePath(rawPath).toLowerCase();
 			if (!byPath.has(key)) {
 				byPath.set(key, game);
 				continue;
