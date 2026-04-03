@@ -66,6 +66,7 @@ body[data-side="left"] .sidebar {
   flex-direction: column;
   padding: 8px 0;
   border-radius: 30px;
+  min-width: 0;
 }
 
 body[data-side="right"] .sidebar {
@@ -79,6 +80,7 @@ body[data-side="right"] .sidebar {
   flex-direction: column;
   padding: 8px 0;
   border-radius: 30px;
+  min-width: 0;
 }
 
 .sidebar:hover {
