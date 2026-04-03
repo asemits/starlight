@@ -49,16 +49,34 @@
         }
 
         let html = await response.text();
-        const baseTag = '<base href="' + CDN_BASE + '">';
-        html = html.replace(
-          /<script[^>]*src=["'][^"']*game-interface\.js[^"']*["'][^>]*>\s*<\/script>/gi,
-          '<script>window.GameInterface=window.GameInterface||{init:function(){return Promise.resolve();},trackEvent:function(){return Promise.resolve();},setGameData:function(){return Promise.resolve();},showInterstitial:function(){return Promise.resolve(false);},showRewarded:function(){return Promise.resolve(false);}};<\/script>'
-        );
-
-        if (/<head[^>]*>/i.test(html)) {
-          html = html.replace(/<head([^>]*)>/i, '<head$1>' + baseTag);
+        let effectiveBase = CDN_BASE;
+        const baseMatch = html.match(/<base[^>]*href=["']([^"']+)["'][^>]*>/i);
+        if (baseMatch && baseMatch[1]) {
+          effectiveBase = baseMatch[1];
         } else {
-          html = '<head>' + baseTag + '</head>' + html;
+          const baseTag = '<base href="' + CDN_BASE + '">';
+          if (/<head[^>]*>/i.test(html)) {
+            html = html.replace(/<head([^>]*)>/i, '<head$1>' + baseTag);
+          } else {
+            html = '<head>' + baseTag + '</head>' + html;
+          }
+        }
+
+        const giScriptRegex = /<script[^>]*src=["']([^"']*game-interface\.js[^"']*)["'][^>]*>\s*<\/script>/gi;
+        const giMatches = [...html.matchAll(giScriptRegex)];
+        for (const match of giMatches) {
+          const srcValue = match[1];
+          let replacement = '<script>window.GameInterface=window.GameInterface||{init:function(){return Promise.resolve();},trackEvent:function(){return Promise.resolve();},setGameData:function(){return Promise.resolve();},showInterstitial:function(){return Promise.resolve(false);},showRewarded:function(){return Promise.resolve(false);}};<\/script>';
+          try {
+            const resolvedUrl = new URL(srcValue, effectiveBase).toString();
+            const giResponse = await fetch(resolvedUrl, { cache: "no-store" });
+            if (giResponse.ok) {
+              const giCode = await giResponse.text();
+              replacement = '<script>' + giCode.replace(/<\/script>/gi, '<\\/script>') + '<\/script>';
+            }
+          } catch (_error) {
+          }
+          html = html.replace(match[0], replacement);
         }
 
         document.open();
