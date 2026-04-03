@@ -52,7 +52,7 @@
         const baseTag = '<base href="' + CDN_BASE + '">';
         html = html.replace(
           /<script[^>]*src=["'][^"']*game-interface\.js[^"']*["'][^>]*>\s*<\/script>/gi,
-          '<script>window.GameInterface=window.GameInterface||{init:function(){},trackEvent:function(){},setGameData:function(){},showInterstitial:function(){},showRewarded:function(){}};<\/script>'
+          '<script>window.GameInterface=window.GameInterface||{init:function(){return Promise.resolve();},trackEvent:function(){return Promise.resolve();},setGameData:function(){return Promise.resolve();},showInterstitial:function(){return Promise.resolve(false);},showRewarded:function(){return Promise.resolve(false);}};<\/script>'
         );
 
         if (/<head[^>]*>/i.test(html)) {
