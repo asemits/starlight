@@ -17,6 +17,7 @@
 		popularLoadedAt: 0,
 		overlayCleanup: null,
 		presenceCleanup: null,
+		warmedImages: new Set(),
 		renderQueued: false
 	};
 
@@ -249,6 +250,35 @@
 			`${CDN_BASE}${encoded}.jpg`,
 			"/logos/logo.png"
 		].join("|");
+	}
+
+	function warmImageUrl(url) {
+		const src = normalizeImageUrl(url);
+		if (!src || state.warmedImages.has(src)) {
+			return;
+		}
+		state.warmedImages.add(src);
+		const img = new Image();
+		img.loading = "eager";
+		img.decoding = "async";
+		img.src = src;
+	}
+
+	function warmGameImages(games) {
+		(games || []).forEach((game) => {
+			if (!game) {
+				return;
+			}
+			if (game.image) {
+				warmImageUrl(game.image);
+			}
+			const fallbackChain = thumbFallback(game.path)
+				.split("|")
+				.map((item) => item.trim())
+				.filter(Boolean)
+				.slice(0, 2);
+			fallbackChain.forEach((item) => warmImageUrl(item));
+		});
 	}
 
 	function findGameByPath(path) {
@@ -584,7 +614,7 @@
 			<article class="game-card game-open-trigger" data-path="${escapeHtml(game.path)}">
 				<div class="game-card-inner">
 					<div class="game-thumb-wrap">
-						${image ? `<img class="game-thumb" src="${image}" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">` : `<img class="game-thumb" src="/logos/logo.png" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">`}
+						${image ? `<img class="game-thumb" src="${image}" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">` : `<img class="game-thumb" src="/logos/logo.png" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">`}
 					</div>
 					<h3 class="game-name">${escapeHtml(game.name)}</h3>
 					<div class="game-mini-stats">
@@ -608,7 +638,7 @@
 		return `
 			<article class="game-pop-card game-open-trigger" data-path="${escapeHtml(game.path)}">
 				<div class="game-pop-rank">#${rank + 1}</div>
-				${image ? `<img class="game-pop-thumb" src="${image}" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">` : `<img class="game-pop-thumb" src="/logos/logo.png" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">`}
+				${image ? `<img class="game-pop-thumb" src="${image}" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">` : `<img class="game-pop-thumb" src="/logos/logo.png" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">`}
 				<div class="game-pop-meta">
 					<p class="game-pop-name">${escapeHtml(game.name)}</p>
 					<div class="game-pop-stats">
@@ -661,7 +691,7 @@
 		heroWrap.innerHTML = `
 			<article class="games-hero-card game-open-trigger" data-path="${escapeHtml(heroGame.path)}">
 				<div class="games-hero-media">
-					${heroGame.image ? `<img src="${heroGame.image}" class="games-hero-thumb" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">` : `<img src="/logos/logo.png" class="games-hero-thumb" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">`}
+					${heroGame.image ? `<img src="${heroGame.image}" class="games-hero-thumb" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">` : `<img src="/logos/logo.png" class="games-hero-thumb" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">`}
 					<h2 class="games-hero-name">${escapeHtml(heroGame.name)}</h2>
 				</div>
 				<div class="games-hero-stats">
@@ -691,7 +721,7 @@
 		`;
 	}
 
-	function renderCards(root) {
+	function renderCards(root, animate) {
 		const list = currentFilteredGames();
 		const visible = getVisibleGames();
 
@@ -701,15 +731,32 @@
 		}
 
 		const grid = root.querySelector("#games-grid");
-		if (grid) {
-			grid.innerHTML = visible.map((game) => gameCardMarkup(game)).join("");
+		const nav = root.querySelector("#games-pagination");
+
+		const applyDom = () => {
+			if (grid) {
+				grid.innerHTML = visible.map((game) => gameCardMarkup(game)).join("");
+			}
+
+			if (nav) {
+				nav.className = getPaginationMode() === "alphabetical" ? "games-alpha-nav" : "games-page-nav";
+				nav.innerHTML = paginationMarkup(list.length);
+			}
+		};
+
+		if (!animate) {
+			applyDom();
+			return;
 		}
 
-		const nav = root.querySelector("#games-pagination");
-		if (nav) {
-			nav.className = getPaginationMode() === "alphabetical" ? "games-alpha-nav" : "games-page-nav";
-			nav.innerHTML = paginationMarkup(list.length);
-		}
+		const targets = [grid, nav].filter(Boolean);
+		targets.forEach((node) => node.classList.add("cards-switching"));
+		window.setTimeout(() => {
+			applyDom();
+			requestAnimationFrame(() => {
+				targets.forEach((node) => node.classList.remove("cards-switching"));
+			});
+		}, 95);
 	}
 
 	function renderOverlayStats(overlay, path) {
@@ -1007,6 +1054,7 @@
 				display: grid;
 				grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 				gap: 10px;
+				transition: opacity 0.14s ease, transform 0.14s ease;
 			}
 			.game-card {
 				border-radius: 12px;
@@ -1098,6 +1146,11 @@
 				flex-wrap: wrap;
 				margin-top: 10px;
 				justify-content: center;
+				transition: opacity 0.14s ease, transform 0.14s ease;
+			}
+			.cards-switching {
+				opacity: 0.25;
+				transform: translateY(8px);
 			}
 			.games-page-btn {
 				border: 1px solid var(--border);
@@ -1193,7 +1246,7 @@
 			if (target.id === "games-search") {
 				state.search = target.value || "";
 				state.page = 1;
-				renderCards(root);
+				renderCards(root, false);
 			}
 		});
 
@@ -1213,7 +1266,7 @@
 					await setRating(game, rating);
 					renderHero(root);
 					renderPopular(root);
-					renderCards(root);
+					renderCards(root, false);
 				}
 				return;
 			}
@@ -1221,14 +1274,14 @@
 			const pageButton = target.closest("[data-action='page']");
 			if (pageButton) {
 				state.page = Number(pageButton.getAttribute("data-page") || "1");
-				renderCards(root);
+				renderCards(root, true);
 				return;
 			}
 
 			const letterButton = target.closest("[data-action='letter']");
 			if (letterButton) {
 				state.letter = letterButton.getAttribute("data-letter") || "A";
-				renderCards(root);
+				renderCards(root, true);
 				return;
 			}
 
@@ -1307,13 +1360,19 @@
 			...extra.map((game) => game.path),
 			hero ? hero.path : ""
 		].filter(Boolean))];
+
+		warmGameImages([
+			hero,
+			...extra.slice(0, 10),
+			...visible.slice(0, 24)
+		].filter(Boolean));
 		await ensureStats(paths);
 
 		root.innerHTML = baseMarkup();
 		bindEvents(root);
 		renderHero(root);
 		renderPopular(root);
-		renderCards(root);
+		renderCards(root, false);
 	}
 
 	function mount(selector) {
