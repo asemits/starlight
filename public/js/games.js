@@ -756,7 +756,7 @@
 			requestAnimationFrame(() => {
 				targets.forEach((node) => node.classList.remove("cards-switching"));
 			});
-		}, 95);
+		}, 135);
 	}
 
 	function renderOverlayStats(overlay, path) {
@@ -1054,7 +1054,7 @@
 				display: grid;
 				grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 				gap: 10px;
-				transition: opacity 0.14s ease, transform 0.14s ease;
+				transition: opacity 0.24s ease, transform 0.24s ease;
 			}
 			.game-card {
 				border-radius: 12px;
@@ -1146,7 +1146,7 @@
 				flex-wrap: wrap;
 				margin-top: 10px;
 				justify-content: center;
-				transition: opacity 0.14s ease, transform 0.14s ease;
+				transition: opacity 0.24s ease, transform 0.24s ease;
 			}
 			.cards-switching {
 				opacity: 0.25;

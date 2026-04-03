@@ -48,7 +48,7 @@
         z-index: 1;
         opacity: 1;
         transform: translateY(0);
-        transition: opacity 0.18s ease, transform 0.18s ease;
+        transition: opacity 0.28s ease, transform 0.28s ease;
       }
 
       #app-content.route-exit {
@@ -171,6 +171,21 @@
         if (window.location.pathname === '/games' && window.StarlightGames) {
           window.StarlightGames.render();
         }
+      }
+
+      function switchSettingsCategory(category) {
+        document.querySelectorAll('[data-settings-tab]').forEach((button) => {
+          const active = button.getAttribute('data-settings-tab') === category;
+          button.classList.toggle('bg-white/15', active);
+          button.classList.toggle('border-white/30', active);
+          button.classList.toggle('text-white', active);
+          button.classList.toggle('text-gray-300', !active);
+        });
+
+        document.querySelectorAll('[data-settings-panel]').forEach((panel) => {
+          const show = panel.getAttribute('data-settings-panel') === category;
+          panel.classList.toggle('hidden', !show);
+        });
       }
 
       (function initGlobalParticles() {
@@ -311,44 +326,53 @@
               <h1 class="text-3xl font-bold">Social</h1>
             `,
             '/settings': `
-              <div class="p-8 max-w-5xl mx-auto">
+              <div class="p-8 max-w-6xl mx-auto">
                 <h1 class="text-3xl font-bold font-orbitron mb-6">Settings</h1>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <section class="bg-white/5 p-6 rounded-2xl border border-white/10">
-                    <h2 class="text-sm text-gray-300 uppercase tracking-[0.2em] mb-4">Layout</h2>
-                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Sidebar Position</label>
-                    <select onchange="changeSidebarPos(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                      <option value="top" ${localStorage.getItem('sidebar-pos') === 'top' ? 'selected' : ''}>Top</option>
-                      <option value="bottom" ${localStorage.getItem('sidebar-pos') === 'bottom' ? 'selected' : ''}>Bottom</option>
-                      <option value="left" ${localStorage.getItem('sidebar-pos') === 'left' ? 'selected' : ''}>Left</option>
-                      <option value="right" ${localStorage.getItem('sidebar-pos') === 'right' ? 'selected' : ''}>Right</option>
-                    </select>
-                  </section>
+                <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
+                  <aside class="bg-white/5 p-4 rounded-2xl border border-white/10 h-fit">
+                    <button type="button" data-settings-tab="layout" onclick="switchSettingsCategory('layout')" class="w-full text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 bg-white/15 border-white/30 text-white mb-2 transition">Layout</button>
+                    <button type="button" data-settings-tab="games" onclick="switchSettingsCategory('games')" class="w-full text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 mb-2 transition">Games</button>
+                    <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="w-full text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition">Particles</button>
+                  </aside>
 
-                  <section class="bg-white/5 p-6 rounded-2xl border border-white/10">
-                    <h2 class="text-sm text-gray-300 uppercase tracking-[0.2em] mb-4">Games</h2>
-                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Games Pagination</label>
-                    <select onchange="changeGamesPaginationMode(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                      <option value="numbered" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? '' : 'selected'}>Numbered</option>
-                      <option value="alphabetical" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? 'selected' : ''}>Alphabetical</option>
-                    </select>
-                  </section>
+                  <section>
+                    <div data-settings-panel="layout" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <label class="block mb-2 text-sm text-gray-300">Sidebar Position</label>
+                        <select onchange="changeSidebarPos(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                          <option value="top" ${localStorage.getItem('sidebar-pos') === 'top' ? 'selected' : ''}>Top</option>
+                          <option value="bottom" ${localStorage.getItem('sidebar-pos') === 'bottom' ? 'selected' : ''}>Bottom</option>
+                          <option value="left" ${localStorage.getItem('sidebar-pos') === 'left' ? 'selected' : ''}>Left</option>
+                          <option value="right" ${localStorage.getItem('sidebar-pos') === 'right' ? 'selected' : ''}>Right</option>
+                        </select>
+                      </article>
+                    </div>
 
-                  <section class="bg-white/5 p-6 rounded-2xl border border-white/10">
-                    <h2 class="text-sm text-gray-300 uppercase tracking-[0.2em] mb-4">Particles</h2>
-                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Particle Bonds</label>
-                    <select onchange="changeGamesParticlesBonds(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                      <option value="off" ${localStorage.getItem('games-particles-bonds') === 'on' ? '' : 'selected'}>Off</option>
-                      <option value="on" ${localStorage.getItem('games-particles-bonds') === 'on' ? 'selected' : ''}>On</option>
-                    </select>
-                  </section>
+                    <div data-settings-panel="games" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <label class="block mb-2 text-sm text-gray-300">Games Pagination</label>
+                        <select onchange="changeGamesPaginationMode(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                          <option value="numbered" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? '' : 'selected'}>Numbered</option>
+                          <option value="alphabetical" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? 'selected' : ''}>Alphabetical</option>
+                        </select>
+                      </article>
+                    </div>
 
-                  <section class="bg-white/5 p-6 rounded-2xl border border-white/10">
-                    <h2 class="text-sm text-gray-300 uppercase tracking-[0.2em] mb-4">Particles</h2>
-                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Particle Color</label>
-                    <input type="color" value="${localStorage.getItem('games-particles-color') || '#ffffff'}" onchange="changeGamesParticlesColor(this.value)" class="w-full h-12 bg-black border border-white/20 rounded-xl text-white outline-none">
-                  </section>
+                    <div data-settings-panel="particles" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <label class="block mb-2 text-sm text-gray-300">Particle Bonds</label>
+                        <select onchange="changeGamesParticlesBonds(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                          <option value="off" ${localStorage.getItem('games-particles-bonds') === 'on' ? '' : 'selected'}>Off</option>
+                          <option value="on" ${localStorage.getItem('games-particles-bonds') === 'on' ? 'selected' : ''}>On</option>
+                        </select>
+                      </article>
 
+                      <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <label class="block mb-2 text-sm text-gray-300">Particle Color</label>
+                        <input type="color" value="${localStorage.getItem('games-particles-color') || '#ffffff'}" onchange="changeGamesParticlesColor(this.value)" class="w-full h-12 bg-black border border-white/20 rounded-xl text-white outline-none">
+                      </article>
+                    </div>
+                  </section>
                 </div>
               </div>
             `,
@@ -601,7 +625,7 @@
 
             const token = ++routeToken;
             appContent.classList.add('route-exit');
-            await new Promise((resolve) => setTimeout(resolve, 120));
+            await new Promise((resolve) => setTimeout(resolve, 170));
             if (token !== routeToken) {
               return;
             }
@@ -612,6 +636,10 @@
             requestAnimationFrame(() => {
               appContent.classList.remove('route-enter');
             });
+
+          if (path === '/settings') {
+            switchSettingsCategory('layout');
+          }
 
           if (path === '/games' && window.StarlightGames) {
             window.StarlightGames.mount('#games-root');
