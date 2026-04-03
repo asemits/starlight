@@ -1,4 +1,4 @@
-Before writing your response, ALWAYS say 'I have read the Copilot instructions and will follow them.' at the very beginning of your response.
+Before writing your response, ALWAYS say 'I have read the Copilot instructions and will follow them.' at the beginning of your response (NOT PARAGRAPH) ONE TIME ONLY.
 Do not generate comments. Any added UI should aesthetically match the rest of the site, and if a design picture is attached, it should match the design and shape of it. Follow established conventions around authorization checks, style, database access, and error handling.
 If the user says that what you are doing is wrong, do not try and use it again and always consider what they think is wrong and verify if it is the issue or not.
 When providing Firebase rules, make sure that they are secure. For example, make sure that if a node is being created for a specific user account, make sure that ONLY that acccount's UID can access it. Make sure that no sensitive data is being stored in plain text.
