@@ -25,6 +25,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/main.js" type="module"></script>
     <script src="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/sounds.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <!-- css -->
     <link rel="stylesheet" href="css/sidebar.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -73,7 +75,21 @@
         </ul>
     </nav>
     <div id="app-content" class="p-8 pt-24"></div>
+    <script src="js/games.js"></script>
     <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyAaOp3LYoMGbByON7W7pGQYV_oXJlmU_Hw",
+        authDomain: "starlight-28e40.firebaseapp.com",
+        projectId: "starlight-28e40",
+        storageBucket: "starlight-28e40.firebasestorage.app",
+        messagingSenderId: "206859310211",
+        appId: "1:206859310211:web:3450cfa9fae7f6360a77b6",
+        measurementId: "G-G52TDH6GRY"
+      };
+
+      const firebaseApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+      window.starlightDb = firebaseApp.firestore();
+
         const savedSidebarPos = localStorage.getItem('sidebar-pos') || 'top';
         document.body.setAttribute('data-side', savedSidebarPos);
 
@@ -82,6 +98,13 @@
             localStorage.setItem('sidebar-pos', newPos);
         }
 
+      function changeGamesPaginationMode(newMode) {
+        localStorage.setItem('games-pagination-mode', newMode);
+        if (window.location.pathname === '/games' && window.StarlightGames) {
+          window.StarlightGames.render();
+        }
+      }
+
         const appContent = document.getElementById('app-content');
         // page content for each route
         const pages = {
@@ -89,7 +112,7 @@
               <h1 class="text-3xl font-bold">Home</h1>
             `,
             '/games': `
-              <h1 class="text-3xl font-bold">Games</h1>
+              <div id="games-root"></div>
             `,
             '/proxy': `
               <h1 class="text-3xl font-bold">Proxy</h1>
@@ -107,6 +130,13 @@
                      <option value="bottom" ${localStorage.getItem('sidebar-pos') === 'bottom' ? 'selected' : ''}>Bottom</option>
                      <option value="left" ${localStorage.getItem('sidebar-pos') === 'left' ? 'selected' : ''}>Left</option>
                      <option value="right" ${localStorage.getItem('sidebar-pos') === 'right' ? 'selected' : ''}>Right</option>
+                    </select>
+                </div>
+                <div class="bg-white/5 p-6 rounded-2xl border border-white/10 max-w-md mt-4" style="text-align: center;">
+                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Games Pagination</label>
+                    <select onchange="changeGamesPaginationMode(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                      <option value="numbered" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? '' : 'selected'}>Numbered</option>
+                      <option value="alphabetical" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? 'selected' : ''}>Alphabetical</option>
                     </select>
                 </div>
               </div>
@@ -360,6 +390,9 @@
             const path = window.location.pathname;
             console.log("Current Pathname:", path);
             appContent.innerHTML = pages[path] || pages['404'];
+          if (path === '/games' && window.StarlightGames) {
+            window.StarlightGames.mount('#games-root');
+          }
         }
         document.addEventListener('click', (e) => {
             const link = e.target.closest('.nav-link');
@@ -374,4 +407,4 @@
         window.addEventListener('DOMContentLoaded', router);
     </script>
   </body>
-</html>
+</html> 
