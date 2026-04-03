@@ -123,6 +123,22 @@
         }
       }
 
+      function changeGamesParticlesBonds(newValue) {
+        const value = newValue === 'on' ? 'on' : 'off';
+        localStorage.setItem('games-particles-bonds', value);
+        if (window.location.pathname === '/games' && window.StarlightGames) {
+          window.StarlightGames.render();
+        }
+      }
+
+      function changeGamesParticlesColor(newColor) {
+        const valid = /^#[0-9a-fA-F]{6}$/.test(newColor) ? newColor : '#ffffff';
+        localStorage.setItem('games-particles-color', valid);
+        if (window.location.pathname === '/games' && window.StarlightGames) {
+          window.StarlightGames.render();
+        }
+      }
+
         const appContent = document.getElementById('app-content');
         // page content for each route
         const pages = {
@@ -156,6 +172,17 @@
                       <option value="numbered" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? '' : 'selected'}>Numbered</option>
                       <option value="alphabetical" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? 'selected' : ''}>Alphabetical</option>
                     </select>
+                </div>
+                <div class="bg-white/5 p-6 rounded-2xl border border-white/10 max-w-md mt-4" style="text-align: center;">
+                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Games Particle Bonds</label>
+                    <select onchange="changeGamesParticlesBonds(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                      <option value="off" ${localStorage.getItem('games-particles-bonds') === 'on' ? '' : 'selected'}>Off</option>
+                      <option value="on" ${localStorage.getItem('games-particles-bonds') === 'on' ? 'selected' : ''}>On</option>
+                    </select>
+                </div>
+                <div class="bg-white/5 p-6 rounded-2xl border border-white/10 max-w-md mt-4" style="text-align: center;">
+                    <label class="block mb-2 text-sm text-gray-400 uppercase tracking-widest">Games Particle Color</label>
+                    <input type="color" value="${localStorage.getItem('games-particles-color') || '#ffffff'}" onchange="changeGamesParticlesColor(this.value)" class="w-full h-12 bg-black border border-white/20 rounded-xl text-white outline-none">
                 </div>
               </div>
             `,
