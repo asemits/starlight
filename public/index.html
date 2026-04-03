@@ -26,6 +26,7 @@
     <script src="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/main.js" type="module"></script>
     <script src="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/sounds.js" type="module"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <!-- css -->
     <link rel="stylesheet" href="css/sidebar.css">
@@ -88,7 +89,24 @@
       };
 
       const firebaseApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+      window.starlightAuth = firebaseApp.auth();
       window.starlightDb = firebaseApp.firestore();
+
+      window.starlightAuthReady = new Promise((resolve, reject) => {
+        const unsubscribe = window.starlightAuth.onAuthStateChanged(async (user) => {
+          if (user) {
+            unsubscribe();
+            resolve(user);
+            return;
+          }
+          try {
+            await window.starlightAuth.signInAnonymously();
+          } catch (error) {
+            console.error("Anonymous auth failed. Enable Anonymous sign-in in Firebase Auth.", error);
+            reject(error);
+          }
+        });
+      });
 
         const savedSidebarPos = localStorage.getItem('sidebar-pos') || 'top';
         document.body.setAttribute('data-side', savedSidebarPos);

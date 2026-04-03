@@ -1,7 +1,6 @@
 (function () {
 	const CDN_BASE = "https://cdn.jsdelivr.net/gh/asemits/starlight-games@main/";
 	const TREE_API = "https://api.github.com/repos/asemits/starlight-games/git/trees/main?recursive=1";
-	const DEVICE_ID_KEY = "starlight-device-id";
 	const PAGE_SIZE = 18;
 
 	const state = {
@@ -17,13 +16,24 @@
 		overlayCleanup: null
 	};
 
-	function getDeviceId() {
-		let id = localStorage.getItem(DEVICE_ID_KEY);
-		if (!id) {
-			id = `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-			localStorage.setItem(DEVICE_ID_KEY, id);
+	async function ensureAuthReady() {
+		if (!window.starlightAuth) {
+			return false;
 		}
-		return id;
+
+		if (window.starlightAuth.currentUser) {
+			return true;
+		}
+
+		if (window.starlightAuthReady) {
+			try {
+				await window.starlightAuthReady;
+			} catch (_err) {
+				return false;
+			}
+		}
+
+		return Boolean(window.starlightAuth.currentUser);
 	}
 
 	function getPaginationMode() {
@@ -48,12 +58,16 @@
 		if (!window.starlightDb) {
 			return null;
 		}
+		const uid = window.starlightAuth && window.starlightAuth.currentUser ? window.starlightAuth.currentUser.uid : null;
+		if (!uid) {
+			return null;
+		}
 		const db = window.starlightDb;
 		const gameId = pathToDocId(path);
 		return {
 			gameId,
 			statsRef: db.collection("gameStats").doc(gameId),
-			playerRef: db.collection("gameStats").doc(gameId).collection("players").doc(getDeviceId())
+			playerRef: db.collection("gameStats").doc(gameId).collection("players").doc(uid)
 		};
 	}
 
@@ -192,6 +206,11 @@
 	}
 
 	async function ensureStats(paths) {
+		const authReady = await ensureAuthReady();
+		if (!authReady) {
+			return;
+		}
+
 		const refs = paths
 			.filter((path) => !state.statsCache.has(path))
 			.map((path) => ({ path, refs: statRefs(path) }))
@@ -218,6 +237,11 @@
 	}
 
 	async function trackPlay(game) {
+		const authReady = await ensureAuthReady();
+		if (!authReady) {
+			return;
+		}
+
 		const refs = statRefs(game.path);
 		if (!refs) {
 			return;
@@ -258,6 +282,11 @@
 	}
 
 	async function setRating(game, rating) {
+		const authReady = await ensureAuthReady();
+		if (!authReady) {
+			return;
+		}
+
 		const refs = statRefs(game.path);
 		if (!refs) {
 			return;
@@ -661,6 +690,12 @@
 	async function render() {
 		const root = document.querySelector(state.mountSelector);
 		if (!root) {
+			return;
+		}
+
+		const authReady = await ensureAuthReady();
+		if (!authReady) {
+			root.innerHTML = '<div class="text-2xl text-red-400">Enable Anonymous sign-in in Firebase Authentication to use ratings and stats.</div>';
 			return;
 		}
 
