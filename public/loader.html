@@ -151,12 +151,51 @@
 
       const CDN_BASE = normalizeBase(requestedBase);
 
+      function normalizeGamePath(path) {
+        const raw = String(path || "").trim();
+        if (!raw) {
+          return "";
+        }
+
+        let decoded = "";
+        try {
+          decoded = decodeURIComponent(raw).replace(/^\/+/, "");
+        } catch (_error) {
+          decoded = raw.replace(/^\/+/, "");
+        }
+        const lower = decoded.toLowerCase();
+        if (!lower.endsWith(".html")) {
+          return "";
+        }
+        if (decoded.includes("\\")) {
+          return "";
+        }
+        if (decoded.includes("://") || decoded.startsWith("//")) {
+          return "";
+        }
+
+        const segments = decoded.split("/");
+        if (segments.some((segment) => !segment || segment === "." || segment === "..")) {
+          return "";
+        }
+
+        return decoded;
+      }
+
+      function encodePath(path) {
+        return String(path || "")
+          .split("/")
+          .map((segment) => encodeURIComponent(segment))
+          .join("/");
+      }
+
       function buildGameInterfaceShim(baseHref) {
         const safeBase = JSON.stringify(baseHref || CDN_BASE);
         return '<script>(function(){if(window.GameInterface&&typeof window.GameInterface.init==="function"){return;}var baseHref=' + safeBase + ';function absoluteUrl(file){try{return new URL(file,baseHref).toString();}catch(_e){return file;}}function loadFiles(files){var list=Array.isArray(files)?files:[files];return list.reduce(function(chain,file){return chain.then(function(){if(!file){return Promise.resolve();}var name=String(file);if(/\.css(\?|#|$)/i.test(name)){return new Promise(function(resolve){var link=document.createElement("link");link.rel="stylesheet";link.href=absoluteUrl(name);link.onload=function(){resolve();};link.onerror=function(){resolve();};document.head.appendChild(link);});}return new Promise(function(resolve){var script=document.createElement("script");script.src=absoluteUrl(name);script.onload=function(){resolve();};script.onerror=function(){resolve();};document.head.appendChild(script);});});},Promise.resolve());}window.GameInterface={init:function(files){return loadFiles(files);},trackEvent:function(){return Promise.resolve();},setGameData:function(){return Promise.resolve();},showInterstitial:function(){return Promise.resolve(false);},showRewarded:function(){return Promise.resolve(false);},gameReady:function(){return Promise.resolve();},gameStart:function(){return Promise.resolve();},gameComplete:function(){return Promise.resolve();},gameOver:function(){return Promise.resolve();},gamePause:function(){return Promise.resolve();},gameResume:function(){return Promise.resolve();},sendScore:function(){return Promise.resolve();},onAudioStateChange:function(){return Promise.resolve();},onMuteStateChange:function(){return Promise.resolve();},onPauseStateChange:function(){return Promise.resolve();},isMuted:function(){return false;},isPaused:function(){return false;}};})();<\/script>';
       }
 
-      if (!gamePath || gamePath.includes("..") || !/^[A-Za-z0-9/_ ().,'!+\-]+\.html$/.test(gamePath)) {
+      const normalizedGamePath = normalizeGamePath(gamePath);
+      if (!normalizedGamePath) {
         status.textContent = "Invalid game path.";
         return;
       }
@@ -168,17 +207,22 @@ function showError(msg) {
       }
 
       try {
-        const sourceUrl = CDN_BASE + encodeURI(gamePath);
+        const sourceUrl = new URL(encodePath(normalizedGamePath), CDN_BASE).toString();
+        const gameDirUrl = sourceUrl.slice(0, sourceUrl.lastIndexOf("/") + 1);
         const response = await fetch(sourceUrl, { cache: "no-store" });
         if (!response.ok) { showError("Failed to load game source."); return; }
 
         let html = await response.text();
-        let effectiveBase = CDN_BASE;
+        let effectiveBase = gameDirUrl;
         const baseMatch = html.match(/<base[^>]*href=["']([^"']+)["'][^>]*>/i);
         if (baseMatch && baseMatch[1]) {
-          effectiveBase = baseMatch[1];
+          try {
+            effectiveBase = new URL(baseMatch[1], gameDirUrl).toString();
+          } catch (_error) {
+            effectiveBase = gameDirUrl;
+          }
         } else {
-          const baseTag = '<base href="' + CDN_BASE + '">';
+          const baseTag = '<base href="' + gameDirUrl + '">';
           if (/<head[^>]*>/i.test(html)) {
             html = html.replace(/<head([^>]*)>/i, '<head$1>' + baseTag);
           } else {

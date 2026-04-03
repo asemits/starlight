@@ -6,7 +6,7 @@
 	const PAGE_SIZE = 18;
 	const POPULAR_LIMIT = 10;
 	const POPULAR_REFRESH_MS = 15000;
-	const GAME_LIST_CACHE_KEY = "starlight-games-list-v2";
+	const GAME_LIST_CACHE_KEY = "starlight-games-list-v3";
 
 	const state = {
 		mountSelector: "#games-root",
@@ -150,7 +150,22 @@
 	}
 
 	function normalizePath(path) {
-		return decodeURIComponent(String(path || "").trim()).replace(/^\/+/, "");
+		const raw = String(path || "").trim();
+		if (!raw) {
+			return "";
+		}
+		try {
+			return decodeURIComponent(raw).replace(/^\/+/, "");
+		} catch (_error) {
+			return raw.replace(/^\/+/, "");
+		}
+	}
+
+	function encodePath(path) {
+		return normalizePath(path)
+			.split("/")
+			.map((segment) => encodeURIComponent(segment))
+			.join("/");
 	}
 
 	function normalizeName(name) {
@@ -332,7 +347,7 @@
 
 	function thumbFallback(path, sourceBase) {
 		const clean = normalizePath(path).replace(/\.html$/i, "");
-		const encoded = encodeURIComponent(clean);
+		const encoded = encodePath(clean);
 		const primary = normalizeSourceBase(sourceBase);
 		const secondary = CDN_BASES.find((base) => base !== primary) || SECONDARY_CDN_BASE;
 		return [
