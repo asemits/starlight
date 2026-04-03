@@ -60,7 +60,7 @@ body[data-side="left"] .sidebar {
   top: 50%;
   left: 20px;
   transform: translateY(-50%);
-  width: 60px;
+  width: fit-content;
   height: auto;
   min-height: 0;
   flex-direction: column;
@@ -74,7 +74,7 @@ body[data-side="right"] .sidebar {
   right: 20px;
   left: auto;
   transform: translateY(-50%);
-  width: 60px;
+  width: fit-content;
   height: auto;
   min-height: 0;
   flex-direction: column;
