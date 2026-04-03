@@ -191,7 +191,7 @@
 
       function buildGameInterfaceShim(baseHref) {
         const safeBase = JSON.stringify(baseHref || CDN_BASE);
-        return '<script>(function(){if(window.GameInterface&&typeof window.GameInterface.init==="function"){return;}var baseHref=' + safeBase + ';function absoluteUrl(file){try{return new URL(file,baseHref).toString();}catch(_e){return file;}}function loadFiles(files){var list=Array.isArray(files)?files:[files];return list.reduce(function(chain,file){return chain.then(function(){if(!file){return Promise.resolve();}var name=String(file);if(/\.css(\?|#|$)/i.test(name)){return new Promise(function(resolve){var link=document.createElement("link");link.rel="stylesheet";link.href=absoluteUrl(name);link.onload=function(){resolve();};link.onerror=function(){resolve();};document.head.appendChild(link);});}return new Promise(function(resolve){var script=document.createElement("script");script.src=absoluteUrl(name);script.onload=function(){resolve();};script.onerror=function(){resolve();};document.head.appendChild(script);});});},Promise.resolve());}window.GameInterface={init:function(files){return loadFiles(files);},trackEvent:function(){return Promise.resolve();},setGameData:function(){return Promise.resolve();},showInterstitial:function(){return Promise.resolve(false);},showRewarded:function(){return Promise.resolve(false);},gameReady:function(){return Promise.resolve();},gameStart:function(){return Promise.resolve();},gameComplete:function(){return Promise.resolve();},gameOver:function(){return Promise.resolve();},gamePause:function(){return Promise.resolve();},gameResume:function(){return Promise.resolve();},sendScore:function(){return Promise.resolve();},onAudioStateChange:function(){return Promise.resolve();},onMuteStateChange:function(){return Promise.resolve();},onPauseStateChange:function(){return Promise.resolve();},isMuted:function(){return false;},isPaused:function(){return false;}};})();<\/script>';
+        return '<script>(function(){if(window.GameInterface&&typeof window.GameInterface.init==="function"){return;}var baseHref=' + safeBase + ';function absoluteUrl(file){try{return new URL(file,baseHref).toString();}catch(_e){return file;}}function loadFiles(files){var list=Array.isArray(files)?files:[files];return Promise.all(list.filter(Boolean).map(function(file){var name=String(file);if(/\\.css(\\?|#|$)/i.test(name)){return new Promise(function(resolve){var link=document.createElement("link");link.rel="stylesheet";link.href=absoluteUrl(name);link.onload=resolve;link.onerror=resolve;document.head.appendChild(link);});}return new Promise(function(resolve){var script=document.createElement("script");script.src=absoluteUrl(name);script.onload=resolve;script.onerror=resolve;document.head.appendChild(script);});}));}window.GameInterface={init:function(files){return loadFiles(files);},trackEvent:function(){return Promise.resolve();},setGameData:function(){return Promise.resolve();},showInterstitial:function(){return Promise.resolve(false);},showRewarded:function(){return Promise.resolve(false);},gameReady:function(){return Promise.resolve();},gameStart:function(){return Promise.resolve();},gameComplete:function(){return Promise.resolve();},gameOver:function(){return Promise.resolve();},gamePause:function(){return Promise.resolve();},gameResume:function(){return Promise.resolve();},sendScore:function(){return Promise.resolve();},onAudioStateChange:function(){return Promise.resolve();},onMuteStateChange:function(){return Promise.resolve();},onPauseStateChange:function(){return Promise.resolve();},isMuted:function(){return false;},isPaused:function(){return false;}};})();<\/script>';
       }
 
       const normalizedGamePath = normalizeGamePath(gamePath);
@@ -235,23 +235,6 @@ function showError(msg) {
           html = html.replace(/<head([^>]*)>/i, '<head$1>' + shimTag);
         } else {
           html = '<head>' + shimTag + '</head>' + html;
-        }
-
-        const giScriptRegex = /<script[^>]*src=["']([^"']*game-interface\.js[^"']*)["'][^>]*>\s*<\/script>/gi;
-        const giMatches = [...html.matchAll(giScriptRegex)];
-        for (const match of giMatches) {
-          const srcValue = match[1];
-          let replacement = '';
-          try {
-            const resolvedUrl = new URL(srcValue, effectiveBase).toString();
-            const giResponse = await fetch(resolvedUrl, { cache: "no-store" });
-            if (giResponse.ok) {
-              const giCode = await giResponse.text();
-              replacement = '<script>' + giCode.replace(/<\/script>/gi, '<\\/script>') + '<\/script>';
-            }
-          } catch (_error) {
-          }
-          html = html.replace(match[0], replacement);
         }
 
         document.open();

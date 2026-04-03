@@ -6,7 +6,7 @@
 	const PAGE_SIZE = 18;
 	const POPULAR_LIMIT = 10;
 	const POPULAR_REFRESH_MS = 15000;
-	const GAME_LIST_CACHE_KEY = "starlight-games-list-v4";
+	const GAME_LIST_CACHE_KEY = "starlight-games-list-v5";
 
 	const state = {
 		mountSelector: "#games-root",
@@ -205,7 +205,13 @@
 	function filenameToTitle(filePath) {
 		const file = String(filePath || "").split("/").pop() || "";
 		const base = file.replace(/\.html$/i, "");
-		const decoded = decodeURIComponent(base).replaceAll(/[_-]+/g, " ").trim();
+		const decoded = decodeURIComponent(base)
+			.replaceAll(/[_-]+/g, " ")
+			.replaceAll(/([a-z])([A-Z])/g, "$1 $2")
+			.replaceAll(/([A-Za-z])(\d)/g, "$1 $2")
+			.replaceAll(/(\d)([A-Za-z])/g, "$1 $2")
+			.replaceAll(/\s+/g, " ")
+			.trim();
 		if (!decoded) {
 			return "Untitled Game";
 		}
@@ -299,15 +305,32 @@
 			}
 			const data = await response.json();
 			const tree = Array.isArray(data.tree) ? data.tree : [];
-			return tree
-				.filter((item) => item && item.type === "blob" && /\.html$/i.test(item.path || ""))
+			const blobs = tree.filter((item) => item && item.type === "blob");
+			const imageByStem = new Map();
+			blobs
+				.filter((item) => /\.(?:png|jpe?g|webp|gif)$/i.test(item.path || ""))
+				.forEach((item) => {
+					const imagePath = normalizePath(item.path || "");
+					const stem = imagePath.replace(/\.(?:png|jpe?g|webp|gif)$/i, "").toLowerCase();
+					if (!imageByStem.has(stem)) {
+						imageByStem.set(stem, imagePath);
+					}
+				});
+
+			return blobs
+				.filter((item) => /\.html$/i.test(item.path || ""))
 				.filter((item) => !/\/(?:index|404)\.html$/i.test(item.path || "") && !/^(?:index|404)\.html$/i.test(item.path || ""))
-				.map((item) => ({
-					title: filenameToTitle(item.path),
-					url: normalizePath(item.path),
-					image: "",
-					sourceBase: SECONDARY_CDN_BASE
-				}));
+				.map((item) => {
+					const path = normalizePath(item.path);
+					const stem = path.replace(/\.html$/i, "");
+					const imagePath = imageByStem.get(stem.toLowerCase()) || "";
+					return {
+						title: filenameToTitle(path),
+						url: path,
+						image: imagePath ? `${SECONDARY_CDN_BASE}${encodePath(imagePath)}` : "",
+						sourceBase: SECONDARY_CDN_BASE
+					};
+				});
 		} catch (_error) {
 			return [];
 		}
@@ -389,7 +412,7 @@
 				.split("|")
 				.map((item) => item.trim())
 				.filter(Boolean)
-				.slice(0, 2);
+				.slice(0, 1);
 			fallbackChain.forEach((item) => warmImageUrl(item));
 		});
 	}
@@ -720,13 +743,13 @@
 
 	function gameCardMarkup(game) {
 		const stats = statsForPath(game.path);
-		const image = game.image || "";
 		const fallbacks = thumbFallback(game.path, game.sourceBase);
+		const initialSrc = game.image || fallbacks.split("|")[0] || "/logos/logo.png";
 		return `
 			<article class="game-card game-open-trigger" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}">
 				<div class="game-card-inner">
 					<div class="game-thumb-wrap">
-						${image ? `<img class="game-thumb" src="${image}" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">` : `<img class="game-thumb" src="/logos/logo.png" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">`}
+						<img class="game-thumb" src="${escapeHtml(initialSrc)}" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">
 					</div>
 					<h3 class="game-name">${escapeHtml(game.name)}</h3>
 					<div class="game-mini-stats">
@@ -745,12 +768,12 @@
 
 	function popularCardMarkup(game, rank) {
 		const stats = statsForPath(game.path);
-		const image = game.image || "";
 		const fallbacks = thumbFallback(game.path, game.sourceBase);
+		const initialSrc = game.image || fallbacks.split("|")[0] || "/logos/logo.png";
 		return `
 			<article class="game-pop-card game-open-trigger" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}">
 				<div class="game-pop-rank">#${rank + 1}</div>
-				${image ? `<img class="game-pop-thumb" src="${image}" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">` : `<img class="game-pop-thumb" src="/logos/logo.png" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">`}
+				<img class="game-pop-thumb" src="${escapeHtml(initialSrc)}" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(fallbacks)}" alt="${escapeHtml(game.name)}">
 				<div class="game-pop-meta">
 					<p class="game-pop-name">${escapeHtml(game.name)}</p>
 					<div class="game-pop-stats">
@@ -800,10 +823,11 @@
 
 		const stats = statsForPath(heroGame.path);
 		const heroFallbacks = thumbFallback(heroGame.path, heroGame.sourceBase);
+		const heroInitialSrc = heroGame.image || heroFallbacks.split("|")[0] || "/logos/logo.png";
 		heroWrap.innerHTML = `
 			<article class="games-hero-card game-open-trigger" data-path="${escapeHtml(heroGame.path)}" data-base="${escapeHtml(normalizeSourceBase(heroGame.sourceBase))}">
 				<div class="games-hero-media">
-					${heroGame.image ? `<img src="${heroGame.image}" class="games-hero-thumb" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">` : `<img src="/logos/logo.png" class="games-hero-thumb" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">`}
+					<img src="${escapeHtml(heroInitialSrc)}" class="games-hero-thumb" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">
 					<h2 class="games-hero-name">${escapeHtml(heroGame.name)}</h2>
 				</div>
 				<div class="games-hero-stats">
