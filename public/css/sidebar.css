@@ -60,11 +60,11 @@ body[data-side="left"] .sidebar {
   top: 50%;
   left: 20px;
   transform: translateY(-50%);
-  width: 70px;
+  width: 60px;
   height: auto;
-  min-height: 320px;
+  min-height: 0;
   flex-direction: column;
-  padding: 20px 0;
+  padding: 12px 0;
 }
 
 body[data-side="right"] .sidebar {
@@ -72,11 +72,11 @@ body[data-side="right"] .sidebar {
   right: 20px;
   left: auto;
   transform: translateY(-50%);
-  width: 70px;
+  width: 60px;
   height: auto;
-  min-height: 320px;
+  min-height: 0;
   flex-direction: column;
-  padding: 20px 0;
+  padding: 12px 0;
 }
 
 .sidebar:hover {
@@ -110,7 +110,7 @@ body[data-side="right"] .sidebar .sidebar-logo {
 body[data-side="left"] .sidebar ul, 
 body[data-side="right"] .sidebar ul {
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
 }
 
 .sidebar li { position: relative; }
