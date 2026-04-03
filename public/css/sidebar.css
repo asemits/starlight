@@ -114,7 +114,7 @@ body[data-side="right"] .sidebar .sidebar-logo {
 body[data-side="left"] .sidebar ul, 
 body[data-side="right"] .sidebar ul {
   flex-direction: column;
-  gap: 0;
+  gap: 2px;
 }
 
 body[data-side="left"] .sidebar li a,
