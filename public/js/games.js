@@ -1,6 +1,5 @@
 (function () {
-	const CDN_BASE = "https://cdn.jsdelivr.net/gh/asemits/starlight-games@main/";
-	const TREE_API = "https://api.github.com/repos/asemits/starlight-games/git/trees/main?recursive=1";
+	const CDN_BASE = "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy@main/";
 	const PAGE_SIZE = 18;
 
 	const state = {
@@ -100,50 +99,29 @@
 	}
 
 	async function loadGames() {
-		if (state.ready) {
-			return;
-		}
+    if (state.ready) return;
 
-		if (Array.isArray(window.GAMES) && window.GAMES.length) {
-			state.games = window.GAMES.map((game) => ({ ...game }));
-			state.ready = true;
-			return;
-		}
+   if (!window.GAMES_LIST) {
+    await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        const isDev = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+        script.src = isDev ? '/public/gameslist.js' : '/gameslist.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+const list = window.GAMES_LIST;
 
-		const response = await fetch(TREE_API, { cache: "no-store" });
-		const payload = await response.json();
-		const tree = Array.isArray(payload.tree) ? payload.tree : [];
-		const files = new Set(tree.map((entry) => entry.path));
-		const htmlFiles = tree
-			.map((entry) => entry.path)
-			.filter((path) => path.toLowerCase().endsWith(".html"));
+state.games = list.map(g => ({
+    name: g.title,
+    path: g.url,
+    type: '',
+    image: g.image || ''
+})).sort((a, b) => a.name.localeCompare(b.name));
 
-		const imageExts = ["png", "jpg", "jpeg", "webp"];
-		const games = [];
-
-		for (const htmlFile of htmlFiles) {
-			const stem = htmlFile.replace(/\.html$/i, "");
-			let image = "";
-			for (const ext of imageExts) {
-				const candidate = `${stem}.${ext}`;
-				if (files.has(candidate)) {
-					image = candidate;
-					break;
-				}
-			}
-
-			games.push({
-				name: filenameToName(htmlFile),
-				path: htmlFile,
-				type: defaultTypeFromName(filenameToName(htmlFile)),
-				image
-			});
-		}
-
-		state.games = games.sort((a, b) => a.name.localeCompare(b.name));
-		state.ready = true;
-	}
-
+    state.ready = true;
+}
 	function getPopularGames() {
 		const pinned = ["UGS Library (1,700 Games)", "1v1 LOL", "Geometry Dash", "Retro Bowl", "Basketball Stars", "Subway Surfers"];
 		const byName = new Map(state.games.map((game) => [game.name, game]));
@@ -205,9 +183,13 @@
 		return state.statsCache.get(path) || { plays: 0, uniqueClicks: 0, thumbsUp: 0, thumbsDown: 0, myRating: 0 };
 	}
 
-	function createGameRunnerUrl(gamePath) {
-		return `/game-runner.html?path=${encodeURIComponent(gamePath)}`;
-	}
+function createGameRunnerUrl(gamePath) {
+    const isDev = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+    const base = isDev ? '/public/game-runner.html' : '/game-runner.html';
+    const url = new URL(base, window.location.origin);
+    url.searchParams.set('path', gamePath);
+    return url.toString();
+}
 
 	async function ensureStats(paths) {
 		const authReady = await ensureAuthReady();
@@ -367,7 +349,7 @@
 
 	function gameCardMarkup(game) {
 		const stats = statsForPath(game.path);
-		const image = game.image ? `${CDN_BASE}${encodeURI(game.image)}` : "";
+        const image = game.image || "";
 		return `
 			<article class="game-card" data-path="${escapeHtml(game.path)}">
 				<div class="game-thumb-wrap">
@@ -393,58 +375,600 @@
 		const allFiltered = currentFilteredGames();
 		const visibleGames = getVisibleGames();
 		const heroGame = popularGames[0] || state.games[0];
-		const heroImage = heroGame && heroGame.image ? `${CDN_BASE}${encodeURI(heroGame.image)}` : "";
+		const heroImage = heroGame?.image || "";
 
 		return `
 			<style>
-				.games-page { --panel:#666; --panel-edge:#4b4b4d; --ink:#efefef; --card:#4b4b4d; --thumb:#000; --accent:#f4f4f4; font-family:'Oxanium', 'Montserrat', sans-serif; color:var(--ink); }
-				.games-hero { background:var(--panel-edge); border-radius:88px; padding:28px; margin-bottom:30px; }
-				.games-hero-card { max-width:1040px; margin:0 auto; border-radius:86px; background:var(--panel-edge); padding:34px 30px 16px; }
-				.games-hero-thumb { width:100%; max-height:520px; object-fit:cover; border-radius:56px; background:#000; aspect-ratio:16/9; }
-				.games-hero-name { text-align:center; font-size:56px; margin-top:14px; letter-spacing:0.02em; }
-				.games-popular { background:var(--panel); border-radius:70px; padding:30px; margin-bottom:26px; }
-				.games-popular-title { font-size:42px; margin:6px 0 20px; }
-				.games-popular-row { display:flex; align-items:center; gap:14px; }
-				.games-slide-btn { flex:0 0 40px; height:260px; border-radius:8px; border:0; background:#4f4f52; color:#111; font-size:24px; }
-				.games-popular-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; width:100%; }
-				.game-pop-card { background:var(--card); border-radius:46px; padding:14px 14px 8px; cursor:pointer; }
-				.game-pop-thumb { width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:34px; background:#000; }
-				.game-pop-name { text-align:center; font-size:36px; margin:8px 0 4px; }
-				.games-toolbar { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin:18px 0; }
-				.games-search { width:280px; max-width:100%; border-radius:12px; border:1px solid #8f8f90; background:#151515; color:#fff; padding:10px 12px; }
-				.games-card-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:16px; }
-				.game-card { background:#323233; border-radius:24px; padding:10px; cursor:pointer; border:1px solid rgba(255,255,255,0.08); }
-				.game-thumb-wrap { border-radius:16px; overflow:hidden; background:#000; }
-				.game-thumb { width:100%; height:140px; object-fit:cover; display:block; }
-				.game-thumb.placeholder { height:140px; display:flex; align-items:center; justify-content:center; color:#bcbcbc; }
-				.game-name { font-size:18px; margin:10px 0 4px; line-height:1.25; }
-				.game-type { font-size:12px; opacity:.8; text-transform:uppercase; letter-spacing:.08em; margin:0; }
-				.game-card-actions { display:flex; gap:8px; margin-top:10px; }
-				.rate-btn { border:1px solid rgba(255,255,255,0.18); border-radius:999px; padding:6px 10px; font-size:12px; background:rgba(0,0,0,0.45); color:#fff; }
-				.rate-btn.active { background:#fff; color:#111; }
-				.games-page-nav, .games-alpha-nav { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
-				.games-page-btn { border:1px solid rgba(255,255,255,0.22); border-radius:10px; background:#1f1f20; color:#fff; padding:6px 10px; min-width:36px; }
-				.games-page-btn.active { background:#fff; color:#111; }
-				.game-overlay { position:fixed; inset:0; z-index:9999; background:#030303; display:flex; flex-direction:column; }
-				.game-frame-wrap { flex:1; min-height:0; }
-				.game-frame { width:100%; height:100%; border:0; background:#000; }
-				.game-bottom-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; padding:10px 12px; border-top:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.92); }
-				.bar-left, .bar-right { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-				.bar-btn { border:1px solid rgba(255,255,255,0.25); background:#101010; color:#fff; border-radius:10px; padding:7px 10px; font-size:13px; }
-				.bar-stats { font-size:12px; opacity:.9; }
-				@media (max-width: 900px) {
-					.games-hero { border-radius:36px; padding:14px; }
-					.games-hero-card { border-radius:30px; padding:12px; }
-					.games-hero-thumb { border-radius:20px; }
-					.games-hero-name { font-size:34px; }
-					.games-popular { border-radius:24px; padding:12px; }
-					.games-popular-title { font-size:28px; margin-top:2px; }
-					.games-slide-btn { height:188px; }
-					.game-pop-card { border-radius:20px; }
-					.game-pop-thumb { border-radius:14px; }
-					.game-pop-name { font-size:20px; }
-					.games-popular-grid { grid-template-columns:1fr; }
-				}
+.games-page {
+  --ink: rgba(255,255,255,0.85);
+  --ink-dim: rgba(255,255,255,0.4);
+  --ink-faint: rgba(255,255,255,0.15);
+  --glass: rgba(255,255,255,0.04);
+  --glass-mid: rgba(255,255,255,0.07);
+  --glass-hover: rgba(255,255,255,0.09);
+  --border: rgba(255,255,255,0.1);
+  --border-hover: rgba(255,255,255,0.22);
+  --spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow-deep: 0 40px 80px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.6);
+  font-family: 'Geist', 'Oxanium', 'Montserrat', sans-serif;
+  color: var(--ink);
+}
+
+/* ── Hero ─────────────────────────────────────────── */
+.games-hero {
+  border-radius: 32px;
+  padding: 3px;
+  margin-bottom: 30px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03), rgba(255,255,255,0.08));
+  animation: sectionReveal 0.8s var(--spring) forwards;
+  opacity: 0;
+}
+
+.games-hero-card {
+  max-width: 1040px;
+  margin: 0 auto;
+  border-radius: 30px;
+  background: var(--glass);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  padding: 28px 28px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.games-hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+}
+
+.games-hero-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.games-hero-thumb {
+  width: 100%;
+  max-height: 480px;
+  object-fit: cover;
+  border-radius: 20px;
+  aspect-ratio: 16/9;
+  background: #000;
+  display: block;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.7), 0 0 0 0.5px rgba(255,255,255,0.08);
+  transition: transform 0.6s var(--spring), box-shadow 0.6s ease;
+}
+
+.games-hero-thumb:hover {
+  transform: scale(1.01);
+  box-shadow: 0 32px 80px rgba(0,0,0,0.8), 0 0 0 0.5px rgba(255,255,255,0.15);
+}
+
+.games-hero-name {
+  text-align: center;
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 200;
+  letter-spacing: 0.06em;
+  margin-top: 18px;
+  color: var(--ink);
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  text-shadow: 0 0 60px rgba(255,255,255,0.15);
+}
+
+/* ── Section reveal ───────────────────────────────── */
+@keyframes sectionReveal {
+  0%   { opacity: 0; transform: translateY(28px); filter: blur(6px); }
+  60%  { filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cardIn {
+  0%   { opacity: 0; transform: translateY(24px) scale(0.96); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes scanline {
+  0%   { transform: translateY(-100%); opacity: 1; }
+  100% { transform: translateY(400%); opacity: 0; }
+}
+
+@keyframes shimmerEdge {
+  0%, 100% { opacity: 0.3; }
+  50%       { opacity: 1; }
+}
+
+/* ── Popular ──────────────────────────────────────── */
+.games-popular {
+  border-radius: 28px;
+  padding: 3px;
+  margin-bottom: 26px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+  opacity: 0;
+  animation: sectionReveal 0.8s 0.15s var(--spring) forwards;
+}
+
+.games-popular-inner {
+  border-radius: 26px;
+  background: var(--glass);
+  backdrop-filter: blur(32px) saturate(160%);
+  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  padding: 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+.games-popular-inner::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+}
+
+.games-popular-title {
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  font-size: clamp(24px, 3.5vw, 38px);
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  margin: 0 0 20px;
+  color: var(--ink);
+  text-transform: uppercase;
+}
+
+.games-popular-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.games-slide-btn {
+  flex: 0 0 36px;
+  height: 240px;
+  border-radius: 12px;
+  border: 0.5px solid var(--border);
+  background: var(--glass-mid);
+  backdrop-filter: blur(12px);
+  color: rgba(255,255,255,0.5);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.3s var(--spring);
+}
+
+.games-slide-btn:hover {
+  background: var(--glass-hover);
+  border-color: var(--border-hover);
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.games-popular-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
+}
+
+/* ── Popular card ─────────────────────────────────── */
+.game-pop-card {
+  border-radius: 20px;
+  padding: 3px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+  cursor: pointer;
+  transition: transform 0.5s var(--spring), box-shadow 0.5s ease;
+  position: relative;
+  opacity: 0;
+  animation: cardIn 0.6s var(--spring) forwards;
+}
+
+.game-pop-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: var(--shadow-deep), 0 0 0 0.5px rgba(255,255,255,0.15);
+}
+
+.game-pop-card-inner {
+  border-radius: 18px;
+  background: var(--glass-mid);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  padding: 12px 12px 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.game-pop-card-inner::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+}
+
+.game-pop-card-inner::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 50%;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.05), transparent);
+  transform: translateY(-100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.game-pop-card:hover .game-pop-card-inner::after {
+  animation: scanline 0.75s var(--spring) forwards;
+}
+
+.game-pop-thumb {
+  width: 100%;
+  aspect-ratio: 16/10;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #000;
+  display: block;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  transition: transform 0.5s var(--spring), box-shadow 0.4s ease;
+}
+
+.game-pop-card:hover .game-pop-thumb {
+  transform: scale(1.03);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.8);
+}
+
+.game-pop-name {
+  text-align: center;
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  font-size: clamp(18px, 2.5vw, 28px);
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  margin: 10px 0 4px;
+  color: var(--ink);
+  transition: text-shadow 0.3s ease;
+}
+
+.game-pop-card:hover .game-pop-name {
+  text-shadow: 0 0 24px rgba(255,255,255,0.3);
+}
+
+/* ── Toolbar ──────────────────────────────────────── */
+.games-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+  opacity: 0;
+  animation: sectionReveal 0.7s 0.25s var(--spring) forwards;
+}
+
+.games-search {
+  width: 280px;
+  max-width: 100%;
+  border-radius: 999px;
+  border: 0.5px solid var(--border);
+  background: var(--glass-mid);
+  backdrop-filter: blur(20px);
+  color: #fff;
+  padding: 10px 18px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+.games-search::placeholder { color: var(--ink-dim); }
+
+.games-search:focus {
+  border-color: rgba(255,255,255,0.3);
+  background: var(--glass-hover);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.4);
+}
+
+/* ── Game card grid ───────────────────────────────── */
+.games-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  opacity: 0;
+  animation: sectionReveal 0.8s 0.3s var(--spring) forwards;
+}
+
+.game-card {
+  border-radius: 3px;
+  padding: 2px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02), rgba(255,255,255,0.06));
+  cursor: pointer;
+  position: relative;
+  opacity: 0;
+  animation: cardIn 0.5s var(--spring) forwards;
+  transition: transform 0.5s var(--spring), box-shadow 0.5s ease;
+}
+
+.game-card:hover {
+  transform: translateY(-10px) scale(1.02);
+  box-shadow: var(--shadow-deep), 0 0 0 0.5px rgba(255,255,255,0.18);
+}
+
+.game-card-inner {
+  border-radius: 2px;
+  background: rgba(12,12,12,0.85);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  padding: 10px;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.game-card-inner::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+}
+
+.game-card-inner::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 50%;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.05), transparent);
+  transform: translateY(-100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.game-card:hover .game-card-inner::after {
+  animation: scanline 0.65s var(--spring) forwards;
+}
+
+.game-thumb-wrap {
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  position: relative;
+}
+
+.game-thumb {
+  width: 100%;
+  height: 130px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s var(--spring);
+}
+
+.game-card:hover .game-thumb {
+  transform: scale(1.06);
+}
+
+.game-thumb.placeholder {
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  font-size: 32px;
+}
+
+/* Bottom glow bar */
+.game-card .glow-bar {
+  position: absolute;
+  bottom: 0; left: 20%; right: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  opacity: 0;
+  transition: opacity 0.4s ease, left 0.4s var(--spring), right 0.4s var(--spring);
+  border-radius: 1px;
+}
+
+.game-card:hover .glow-bar {
+  opacity: 1;
+  left: 5%;
+  right: 5%;
+}
+
+/* Corner accents */
+.game-card .corner-tr {
+  position: absolute;
+  top: 10px; right: 10px;
+  width: 8px; height: 8px;
+  border-top: 0.5px solid rgba(255,255,255,0.25);
+  border-right: 0.5px solid rgba(255,255,255,0.25);
+  border-radius: 0 3px 0 0;
+  transition: width 0.4s var(--spring), height 0.4s var(--spring), border-color 0.3s ease;
+  z-index: 3;
+}
+
+.game-card:hover .corner-tr {
+  width: 14px; height: 14px;
+  border-color: rgba(255,255,255,0.6);
+}
+
+.game-name {
+  font-size: 14px;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  margin: 10px 0 3px;
+  color: var(--ink);
+  line-height: 1.3;
+  transition: text-shadow 0.3s ease;
+}
+
+.game-card:hover .game-name {
+  text-shadow: 0 0 16px rgba(255,255,255,0.25);
+}
+
+.game-type {
+  font-size: 10px;
+  opacity: .45;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin: 0;
+  font-weight: 300;
+}
+
+.game-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.rate-btn {
+  border: 0.5px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: var(--glass);
+  backdrop-filter: blur(8px);
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+  font-family: inherit;
+}
+
+.rate-btn:hover {
+  background: var(--glass-mid);
+  border-color: var(--border-hover);
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.rate-btn.active {
+  background: rgba(255,255,255,0.9);
+  border-color: rgba(255,255,255,0.9);
+  color: #000;
+}
+
+/* ── Pagination ───────────────────────────────────── */
+.games-page-nav,
+.games-alpha-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 20px;
+}
+
+.games-page-btn {
+  border: 0.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--glass);
+  backdrop-filter: blur(8px);
+  color: var(--ink-dim);
+  padding: 6px 14px;
+  min-width: 36px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.2s var(--spring);
+}
+
+.games-page-btn:hover {
+  background: var(--glass-hover);
+  border-color: var(--border-hover);
+  color: var(--ink);
+  transform: translateY(-2px);
+}
+
+.games-page-btn.active {
+  background: rgba(255,255,255,0.9);
+  border-color: rgba(255,255,255,0.9);
+  color: #000;
+}
+
+/* ── Game overlay ─────────────────────────────────── */
+.game-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.96);
+  backdrop-filter: blur(24px);
+  display: flex;
+  flex-direction: column;
+  animation: overlayIn 0.5s var(--spring) forwards;
+}
+
+@keyframes overlayIn {
+  0%   { opacity: 0; transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.game-frame-wrap { flex: 1; min-height: 0; }
+
+.game-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+.game-bottom-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 0.5px solid var(--border);
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(24px);
+}
+
+.bar-left, .bar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.bar-btn {
+  border: 0.5px solid var(--border);
+  background: var(--glass-mid);
+  backdrop-filter: blur(12px);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.3s ease, border-color 0.3s ease, transform 0.2s var(--spring);
+}
+
+.bar-btn:hover {
+  background: var(--glass-hover);
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+
+.bar-stats {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+/* ── Responsive ───────────────────────────────────── */
+@media (max-width: 900px) {
+  .games-hero { border-radius: 20px; padding: 2px; }
+  .games-hero-card { border-radius: 18px; padding: 14px; }
+  .games-hero-thumb { border-radius: 12px; }
+  .games-hero-name { font-size: 28px; }
+  .games-popular { border-radius: 18px; }
+  .games-popular-inner { border-radius: 16px; padding: 16px; }
+  .games-popular-title { font-size: 22px; }
+  .games-slide-btn { height: 180px; }
+  .game-pop-card { border-radius: 14px; }
+  .game-pop-card-inner { border-radius: 12px; }
+  .game-pop-thumb { border-radius: 8px; }
+  .game-pop-name { font-size: 18px; }
+  .games-popular-grid { grid-template-columns: 1fr; }
+}
 			</style>
 			<section class="games-page">
 				<section class="games-hero">
@@ -461,7 +985,7 @@
 						<div class="games-popular-grid">
 							${visiblePopular
 								.map((game) => {
-									const thumb = game.image ? `${CDN_BASE}${encodeURI(game.image)}` : "";
+									const thumb = game.image || "";
 									return `
 										<article class="game-pop-card game-open-trigger" data-path="${escapeHtml(game.path)}">
 											${thumb ? `<img class="game-pop-thumb" src="${thumb}" alt="${escapeHtml(game.name)}">` : `<div class="game-pop-thumb"></div>`}
@@ -488,16 +1012,88 @@
 			</section>
 		`;
 	}
+function renderCardsOnly(root) {
+    const allFiltered = currentFilteredGames();
+    const visibleGames = getVisibleGames();
 
+    const grid = root.querySelector(".games-card-grid");
+    if (grid) {
+        grid.innerHTML = visibleGames.map(game => gameCardMarkup(game)).join("");
+    }
+
+    const paginationContainer = root.querySelector(".games-page-nav, .games-alpha-nav");
+    if (paginationContainer) {
+        paginationContainer.outerHTML = paginationMarkup(allFiltered.length);
+    }
+
+    const countEl = root.querySelector(".games-toolbar div");
+    if (countEl) {
+        countEl.textContent = `${allFiltered.length} games`;
+    }
+
+    root.querySelectorAll(".game-card").forEach(card => {
+        card.addEventListener("click", async (event) => {
+            if (event.target.closest(".rate-btn")) return;
+            const path = card.getAttribute("data-path");
+            const game = state.games.find(item => item.path === path);
+            if (game) await openGame(game);
+        });
+    });
+
+    root.querySelectorAll(".rate-btn").forEach(button => {
+        button.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            const path = button.getAttribute("data-path");
+            const rating = Number(button.getAttribute("data-rate"));
+            const game = state.games.find(item => item.path === path);
+            if (game) {
+                await setRating(game, rating);
+                renderCardsOnly(root);
+            }
+        });
+    });
+}
+
+function renderPopularOnly(root) {
+    const popularGames = getPopularGames();
+    const visiblePopular = popularGames.slice(state.popularIndex, state.popularIndex + 3);
+    while (visiblePopular.length < 3 && popularGames.length) {
+        visiblePopular.push(popularGames[(visiblePopular.length + state.popularIndex) % popularGames.length]);
+    }
+
+    const grid = root.querySelector(".games-popular-grid");
+    if (!grid) return;
+
+    grid.innerHTML = visiblePopular.map(game => {
+        const thumb = game.image || "";
+        return `
+            <article class="game-pop-card game-open-trigger" data-path="${escapeHtml(game.path)}">
+                <div class="game-pop-card-inner">
+                    ${thumb ? `<img class="game-pop-thumb" src="${thumb}" alt="${escapeHtml(game.name)}">` : `<div class="game-pop-thumb"></div>`}
+                    <p class="game-pop-name">${escapeHtml(game.name)}</p>
+                </div>
+            </article>
+        `;
+    }).join("");
+
+    grid.querySelectorAll(".game-pop-card").forEach(card => {
+        card.addEventListener("click", async (event) => {
+            if (event.target.closest(".rate-btn")) return;
+            const path = card.getAttribute("data-path");
+            const game = state.games.find(item => item.path === path);
+            if (game) await openGame(game);
+        });
+    });
+}
 	function bindPageEvents(root) {
-		const searchInput = root.querySelector("#games-search");
-		if (searchInput) {
-			searchInput.addEventListener("input", (event) => {
-				state.search = event.target.value;
-				state.page = 1;
-				render();
-			});
-		}
+const searchInput = root.querySelector("#games-search");
+if (searchInput) {
+    searchInput.addEventListener("input", (event) => {
+        state.search = event.target.value;
+        state.page = 1;
+        renderCardsOnly(root);
+    });
+}
 
 		root.querySelectorAll("[data-page]").forEach((button) => {
 			button.addEventListener("click", () => {
@@ -514,17 +1110,17 @@
 		});
 
 		root.querySelectorAll("[data-slide]").forEach((button) => {
-			button.addEventListener("click", () => {
-				const dir = button.getAttribute("data-slide");
-				const total = Math.max(1, getPopularGames().length);
-				if (dir === "left") {
-					state.popularIndex = (state.popularIndex - 1 + total) % total;
-				} else {
-					state.popularIndex = (state.popularIndex + 1) % total;
-				}
-				render();
-			});
-		});
+    button.addEventListener("click", () => {
+        const dir = button.getAttribute("data-slide");
+        const total = Math.max(1, getPopularGames().length);
+        if (dir === "left") {
+            state.popularIndex = (state.popularIndex - 1 + total) % total;
+        } else {
+            state.popularIndex = (state.popularIndex + 1) % total;
+        }
+        renderPopularOnly(root);
+    });
+});
 
 		root.querySelectorAll(".game-open-trigger, .game-card").forEach((card) => {
 			card.addEventListener("click", async (event) => {
