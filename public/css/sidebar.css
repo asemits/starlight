@@ -110,7 +110,14 @@ body[data-side="right"] .sidebar .sidebar-logo {
 body[data-side="left"] .sidebar ul, 
 body[data-side="right"] .sidebar ul {
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
+}
+
+body[data-side="left"] .sidebar li a,
+body[data-side="right"] .sidebar li a {
+  height: 34px;
+  padding: 0 8px;
+  justify-content: center;
 }
 
 .sidebar li { position: relative; }
