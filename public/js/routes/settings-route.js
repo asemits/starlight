@@ -5,12 +5,14 @@
       const authConfig = window.StarlightAuthUI && window.StarlightAuthUI.config ? window.StarlightAuthUI.config : {};
       const tosText = String(authConfig.tosText || "Terms of Service are not configured.");
       const privacyText = String(authConfig.privacyPolicyText || "Privacy Policy is not configured.");
+      
       const escapeHtml = (value) => String(value)
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+        
       const tosHtml = escapeHtml(tosText).replaceAll("\n", "<br>");
       const privacyHtml = escapeHtml(privacyText).replaceAll("\n", "<br>");
 
@@ -172,13 +174,31 @@
                   <label class="block mb-2 text-sm text-gray-300">Auto Open In Wrapper</label>
                   <select onchange="changeWrapEnabled(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-4">
                     <option value="off" ${window.getWrapEnabled() === 'on' ? '' : 'selected'}>Off</option>
-                    <option value="on" ${window.getWrapEnabled() === 'on' ? 'selected' : ''}>On</option>
+                    <option value="on" ${window.getWrapEnabled() === 'on' ? 'selected' : 'selected'}>On</option>
                   </select>
                   <label class="block mb-2 text-sm text-gray-300">Wrapper Mode</label>
                   <select onchange="changeWrapMode(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
                     <option value="about-blank" ${window.getWrapMode() === 'about-blank' ? 'selected' : ''}>about:blank</option>
                     <option value="blob" ${window.getWrapMode() === 'blob' ? 'selected' : ''}>blob:</option>
                   </select>
+                </article>
+
+                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
+                  <label class="block mb-2 text-sm text-gray-300">Tab Disguise (Cloak)</label>
+                  <div class="grid grid-cols-1 gap-2">
+                    <button type="button" onclick="applyCloak('Google Drive', 'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
+                      <img src="https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png" class="w-5 h-5"> Google Drive
+                    </button>
+                    <button type="button" onclick="applyCloak('Dashboard', 'https://instructure-uploads.s3.amazonaws.com/account_96810000000000001/attachments/1049/Canvas_logo_gray2.png')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
+                      <img src="https://instructure-uploads.s3.amazonaws.com/account_96810000000000001/attachments/1049/Canvas_logo_gray2.png" class="w-5 h-5"> Dashboard
+                    </button>
+                    <button type="button" onclick="applyCloak('Google', 'https://www.google.com/favicon.ico')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
+                      <img src="https://www.google.com/favicon.ico" class="w-5 h-5"> Google
+                    </button>
+                    <button type="button" onclick="applyCloak('Starlight', '/logos/logo.png')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
+                      <img src="/logos/logo.png" class="w-5 h-5"> Starlight  
+                    </button>
+                  </div>
                 </article>
 
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
