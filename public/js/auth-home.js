@@ -581,7 +581,7 @@
       const recent = list
         .filter((item) => item.clickCount > 0)
         .sort((a, b) => b.lastPlayedAtMs - a.lastPlayedAtMs)
-        .slice(0, 8);
+        .slice(0, 6);
 
       const favorites = list
         .filter((item) => item.isFavorite)
