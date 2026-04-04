@@ -26,7 +26,7 @@ function shouldCacheFirst(request, url) {
 		return true;
 	}
 
-	if (url.hostname === "api.github.com" && /\/repos\/asemits\/starlight-games\/git\/trees\/main/i.test(url.pathname)) {
+	if (url.pathname.endsWith("/secondary-games.json") || url.pathname.endsWith("/public/secondary-games.json")) {
 		return true;
 	}
 

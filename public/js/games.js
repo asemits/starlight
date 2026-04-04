@@ -2,11 +2,11 @@
 	const PRIMARY_CDN_BASE = "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy@main/";
 	const SECONDARY_CDN_BASE = "https://cdn.jsdelivr.net/gh/asemits/starlight-games@main/";
 	const CDN_BASES = [PRIMARY_CDN_BASE, SECONDARY_CDN_BASE];
-	const SECONDARY_TREE_API = "https://api.github.com/repos/asemits/starlight-games/git/trees/main?recursive=1";
+	const SECONDARY_MANIFEST_PATH = "/secondary-games.json";
 	const PAGE_SIZE = 18;
 	const POPULAR_LIMIT = 10;
 	const POPULAR_REFRESH_MS = 15000;
-	const GAME_LIST_CACHE_KEY = "starlight-games-list-v5";
+	const GAME_LIST_CACHE_KEY = "starlight-games-list-v6";
 
 	const state = {
 		mountSelector: "#games-root",
@@ -299,38 +299,33 @@
 
 	async function fetchSecondaryGames() {
 		try {
-			const response = await fetch(SECONDARY_TREE_API, { cache: "force-cache" });
+			const isDev = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
+			const manifestUrl = isDev ? `/public${SECONDARY_MANIFEST_PATH}` : SECONDARY_MANIFEST_PATH;
+			const response = await fetch(manifestUrl, { cache: "force-cache" });
 			if (!response.ok) {
 				return [];
 			}
 			const data = await response.json();
-			const tree = Array.isArray(data.tree) ? data.tree : [];
-			const blobs = tree.filter((item) => item && item.type === "blob");
-			const imageByStem = new Map();
-			blobs
-				.filter((item) => /\.(?:png|jpe?g|webp|gif)$/i.test(item.path || ""))
-				.forEach((item) => {
-					const imagePath = normalizePath(item.path || "");
-					const stem = imagePath.replace(/\.(?:png|jpe?g|webp|gif)$/i, "").toLowerCase();
-					if (!imageByStem.has(stem)) {
-						imageByStem.set(stem, imagePath);
-					}
-				});
-
-			return blobs
-				.filter((item) => /\.html$/i.test(item.path || ""))
-				.filter((item) => !/\/(?:index|404)\.html$/i.test(item.path || "") && !/^(?:index|404)\.html$/i.test(item.path || ""))
+			const entries = Array.isArray(data) ? data : [];
+			return entries
 				.map((item) => {
-					const path = normalizePath(item.path);
-					const stem = path.replace(/\.html$/i, "");
-					const imagePath = imageByStem.get(stem.toLowerCase()) || "";
+					const path = normalizePath(item.url || item.path || "");
+					if (!path || !/\.html$/i.test(path)) {
+						return null;
+					}
+					if (/\/(?:index|404)\.html$/i.test(path) || /^(?:index|404)\.html$/i.test(path)) {
+						return null;
+					}
+					const imagePath = normalizePath(item.image || "");
+					const rawTitle = String(item.title || "").trim();
 					return {
-						title: filenameToTitle(path),
+						title: filenameToTitle(rawTitle || path),
 						url: path,
 						image: imagePath ? `${SECONDARY_CDN_BASE}${encodePath(imagePath)}` : "",
 						sourceBase: SECONDARY_CDN_BASE
 					};
-				});
+				})
+				.filter(Boolean);
 		} catch (_error) {
 			return [];
 		}
