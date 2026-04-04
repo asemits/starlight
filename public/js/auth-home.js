@@ -455,7 +455,6 @@
           <section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
               <h2>Recently Played</h2>
-              <a href="/games" class="nav-link starlight-dashboard-link">Open games</a>
             </div>
             <div id="dashboard-recent" class="starlight-dashboard-grid"></div>
           </section>
