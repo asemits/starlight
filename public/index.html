@@ -23,44 +23,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Oxanium:wght@200..800&display=swap" rel="stylesheet">
     <!-- scripts -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/main.js" type="module"></script>
-    <script src="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/sounds.js" type="module"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <!-- css -->
     <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="css/index.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/style.css" rel="stylesheet">
 </head>
 <body class="bg-black text-white">
-    <style>
-      #global-particles {
-        position: fixed;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
-        opacity: 0.55;
-      }
-
-      #app-content {
-        position: relative;
-        z-index: 1;
-        opacity: 1;
-        transform: translateY(0);
-        transition: opacity 0.28s ease, transform 0.28s ease;
-      }
-
-      #app-content.route-exit {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-
-      #app-content.route-enter {
-        opacity: 0;
-        transform: translateY(-8px);
-      }
-    </style>
     <canvas id="global-particles"></canvas>
     <nav class="sidebar" id="sidebar">
       <img src="logos/logo.png" class="sidebar-logo">
@@ -104,214 +76,10 @@
         </ul>
     </nav>
     <div id="app-content" class="p-8 pt-24"></div>
+    <script src="js/app-core.js"></script>
     <script src="js/games.js"></script>
     <script>
-      const firebaseConfig = {
-        apiKey: "AIzaSyAaOp3LYoMGbByON7W7pGQYV_oXJlmU_Hw",
-        authDomain: "starlight-28e40.firebaseapp.com",
-        projectId: "starlight-28e40",
-        storageBucket: "starlight-28e40.firebasestorage.app",
-        messagingSenderId: "206859310211",
-        appId: "1:206859310211:web:3450cfa9fae7f6360a77b6",
-        measurementId: "G-G52TDH6GRY"
-      };
-
-      const firebaseApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
-      window.starlightAuth = firebaseApp.auth();
-      window.starlightDb = firebaseApp.firestore();
-
-      window.starlightAuthReady = new Promise((resolve, reject) => {
-        const unsubscribe = window.starlightAuth.onAuthStateChanged(async (user) => {
-          if (user) {
-            unsubscribe();
-            resolve(user);
-            return;
-          }
-          try {
-            await window.starlightAuth.signInAnonymously();
-          } catch (error) {
-            console.error("Anonymous auth failed. Enable Anonymous sign-in in Firebase Auth.", error);
-            reject(error);
-          }
-        });
-      });
-
-        const savedSidebarPos = localStorage.getItem('sidebar-pos') || 'top';
-        document.body.setAttribute('data-side', savedSidebarPos);
-
-        function changeSidebarPos(newPos) {
-            document.body.setAttribute('data-side', newPos);
-            localStorage.setItem('sidebar-pos', newPos);
-        }
-
-      function changeGamesPaginationMode(newMode) {
-        localStorage.setItem('games-pagination-mode', newMode);
-        if (window.location.pathname === '/games' && window.StarlightGames) {
-          window.StarlightGames.render();
-        }
-      }
-
-      function changeGamesParticlesBonds(newValue) {
-        const value = newValue === 'on' ? 'on' : 'off';
-        localStorage.setItem('games-particles-bonds', value);
-        if (window.updateGlobalParticlesSettings) {
-          window.updateGlobalParticlesSettings();
-        }
-        if (window.location.pathname === '/games' && window.StarlightGames) {
-          window.StarlightGames.render();
-        }
-      }
-
-      function changeGamesParticlesColor(newColor) {
-        const valid = /^#[0-9a-fA-F]{6}$/.test(newColor) ? newColor : '#ffffff';
-        localStorage.setItem('games-particles-color', valid);
-        if (window.updateGlobalParticlesSettings) {
-          window.updateGlobalParticlesSettings();
-        }
-        if (window.location.pathname === '/games' && window.StarlightGames) {
-          window.StarlightGames.render();
-        }
-      }
-
-      function switchSettingsCategory(category) {
-        document.querySelectorAll('[data-settings-tab]').forEach((button) => {
-          const active = button.getAttribute('data-settings-tab') === category;
-          button.classList.toggle('bg-white/15', active);
-          button.classList.toggle('border-white/30', active);
-          button.classList.toggle('text-white', active);
-          button.classList.toggle('text-gray-300', !active);
-        });
-
-        document.querySelectorAll('[data-settings-panel]').forEach((panel) => {
-          const show = panel.getAttribute('data-settings-panel') === category;
-          panel.classList.toggle('hidden', !show);
-        });
-      }
-
-      (function initGlobalParticles() {
-        const canvas = document.getElementById('global-particles');
-        if (!canvas) {
-          return;
-        }
-
-        const ctx = canvas.getContext('2d');
-        const particles = [];
-        const maxDistance = 120;
-        let width = 0;
-        let height = 0;
-        let rafId = 0;
-
-        function ensureHexColor(input) {
-          const value = String(input || '').trim();
-          return /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#ffffff';
-        }
-
-        function currentSettings() {
-          return {
-            color: ensureHexColor(localStorage.getItem('games-particles-color') || '#ffffff'),
-            bondsOn: localStorage.getItem('games-particles-bonds') === 'on'
-          };
-        }
-
-        const settings = currentSettings();
-
-        function toRgba(hex, alpha) {
-          const clean = ensureHexColor(hex).slice(1);
-          const r = Number.parseInt(clean.slice(0, 2), 16);
-          const g = Number.parseInt(clean.slice(2, 4), 16);
-          const b = Number.parseInt(clean.slice(4, 6), 16);
-          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        }
-
-        function makeParticles() {
-          const count = Math.max(42, Math.floor((width * height) / 18000));
-          particles.length = 0;
-          for (let i = 0; i < count; i += 1) {
-            particles.push({
-              x: Math.random() * width,
-              y: Math.random() * height,
-              vx: (Math.random() - 0.5) * 0.35,
-              vy: (Math.random() - 0.5) * 0.35,
-              r: 0.8 + Math.random() * 2.2
-            });
-          }
-        }
-
-        function resize() {
-          width = window.innerWidth;
-          height = window.innerHeight;
-          canvas.width = width;
-          canvas.height = height;
-          makeParticles();
-        }
-
-        function draw() {
-          ctx.clearRect(0, 0, width, height);
-
-          for (const particle of particles) {
-            particle.x += particle.vx;
-            particle.y += particle.vy;
-            if (particle.x < 0 || particle.x > width) {
-              particle.vx *= -1;
-            }
-            if (particle.y < 0 || particle.y > height) {
-              particle.vy *= -1;
-            }
-
-            ctx.beginPath();
-            ctx.fillStyle = toRgba(settings.color, 0.85);
-            ctx.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2);
-            ctx.fill();
-          }
-
-          if (settings.bondsOn) {
-            for (let i = 0; i < particles.length; i += 1) {
-              const p1 = particles[i];
-              for (let j = i + 1; j < particles.length; j += 1) {
-                const p2 = particles[j];
-                const dx = p1.x - p2.x;
-                const dy = p1.y - p2.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance <= maxDistance) {
-                  const alpha = 0.2 * (1 - distance / maxDistance);
-                  ctx.beginPath();
-                  ctx.strokeStyle = toRgba(settings.color, alpha);
-                  ctx.lineWidth = 1;
-                  ctx.moveTo(p1.x, p1.y);
-                  ctx.lineTo(p2.x, p2.y);
-                  ctx.stroke();
-                }
-              }
-            }
-          }
-
-          rafId = requestAnimationFrame(draw);
-        }
-
-        window.updateGlobalParticlesSettings = function updateGlobalParticlesSettings() {
-          const next = currentSettings();
-          settings.color = next.color;
-          settings.bondsOn = next.bondsOn;
-        };
-
-        resize();
-        draw();
-        window.addEventListener('resize', resize);
-      })();
-
-      (function registerCachingServiceWorker() {
-        if (!('serviceWorker' in navigator)) {
-          return;
-        }
-        const isDev = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-        const swPath = isDev ? '/public/sw.js' : '/sw.js';
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register(swPath).catch(() => {});
-        });
-      })();
-
         const appContent = document.getElementById('app-content');
-        // page content for each route
         const pages = {
             '/': `
               <h1 class="text-3xl font-bold">Home</h1>
@@ -332,7 +100,9 @@
                   <aside class="bg-white/5 p-4 rounded-2xl border border-white/10 h-fit">
                     <button type="button" data-settings-tab="layout" onclick="switchSettingsCategory('layout')" class="w-full text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 bg-white/15 border-white/30 text-white mb-2 transition">Layout</button>
                     <button type="button" data-settings-tab="games" onclick="switchSettingsCategory('games')" class="w-full text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 mb-2 transition">Games</button>
-                    <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="w-full text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition">Particles</button>
+                    <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="w-full text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 mb-2 transition">Particles</button>
+                    <button type="button" data-settings-tab="shortcut" onclick="switchSettingsCategory('shortcut')" class="w-full text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 mb-2 transition">Shortcut</button>
+                    <button type="button" data-settings-tab="cloak" onclick="switchSettingsCategory('cloak')" class="w-full text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition">Tab Cloak</button>
                   </aside>
 
                   <section>
@@ -370,6 +140,47 @@
                       <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
                         <label class="block mb-2 text-sm text-gray-300">Particle Color</label>
                         <input type="color" value="${localStorage.getItem('games-particles-color') || '#ffffff'}" onchange="changeGamesParticlesColor(this.value)" class="w-full h-12 bg-black border border-white/20 rounded-xl text-white outline-none">
+                      </article>
+                    </div>
+
+                    <div data-settings-panel="shortcut" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <article class="bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
+                        <label class="block mb-2 text-sm text-gray-300">Shortcut Enabled</label>
+                        <select onchange="changeShortcutEnabled(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-4">
+                          <option value="off" ${window.getShortcutEnabled() === 'on' ? '' : 'selected'}>Off</option>
+                          <option value="on" ${window.getShortcutEnabled() === 'on' ? 'selected' : ''}>On</option>
+                        </select>
+                        <label class="block mb-2 text-sm text-gray-300">Shortcut Combo</label>
+                        <div class="flex flex-wrap gap-2 mb-2">
+                          <input id="shortcut-combo-display" type="text" readonly value="${window.getShortcutDisplay()}" class="flex-1 min-w-[220px] bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                          <button type="button" onclick="startShortcutCapture()" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Record Combo</button>
+                        </div>
+                        <p id="shortcut-capture-status" class="text-sm text-gray-300 mb-4">Ready</p>
+                        <label class="block mb-2 text-sm text-gray-300">Open This Page When Triggered</label>
+                        <input type="text" value="${window.getShortcutTarget()}" onchange="changeShortcutTarget(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" placeholder="/games">
+                      </article>
+                    </div>
+
+                    <div data-settings-panel="cloak" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <label class="block mb-2 text-sm text-gray-300">Auto Open In Wrapper</label>
+                        <select onchange="changeWrapEnabled(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-4">
+                          <option value="off" ${window.getWrapEnabled() === 'on' ? '' : 'selected'}>Off</option>
+                          <option value="on" ${window.getWrapEnabled() === 'on' ? 'selected' : ''}>On</option>
+                        </select>
+                        <label class="block mb-2 text-sm text-gray-300">Wrapper Mode</label>
+                        <select onchange="changeWrapMode(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                          <option value="about-blank" ${window.getWrapMode() === 'about-blank' ? 'selected' : ''}>about:blank</option>
+                          <option value="blob" ${window.getWrapMode() === 'blob' ? 'selected' : ''}>blob:</option>
+                        </select>
+                      </article>
+
+                      <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <label class="block mb-2 text-sm text-gray-300">Open Immediately</label>
+                        <div class="flex flex-wrap gap-2">
+                          <button type="button" onclick="openWrappedNow('about-blank')" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Open about:blank</button>
+                          <button type="button" onclick="openWrappedNow('blob')" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Open blob:</button>
+                        </div>
                       </article>
                     </div>
                   </section>
@@ -611,9 +422,37 @@
                   <button id="toggleFavorites" class="control-button favorites-toggle">Favorites: OFF</button>
                   <button id="toggleButton" class="control-button overlap-toggle">Overlap: OFF</button>
                   <button id="stopButton" class="control-button stop-button">Stop All Sounds</button>
+                  <button id="ttsToggle" class="control-button">TTS</button>
                   <input id="searchInput" type="text" placeholder="Search buttons">
               </div>
-              <div id="soundboard"></div>`,
+              <div id="soundboard"></div>
+              <div id="ttsPanel" class="hidden" style="max-width:720px;margin:20px auto;padding:14px;border:1px solid rgba(255,255,255,0.25);border-radius:14px;background:rgba(0,0,0,0.45);">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+                  <strong>TTS</strong>
+                  <button id="ttsClose" type="button" class="control-button">Close</button>
+                </div>
+                <textarea id="ttsText" class="w-full bg-black border border-white/20 p-2 rounded mb-2" rows="3" placeholder="Enter text"></textarea>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                  <select id="ttsLangFilter" class="bg-black border border-white/20 p-2 rounded"></select>
+                  <select id="ttsVoice" class="bg-black border border-white/20 p-2 rounded"></select>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-top:8px;">
+                  <label>Volume <input id="ttsVolume" type="range" min="0" max="1" step="0.01" value="1"></label><span id="ttsVolumeVal">1.00</span>
+                  <label>Rate <input id="ttsRate" type="range" min="0.5" max="2" step="0.1" value="1"></label><span id="ttsRateVal">1.0</span>
+                  <label>Pitch <input id="ttsPitch" type="range" min="0" max="2" step="0.01" value="1"></label><span id="ttsPitchVal">1.00</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
+                  <button id="ttsSpeak" type="button" class="control-button">Speak</button>
+                  <button id="ttsPause" type="button" class="control-button">Pause</button>
+                  <button id="ttsResume" type="button" class="control-button">Resume</button>
+                  <button id="ttsStop" type="button" class="control-button">Stop</button>
+                  <button id="ttsReset" type="button" class="control-button">Reset</button>
+                </div>
+                <p id="ttsStatus" style="margin-top:8px;">Idle</p>
+                <div id="ttsSpeaking" class="hidden" style="display:flex;gap:8px;align-items:center;">
+                  <span>Speaking:</span><strong id="ttsCurrentWord">-</strong>
+                </div>
+              </div>`,
           '404': `
           <h1 class="text-3xl font-bold text-red-500">404 Not Found</h1>
           `
@@ -643,6 +482,10 @@
 
           if (path === '/games' && window.StarlightGames) {
             window.StarlightGames.mount('#games-root');
+          }
+
+          if (path === '/soundboard' && window.mountSoundboardRoute) {
+            window.mountSoundboardRoute();
           }
         }
         document.addEventListener('click', (e) => {
