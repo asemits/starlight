@@ -296,6 +296,8 @@
       }, { merge: true });
 
       tx.set(userRef, {
+        uid: user.uid,
+        providers: (user.providerData || []).map((item) => item.providerId).filter(Boolean),
         usernameHash: normalizedHash,
         username: firebase.firestore.FieldValue.delete(),
         usernameLower: firebase.firestore.FieldValue.delete(),
