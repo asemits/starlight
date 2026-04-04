@@ -586,16 +586,25 @@
       const thumbsDownGiven = list.filter((item) => item.rating === -1).length;
 
       function tileMarkup(item, favoriteMode) {
-        const imageMarkup = item.gameImage ? `<img src="${escapeHtml(item.gameImage)}" alt="${escapeHtml(item.gameName)}">` : "<div class=\"starlight-dashboard-fallback\"><i class=\"fa-solid fa-gamepad\"></i></div>";
+        const imageMarkup = item.gameImage
+          ? `
+            <div class="starlight-dashboard-thumb-backdrop" style="background-image:url('${escapeHtml(item.gameImage)}');"></div>
+            <img src="${escapeHtml(item.gameImage)}" alt="${escapeHtml(item.gameName)}" loading="lazy" decoding="async">
+          `
+          : "<div class=\"starlight-dashboard-fallback\"><i class=\"fa-solid fa-gamepad\"></i></div>";
         const removeFavorite = favoriteMode
           ? `<button type="button" class="starlight-dashboard-remove-favorite" data-remove-favorite="1" data-game-path="${escapeHtml(item.gamePath)}" data-source-base="${escapeHtml(item.sourceBase)}" aria-label="Remove from favorites"><i class="fa-solid fa-trash"></i></button>`
           : "";
         return `
           <a href="/games" class="nav-link starlight-dashboard-item" data-game-path="${escapeHtml(item.gamePath)}" data-source-base="${escapeHtml(item.sourceBase)}">
-            <div class="starlight-dashboard-thumb">${imageMarkup}</div>
-            <h3>${escapeHtml(item.gameName)}</h3>
-            <p>Plays: ${item.clickCount}</p>
-            ${removeFavorite}
+            <div class="starlight-dashboard-thumb">
+              ${imageMarkup}
+              <div class="starlight-dashboard-meta">
+                <h3>${escapeHtml(item.gameName)}</h3>
+                <p>Plays: ${item.clickCount}</p>
+              </div>
+              ${removeFavorite}
+            </div>
           </a>
         `;
       }
@@ -1211,16 +1220,21 @@
     const nextManualSyncMs = lastManualSyncMs > 0 ? lastManualSyncMs + MANUAL_SYNC_INTERVAL_MS : 0;
     const canManualSyncNow = !nextManualSyncMs || Date.now() >= nextManualSyncMs;
     const nextManualSyncText = nextManualSyncMs ? new Date(nextManualSyncMs).toLocaleString() : "Now";
-    const lastAutoSyncText = lastAutoSyncMs ? new Date(lastAutoSyncMs).toLocaleString() : "Never";
+    const lastSyncMs = Math.max(lastManualSyncMs, lastAutoSyncMs);
+    const lastSyncText = lastSyncMs ? new Date(lastSyncMs).toLocaleString() : "Never";
     const googleLinked = isGoogleLinked(user);
     const hasMfa = Boolean(user && user.multiFactor && Array.isArray(user.multiFactor.enrolledFactors) && user.multiFactor.enrolledFactors.length > 0);
+
+    const staleOpenAccountButton = document.getElementById("settings-open-account");
+    if (staleOpenAccountButton) {
+      staleOpenAccountButton.remove();
+    }
 
     const tabRow = document.createElement("div");
     tabRow.className = "flex items-center gap-2 mt-2";
     tabRow.id = "settings-account-tab-row";
     tabRow.innerHTML = `
       <button type="button" data-settings-tab="account" onclick="switchSettingsCategory('account')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-user"></i><span>Account</span></button>
-      <button type="button" onclick="switchSettingsCategory('account')" title="Open Account" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-arrow-right"></i></button>
     `;
     aside.appendChild(tabRow);
 
@@ -1265,7 +1279,7 @@
       <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
         <label class="block mb-2 text-sm text-gray-300">Data Sync</label>
         <p class="text-sm text-gray-300 mb-1">Auto sync: every 30 minutes</p>
-        <p class="text-sm text-gray-300 mb-1">Last auto sync: ${escapeHtml(lastAutoSyncText)}</p>
+        <p class="text-sm text-gray-300 mb-1">Last sync: ${escapeHtml(lastSyncText)}</p>
         <p class="text-sm text-gray-300 mb-3">Next manual sync: ${escapeHtml(nextManualSyncText)}</p>
         <button id="settings-sync-now" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition" ${canManualSyncNow ? "" : "disabled"}>Sync Now</button>
         <p id="settings-sync-status" class="text-sm mt-3"></p>
