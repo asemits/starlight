@@ -6,7 +6,7 @@
 	const PAGE_SIZE = 18;
 	const POPULAR_LIMIT = 10;
 	const POPULAR_REFRESH_MS = 15000;
-	const GAME_LIST_CACHE_KEY = "starlight-games-list-v6";
+	const GAME_LIST_CACHE_KEY = "starlight-games-list-v7";
 
 	const state = {
 		mountSelector: "#games-root",
@@ -208,8 +208,6 @@
 		const decoded = decodeURIComponent(base)
 			.replaceAll(/[_-]+/g, " ")
 			.replaceAll(/([a-z])([A-Z])/g, "$1 $2")
-			.replaceAll(/([A-Za-z])(\d)/g, "$1 $2")
-			.replaceAll(/(\d)([A-Za-z])/g, "$1 $2")
 			.replaceAll(/\s+/g, " ")
 			.trim();
 		if (!decoded) {
@@ -219,6 +217,32 @@
 			.split(" ")
 			.map((word) => (word ? word.charAt(0).toUpperCase() + word.slice(1) : ""))
 			.join(" ");
+	}
+
+	function isWeakTitle(value) {
+		const title = String(value || "").trim();
+		if (!title) {
+			return true;
+		}
+		const normalized = title.toLowerCase();
+		if (["unity webgl player", "index", "home", "game", "untitled"].includes(normalized)) {
+			return true;
+		}
+		if (/^https?:\/\//i.test(title)) {
+			return true;
+		}
+		if (title.length <= 4 && !title.includes(" ")) {
+			return true;
+		}
+		return false;
+	}
+
+	function resolveDisplayTitle(rawTitle, path) {
+		const parsed = filenameToTitle(path);
+		if (isWeakTitle(rawTitle)) {
+			return parsed;
+		}
+		return String(rawTitle || "").replaceAll(/\s+/g, " ").trim();
 	}
 
 	function dedupeGames(list) {
@@ -319,7 +343,7 @@
 					const imagePath = normalizePath(item.image || "");
 					const rawTitle = String(item.title || "").trim();
 					return {
-						title: filenameToTitle(rawTitle || path),
+						title: resolveDisplayTitle(rawTitle, path),
 						url: path,
 						image: imagePath ? `${SECONDARY_CDN_BASE}${encodePath(imagePath)}` : "",
 						sourceBase: SECONDARY_CDN_BASE
