@@ -226,6 +226,12 @@
             <p class="card-desc">Forecast and alerts</p>
             <div class="glow-bar"></div>
           </a>
+          <a href="/music" class="nav-link tool-card" style="animation-delay: 0.5s;">
+            <i class="fa-solid fa-music"></i>
+            <h2>Music</h2>
+            <p class="card-desc">Listen to your favorite tracks</p>
+            <div class="glow-bar"></div>
+          </a>
         </div>
       `;
     }
