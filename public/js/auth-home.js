@@ -9,6 +9,7 @@
     siteName: "starlight",
     heroTagline: "your launchpad for games, tools, and everything in between",
     heroSubtext: "",
+    privacyPolicyText: `Starlight Privacy Policy\n\n1. We use Firebase Authentication to manage sign-in state.\n2. We store only required account metadata and app activity needed for features.\n3. We do not intentionally store sensitive personal data in plain text.\n4. You can stop using the service at any time and request account data removal through the site owner.\n\nEdit this text directly in public/js/auth-home.js.`,
     tosText: `Starlight Terms of Service\n\n1. Use this site responsibly.\n2. Do not abuse or disrupt services.\n3. Respect applicable laws and school/workplace policies.\n4. Accounts violating these terms may be restricted.\n\nEdit this text directly in public/js/auth-home.js.`,
     features: [
       {

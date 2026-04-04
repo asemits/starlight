@@ -2,6 +2,18 @@
   const modules = window.StarlightRouteModules = window.StarlightRouteModules || {};
   modules["/settings"] = {
     render: function renderSettingsRoute() {
+      const authConfig = window.StarlightAuthUI && window.StarlightAuthUI.config ? window.StarlightAuthUI.config : {};
+      const tosText = String(authConfig.tosText || "Terms of Service are not configured.");
+      const privacyText = String(authConfig.privacyPolicyText || "Privacy Policy is not configured.");
+      const escapeHtml = (value) => String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+      const tosHtml = escapeHtml(tosText).replaceAll("\n", "<br>");
+      const privacyHtml = escapeHtml(privacyText).replaceAll("\n", "<br>");
+
       return `
         <div class="p-8 max-w-6xl mx-auto">
           <h1 class="text-3xl font-bold font-orbitron mb-6">Settings</h1>
@@ -30,6 +42,9 @@
               <div class="flex items-center gap-2">
                 <button type="button" data-settings-tab="widget" onclick="switchSettingsCategory('widget')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-table-cells-large"></i><span>Widget</span></button>
                 <button type="button" onclick="resetSettingsCategory('widget')" title="Reset Widget defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+              </div>
+              <div class="flex items-center gap-2 mt-2">
+                <button type="button" data-settings-tab="about" onclick="switchSettingsCategory('about')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-circle-info"></i><span>About</span></button>
               </div>
             </aside>
 
@@ -226,6 +241,18 @@
                       </select>
                     </div>
                   </div>
+                </article>
+              </div>
+
+              <div data-settings-panel="about" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                  <h2 class="text-lg font-semibold mb-3">Privacy Policy</h2>
+                  <div class="text-sm text-gray-200 leading-6 max-h-[420px] overflow-y-auto pr-1">${privacyHtml}</div>
+                </article>
+
+                <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                  <h2 class="text-lg font-semibold mb-3">Terms of Service</h2>
+                  <div class="text-sm text-gray-200 leading-6 max-h-[420px] overflow-y-auto pr-1">${tosHtml}</div>
                 </article>
               </div>
             </section>
