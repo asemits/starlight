@@ -131,6 +131,14 @@
 
                     <div data-settings-panel="particles" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <label class="block mb-2 text-sm text-gray-300">Particles</label>
+                        <select onchange="changeGamesParticlesEnabled(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                          <option value="on" ${localStorage.getItem('games-particles-enabled') === 'off' ? '' : 'selected'}>On</option>
+                          <option value="off" ${localStorage.getItem('games-particles-enabled') === 'off' ? 'selected' : ''}>Off</option>
+                        </select>
+                      </article>
+
+                      <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
                         <label class="block mb-2 text-sm text-gray-300">Particle Bonds</label>
                         <select onchange="changeGamesParticlesBonds(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
                           <option value="off" ${localStorage.getItem('games-particles-bonds') === 'on' ? '' : 'selected'}>Off</option>

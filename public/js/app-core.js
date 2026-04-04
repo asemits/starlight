@@ -140,6 +140,17 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
   };
 
+  window.changeGamesParticlesEnabled = function changeGamesParticlesEnabled(newValue) {
+    const value = newValue === "off" ? "off" : "on";
+    localStorage.setItem("games-particles-enabled", value);
+    if (window.updateGlobalParticlesSettings) {
+      window.updateGlobalParticlesSettings();
+    }
+    if (window.location.pathname === "/games" && window.StarlightGames) {
+      window.StarlightGames.render();
+    }
+  };
+
   window.changeGamesParticlesBonds = function changeGamesParticlesBonds(newValue) {
     const value = newValue === "on" ? "on" : "off";
     localStorage.setItem("games-particles-bonds", value);
@@ -611,6 +622,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
     function currentSettings() {
       return {
+        enabled: localStorage.getItem("games-particles-enabled") !== "off",
         color: ensureHexColor(localStorage.getItem("games-particles-color") || "#ffffff"),
         bondsOn: localStorage.getItem("games-particles-bonds") === "on"
       };
@@ -650,6 +662,11 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
     function draw() {
       ctx.clearRect(0, 0, width, height);
+
+      if (!settings.enabled) {
+        requestAnimationFrame(draw);
+        return;
+      }
 
       for (const particle of particles) {
         particle.x += particle.vx;
@@ -693,11 +710,14 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
     window.updateGlobalParticlesSettings = function updateGlobalParticlesSettings() {
       const next = currentSettings();
+      settings.enabled = next.enabled;
       settings.color = next.color;
       settings.bondsOn = next.bondsOn;
+      canvas.style.display = settings.enabled ? "block" : "none";
     };
 
     resize();
+    canvas.style.display = settings.enabled ? "block" : "none";
     draw();
     window.addEventListener("resize", resize);
   })();
