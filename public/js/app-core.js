@@ -528,7 +528,6 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       widget.id = "starlight-info-widget";
       widget.innerHTML = `
         <header class="starlight-widget-handle" data-widget-handle>
-          <span class="starlight-widget-title">Widget</span>
           <i class="fa-solid fa-grip-lines starlight-widget-grip"></i>
         </header>
         <div class="starlight-widget-body">
