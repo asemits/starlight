@@ -460,7 +460,7 @@ function toggleLoop() {
       badge.className = 'loop-badge';
       badge.style.cssText = `
         position:absolute; top:-4px; right:-4px;
-        width:14px; height:14px; border-radius:50%;
+        width:14px; height:15px; border-radius:50%;
         background:var(--mint); color:#000;
         font-size:8px; font-weight:700;
         display:flex; align-items:center; justify-content:center;
