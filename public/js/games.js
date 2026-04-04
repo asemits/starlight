@@ -875,6 +875,23 @@
 		return state.games[0] || null;
 	}
 
+	function heroImageChain(game) {
+		const candidates = [
+			...thumbFallback(game.path, game.sourceBase).split("|"),
+			game.image || "",
+			"/logos/logo.png"
+		];
+		const chain = [];
+		for (const candidate of candidates) {
+			const normalized = normalizeImageUrl(candidate, game.sourceBase);
+			if (!normalized || chain.includes(normalized)) {
+				continue;
+			}
+			chain.push(normalized);
+		}
+		return chain;
+	}
+
 	function renderHero(root) {
 		const heroWrap = root.querySelector("#games-hero");
 		if (!heroWrap) {
@@ -888,11 +905,13 @@
 		}
 
 		const stats = statsForPath(heroGame.path);
-		const heroFallbacks = thumbFallback(heroGame.path, heroGame.sourceBase);
-		const heroInitialSrc = heroGame.image || heroFallbacks.split("|")[0] || "/logos/logo.png";
+		const heroChain = heroImageChain(heroGame);
+		const heroInitialSrc = heroChain[0] || "/logos/logo.png";
+		const heroFallbacks = heroChain.slice(1).join("|");
 		heroWrap.innerHTML = `
 			<article class="games-hero-card game-open-trigger" data-path="${escapeHtml(heroGame.path)}" data-base="${escapeHtml(normalizeSourceBase(heroGame.sourceBase))}">
 				<div class="games-hero-media">
+					<img src="${escapeHtml(heroInitialSrc)}" class="games-hero-backdrop" loading="eager" decoding="async" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="" aria-hidden="true">
 					<img src="${escapeHtml(heroInitialSrc)}" class="games-hero-thumb" loading="eager" fetchpriority="high" decoding="async" data-fallbacks="${escapeHtml(heroFallbacks)}" alt="${escapeHtml(heroGame.name)}">
 					<h2 class="games-hero-name">${escapeHtml(heroGame.name)}</h2>
 				</div>
@@ -1172,18 +1191,44 @@
 			.games-hero-media {
 				position: relative;
 				height: clamp(180px, 30vw, 300px);
+				background: #0a0a0a;
 			}
-			.games-hero-thumb {
+			.games-hero-media::after {
+				content: "";
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0.18) 45%, rgba(0,0,0,0.45));
+				pointer-events: none;
+				z-index: 2;
+			}
+			.games-hero-backdrop {
+				position: absolute;
+				inset: 0;
 				width: 100%;
 				height: 100%;
 				object-fit: cover;
-				background: #111;
+				filter: blur(24px) saturate(1.2) brightness(0.78);
+				transform: scale(1.12);
+				opacity: 0.95;
+			}
+			.games-hero-thumb {
+				position: relative;
+				z-index: 1;
+				width: min(100%, 760px);
+				height: 100%;
+				margin: 0 auto;
+				object-fit: contain;
+				object-position: center;
+				padding: 10px 16px 16px;
+				background: transparent;
 				display: block;
+				filter: drop-shadow(0 18px 34px rgba(0,0,0,0.6));
 			}
 			.games-hero-name {
 				position: absolute;
 				left: 14px;
 				top: 12px;
+				z-index: 3;
 				margin: 0;
 				font-size: clamp(16px, 2.2vw, 24px);
 				font-weight: 600;
