@@ -436,9 +436,11 @@
     const featureCards = config.features.map((card) => {
       return `
         <a href="${escapeHtml(card.href)}" class="starlight-home-feature nav-link" ${isLoggedIn() ? "" : "tabindex='-1'"}>
-          <div class="starlight-home-feature-icon"><i class="${escapeHtml(card.icon)}"></i></div>
-          <h3>${escapeHtml(card.title)}</h3>
-          <p>${escapeHtml(card.description)}</p>
+          <div class="starlight-home-feature-inner">
+            <div class="starlight-home-feature-icon"><i class="${escapeHtml(card.icon)}"></i></div>
+            <h3>${escapeHtml(card.title)}</h3>
+            <p>${escapeHtml(card.description)}</p>
+          </div>
         </a>
       `;
     }).join("");
