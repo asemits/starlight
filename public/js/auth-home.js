@@ -35,7 +35,7 @@
       },
             {
         title: "private",
-        description: "we care about your privacy. All sensitive info is encrypted and we never sell your data to data brokers (they should be broke).",
+        description: "We care about your privacy. All sensitive info is encrypted and we never sell your data to data brokers.",
         icon: "fa-solid fa-lock",
         href: "/settings"
       }
