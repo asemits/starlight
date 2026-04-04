@@ -351,7 +351,9 @@
     window.dispatchEvent(new CustomEvent("starlight:weather-current", {
       detail: {
         icon: weatherIconClass(current.weather_code),
-        temp: widgetTemp
+        temp: widgetTemp,
+        tempValue: Number(current.temperature_2m || 0),
+        system
       }
     }));
 

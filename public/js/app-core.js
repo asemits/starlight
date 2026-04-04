@@ -411,18 +411,57 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   let widgetBatteryBound = false;
   let widgetTick = 0;
   let widgetWeatherIcon = "fa-cloud";
-  let widgetWeatherTemp = "--";
+  let widgetWeatherTempValue = null;
+  let widgetWeatherTempSystem = "imperial";
+
+  function convertTemp(value, fromSystem, toSystem) {
+    const input = Number(value);
+    if (!Number.isFinite(input)) {
+      return null;
+    }
+    if (fromSystem === toSystem) {
+      return input;
+    }
+    if (fromSystem === "metric" && toSystem === "imperial") {
+      return (input * 9) / 5 + 32;
+    }
+    if (fromSystem === "imperial" && toSystem === "metric") {
+      return ((input - 32) * 5) / 9;
+    }
+    return input;
+  }
+
+  function formatWidgetWeatherTemp() {
+    const targetSystem = window.getMeasurementSystem();
+    const unit = targetSystem === "metric" ? "C" : "F";
+    const converted = convertTemp(widgetWeatherTempValue, widgetWeatherTempSystem, targetSystem);
+    if (!Number.isFinite(converted)) {
+      return "--";
+    }
+    return `${Math.round(converted)}${unit}`;
+  }
 
   function readWidgetWeatherFromCache() {
     try {
       const parsed = JSON.parse(localStorage.getItem(WIDGET_WEATHER_CACHE_KEY) || "{}");
       if (parsed && typeof parsed === "object") {
         widgetWeatherIcon = typeof parsed.icon === "string" && parsed.icon ? parsed.icon : "fa-cloud";
-        widgetWeatherTemp = typeof parsed.temp === "string" && parsed.temp ? parsed.temp : "--";
+        if (typeof parsed.tempValue === "number" && Number.isFinite(parsed.tempValue)) {
+          widgetWeatherTempValue = parsed.tempValue;
+          widgetWeatherTempSystem = parsed.system === "metric" ? "metric" : "imperial";
+        } else if (typeof parsed.temp === "string") {
+          const match = parsed.temp.match(/-?\d+(?:\.\d+)?/);
+          widgetWeatherTempValue = match ? Number(match[0]) : null;
+          widgetWeatherTempSystem = /c$/i.test(parsed.temp) ? "metric" : "imperial";
+        } else {
+          widgetWeatherTempValue = null;
+          widgetWeatherTempSystem = "imperial";
+        }
       }
     } catch (_error) {
       widgetWeatherIcon = "fa-cloud";
-      widgetWeatherTemp = "--";
+      widgetWeatherTempValue = null;
+      widgetWeatherTempSystem = "imperial";
     }
   }
 
@@ -532,7 +571,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     const mode = window.getInfoWidgetTimeMode();
     dateTextNode.textContent = formatWidgetDate(new Date(), format, mode);
     weatherIconNode.className = "fa-solid " + widgetWeatherIcon;
-    weatherTempNode.textContent = widgetWeatherTemp;
+    weatherTempNode.textContent = formatWidgetWeatherTemp();
     batteryIconNode.className = "fa-solid " + getWidgetBatteryIconClass();
     batteryNode.textContent = getWidgetBatteryText();
   }
@@ -799,11 +838,20 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       return;
     }
     widgetWeatherIcon = typeof detail.icon === "string" && detail.icon ? detail.icon : "fa-cloud";
-    widgetWeatherTemp = typeof detail.temp === "string" && detail.temp ? detail.temp : "--";
+    widgetWeatherTempValue = Number.isFinite(Number(detail.tempValue)) ? Number(detail.tempValue) : null;
+    widgetWeatherTempSystem = detail.system === "metric" ? "metric" : "imperial";
     try {
-      localStorage.setItem(WIDGET_WEATHER_CACHE_KEY, JSON.stringify({ icon: widgetWeatherIcon, temp: widgetWeatherTemp }));
+      localStorage.setItem(WIDGET_WEATHER_CACHE_KEY, JSON.stringify({
+        icon: widgetWeatherIcon,
+        tempValue: widgetWeatherTempValue,
+        system: widgetWeatherTempSystem
+      }));
     } catch (_error) {
     }
+    renderInfoWidgetNow();
+  });
+
+  window.addEventListener("starlight:measurement-changed", () => {
     renderInfoWidgetNow();
   });
 

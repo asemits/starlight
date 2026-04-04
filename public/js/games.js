@@ -586,44 +586,6 @@
 			return;
 		}
 
-		await window.starlightDb.runTransaction(async (tx) => {
-			const [statsDoc, playerDoc] = await Promise.all([tx.get(refs.statsRef), tx.get(refs.playerRef)]);
-			const now = firebase.firestore.FieldValue.serverTimestamp();
-			const oldRating = playerDoc.exists ? Number(playerDoc.data().rating || 0) : 0;
-			const nextRating = oldRating === Number(rating) ? 0 : Number(rating);
-
-			if (!statsDoc.exists) {
-				tx.set(refs.statsRef, {
-					name: game.name,
-					path: game.path,
-					sourceBase: normalizeSourceBase(game.sourceBase),
-					image: game.image,
-					plays: 0,
-					uniqueClicks: 0,
-					thumbsUp: 0,
-					thumbsDown: 0,
-					currentPlayers: 0,
-					updatedAt: now
-				}, { merge: true });
-			}
-
-			const thumbsUpDelta = (nextRating === 1 ? 1 : 0) - (oldRating === 1 ? 1 : 0);
-			const thumbsDownDelta = (nextRating === -1 ? 1 : 0) - (oldRating === -1 ? 1 : 0);
-			const increment = firebase.firestore.FieldValue.increment;
-
-			tx.set(refs.statsRef, {
-				sourceBase: normalizeSourceBase(game.sourceBase),
-				thumbsUp: increment(thumbsUpDelta),
-				thumbsDown: increment(thumbsDownDelta),
-				updatedAt: now
-			}, { merge: true });
-
-			tx.set(refs.playerRef, {
-				rating: nextRating,
-				lastRatedAt: now
-			}, { merge: true });
-		});
-
 		const prev = statsForPath(game.path);
 		const nextRating = prev.myRating === Number(rating) ? 0 : Number(rating);
 		mergeStatCache(game.path, {
@@ -631,6 +593,49 @@
 			thumbsDown: prev.thumbsDown + ((nextRating === -1 ? 1 : 0) - (prev.myRating === -1 ? 1 : 0)),
 			myRating: nextRating
 		});
+
+		try {
+			await window.starlightDb.runTransaction(async (tx) => {
+				const [statsDoc, playerDoc] = await Promise.all([tx.get(refs.statsRef), tx.get(refs.playerRef)]);
+				const now = firebase.firestore.FieldValue.serverTimestamp();
+				const oldRating = playerDoc.exists ? Number(playerDoc.data().rating || 0) : 0;
+				const desiredRating = oldRating === Number(rating) ? 0 : Number(rating);
+
+				if (!statsDoc.exists) {
+					tx.set(refs.statsRef, {
+						name: game.name,
+						path: game.path,
+						sourceBase: normalizeSourceBase(game.sourceBase),
+						image: game.image,
+						plays: 0,
+						uniqueClicks: 0,
+						thumbsUp: 0,
+						thumbsDown: 0,
+						currentPlayers: 0,
+						updatedAt: now
+					}, { merge: true });
+				}
+
+				const thumbsUpDelta = (desiredRating === 1 ? 1 : 0) - (oldRating === 1 ? 1 : 0);
+				const thumbsDownDelta = (desiredRating === -1 ? 1 : 0) - (oldRating === -1 ? 1 : 0);
+				const increment = firebase.firestore.FieldValue.increment;
+
+				tx.set(refs.statsRef, {
+					sourceBase: normalizeSourceBase(game.sourceBase),
+					thumbsUp: increment(thumbsUpDelta),
+					thumbsDown: increment(thumbsDownDelta),
+					updatedAt: now
+				}, { merge: true });
+
+				tx.set(refs.playerRef, {
+					rating: desiredRating,
+					lastRatedAt: now
+				}, { merge: true });
+			});
+		} catch (error) {
+			mergeStatCache(game.path, prev);
+			throw error;
+		}
 	}
 
 	async function acquirePresence(game) {
@@ -1002,13 +1007,25 @@
 		});
 
 		overlay.querySelector("#overlay-up").addEventListener("click", async () => {
-			await setRating(game, 1);
+			setRating(game, 1)
+				.catch(() => {
+				})
+				.finally(() => {
+					renderOverlayStats(overlay, game.path);
+					queueRender();
+				});
 			renderOverlayStats(overlay, game.path);
 			queueRender();
 		});
 
 		overlay.querySelector("#overlay-down").addEventListener("click", async () => {
-			await setRating(game, -1);
+			setRating(game, -1)
+				.catch(() => {
+				})
+				.finally(() => {
+					renderOverlayStats(overlay, game.path);
+					queueRender();
+				});
 			renderOverlayStats(overlay, game.path);
 			queueRender();
 		});
@@ -1386,7 +1403,14 @@
 				const rating = Number(rateButton.getAttribute("data-rate") || "0");
 				const game = findGame(path, sourceBase);
 				if (game) {
-					await setRating(game, rating);
+					setRating(game, rating)
+						.catch(() => {
+						})
+						.finally(() => {
+							renderHero(root);
+							renderPopular(root);
+							renderCards(root, false);
+						});
 					renderHero(root);
 					renderPopular(root);
 					renderCards(root, false);
