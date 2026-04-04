@@ -342,7 +342,6 @@
         `${aqiNow ?? "N/A"} ${aqiText(aqiNow)}`,
         daily.sunrise && daily.sunrise[0] ? formatHour(daily.sunrise[0]) : "--",
         daily.sunset && daily.sunset[0] ? formatHour(daily.sunset[0]) : "--",
-        weatherLabel(hourly.weather_code[i])
       ));
     }
 
@@ -370,7 +369,6 @@
         `${aqiNow ?? "N/A"} ${aqiText(aqiNow)}`,
         daily.sunrise && daily.sunrise[i] ? formatHour(daily.sunrise[i]) : "--",
         daily.sunset && daily.sunset[i] ? formatHour(daily.sunset[i]) : "--",
-        weatherLabel(daily.weather_code[i])
       ));
     }
 
