@@ -29,9 +29,9 @@
 	left: 24px;
 	top: 90px;
 	z-index: 2000;
-	min-width: 230px;
+	min-width: 220px;
 	max-width: 320px;
-	padding: 8px 10px 10px;
+	padding: 8px 10px;
 	border-radius: 12px;
 	border: 1px solid rgba(255, 255, 255, 0.2);
 	background: rgba(0, 0, 0, 0.6);
@@ -42,14 +42,43 @@
 }
 
 .starlight-widget-handle {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 	cursor: grab;
 	font-size: 11px;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: rgba(255, 255, 255, 0.7);
-	padding-bottom: 6px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-	margin-bottom: 8px;
+	padding-bottom: 2px;
+	margin-bottom: 6px;
+}
+
+.starlight-widget-title {
+	font-size: 10px;
+}
+
+.starlight-widget-grip {
+	font-size: 11px;
+	opacity: 0.7;
+}
+
+.starlight-widget-body {
+	display: grid;
+	gap: 4px;
+}
+
+.starlight-widget-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.starlight-widget-row i {
+	width: 14px;
+	text-align: center;
+	font-size: 12px;
+	opacity: 0.9;
 }
 
 .starlight-widget-date,

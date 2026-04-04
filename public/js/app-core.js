@@ -451,12 +451,27 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     return normalized.replace(/%[YymdeHIMSpaAbB%]/g, (match) => (match in tokens ? tokens[match] : match));
   }
 
-  function getWidgetBatteryText() {
+  function getWidgetBatteryIconClass() {
+    if (widgetBatteryCharging) {
+      return "fa-bolt";
+    }
     if (typeof widgetBatteryLevel !== "number") {
-      return "Battery: N/A";
+      return "fa-battery-empty";
     }
     const pct = Math.round(widgetBatteryLevel * 100);
-    return "Battery: " + pct + "%" + (widgetBatteryCharging ? " (charging)" : "");
+    if (pct >= 90) return "fa-battery-full";
+    if (pct >= 65) return "fa-battery-three-quarters";
+    if (pct >= 40) return "fa-battery-half";
+    if (pct >= 20) return "fa-battery-quarter";
+    return "fa-battery-empty";
+  }
+
+  function getWidgetBatteryText() {
+    if (typeof widgetBatteryLevel !== "number") {
+      return "N/A";
+    }
+    const pct = Math.round(widgetBatteryLevel * 100);
+    return pct + "%" + (widgetBatteryCharging ? " charging" : "");
   }
 
   function renderInfoWidgetNow() {
@@ -465,13 +480,15 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       return;
     }
     const dateTextNode = node.querySelector("[data-widget-date]");
+    const batteryIconNode = node.querySelector("[data-widget-battery-icon]");
     const batteryNode = node.querySelector("[data-widget-battery]");
-    if (!dateTextNode || !batteryNode) {
+    if (!dateTextNode || !batteryIconNode || !batteryNode) {
       return;
     }
     const format = window.getInfoWidgetFormat();
     const mode = window.getInfoWidgetTimeMode();
     dateTextNode.textContent = formatWidgetDate(new Date(), format, mode);
+    batteryIconNode.className = "fa-solid " + getWidgetBatteryIconClass();
     batteryNode.textContent = getWidgetBatteryText();
   }
 
@@ -510,9 +527,19 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       widget = document.createElement("section");
       widget.id = "starlight-info-widget";
       widget.innerHTML = `
-        <div class="starlight-widget-handle" data-widget-handle>
+        <header class="starlight-widget-handle" data-widget-handle>
+          <span class="starlight-widget-title">Widget</span>
+          <i class="fa-solid fa-grip-lines starlight-widget-grip"></i>
+        </header>
+        <div class="starlight-widget-body">
+          <div class="starlight-widget-row">
+            <i class="fa-regular fa-clock"></i>
             <p class="starlight-widget-date" data-widget-date></p>
+          </div>
+          <div class="starlight-widget-row">
+            <i class="fa-solid fa-battery-half" data-widget-battery-icon></i>
             <p class="starlight-widget-battery" data-widget-battery></p>
+          </div>
         </div>
       `;
       document.body.appendChild(widget);
