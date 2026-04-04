@@ -99,7 +99,6 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
         && (!('usernameHash' in request.resource.data) || isNonEmptyString(request.resource.data.usernameHash, 128))
-        && (!('usernameChangedAt' in request.resource.data) || request.resource.data.usernameChangedAt is timestamp)
         && (!('providers' in request.resource.data) || request.resource.data.providers is list)
         && (!('email' in request.resource.data) || request.resource.data.email is string)
         && (!('username' in request.resource.data) || request.resource.data.username is string)
