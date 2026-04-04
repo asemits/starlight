@@ -6,6 +6,15 @@
     error: ""
   };
 
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
   function ensureStyles() {
     if (document.getElementById("starlight-weather-styles")) {
       return;
@@ -18,9 +27,14 @@
       .weather-panel { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.13); border-radius: 28px; padding: 14px; }
       .weather-panel h2 { margin: 0 0 8px; font-size: 20px; letter-spacing: 0.02em; }
       .alerts-list { display: grid; gap: 8px; }
-      .alert-item { border: 1px solid rgba(255,255,255,0.25); border-radius: 14px; padding: 8px 10px; background: rgba(35,35,35,0.62); }
+      .alert-item { border: 1px solid rgba(255,255,255,0.25); border-radius: 14px; padding: 8px 10px; background: rgba(35,35,35,0.62); display: grid; gap: 6px; }
       .alert-item h3 { margin: 0 0 5px; font-size: 14px; }
       .alert-item p { margin: 0; font-size: 12px; opacity: 0.84; line-height: 1.35; }
+      .alert-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 12px; opacity: 0.88; }
+      .alert-description { max-height: 120px; overflow-y: auto; white-space: pre-wrap; line-height: 1.35; font-size: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 6px; }
+      .alert-actions { max-height: 70px; overflow-y: auto; white-space: pre-wrap; line-height: 1.3; font-size: 12px; opacity: 0.9; background: rgba(0,0,0,0.22); border-radius: 9px; padding: 6px; }
+      .alert-description::-webkit-scrollbar, .alert-actions::-webkit-scrollbar { width: 8px; }
+      .alert-description::-webkit-scrollbar-thumb, .alert-actions::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.35); border-radius: 999px; }
       .alert-extreme { border-color: rgba(255,90,90,0.9); }
       .alert-severe { border-color: rgba(255,180,0,0.9); }
       .alert-moderate { border-color: rgba(200,230,0,0.9); }
@@ -332,8 +346,18 @@
     }
 
     const dailyCards = [];
-    const dailyCount = Math.min(6, (daily.time || []).length);
-    for (let i = 0; i < dailyCount; i += 1) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dailyTime = daily.time || [];
+    for (let i = 0; i < dailyTime.length; i += 1) {
+      if (dailyCards.length >= 6) {
+        break;
+      }
+      const dayValue = new Date(dailyTime[i]);
+      dayValue.setHours(0, 0, 0, 0);
+      if (dayValue <= today) {
+        continue;
+      }
       dailyCards.push(buildCard(
         formatDay(daily.time[i]),
         weatherIconClass(daily.weather_code[i]),
@@ -352,17 +376,31 @@
     const alertItems = (alerts.features || []).slice(0, 3).map((feature) => {
       const props = feature.properties || {};
       const cls = alertLevelClass(props.severity);
-      const title = props.headline || props.event || "Weather alert";
-      const desc = props.description ? String(props.description).slice(0, 170) : "No description";
+      const title = escapeHtml(props.headline || props.event || "Weather alert");
+      const desc = escapeHtml(props.description || "No description");
+      const actions = escapeHtml(props.instruction || "Follow local guidance");
+      const certainty = escapeHtml(props.certainty || "Unknown");
+      const urgency = escapeHtml(props.urgency || "Unknown");
+      const severity = escapeHtml(props.severity || "Unknown");
       const expires = props.expires ? new Date(props.expires).toLocaleString() : "N/A";
-      return `<article class="alert-item ${cls}"><h3>${title}</h3><p>${desc}</p><p>Actions: ${props.instruction || "Follow local guidance"}</p><p>Expires: ${expires}</p></article>`;
+      return `<article class="alert-item ${cls}">
+        <h3>${title}</h3>
+        <div class="alert-meta">
+          <span>Certainty: ${certainty}</span>
+          <span>Urgency: ${urgency}</span>
+          <span>Severity: ${severity}</span>
+          <span>Expires: ${escapeHtml(expires)}</span>
+        </div>
+        <div class="alert-description">${desc}</div>
+        <div class="alert-actions">Actions: ${actions}</div>
+      </article>`;
     }).join("");
 
     root.innerHTML = `
       <section class="weather-page">
         <div class="weather-grid-top">
           <section class="weather-panel">
-            <h2>Current weather alerts (USE NWS)</h2>
+            <h2>Alerts</h2>
             <div class="alerts-list">${alertItems || "<p class='wx-status'>No active alerts for this area.</p>"}</div>
           </section>
 
@@ -379,20 +417,19 @@
               <div class="wx-mini-row"><i class="fa-solid fa-lungs"></i><span>AQI ${aqiNow ?? "N/A"} (${aqiText(aqiNow)})</span></div>
               <div class="wx-mini-row"><i class="fa-solid fa-sun"></i><span>Sunrise ${daily.sunrise && daily.sunrise[0] ? formatHour(daily.sunrise[0]) : "--"}</span></div>
               <div class="wx-mini-row"><i class="fa-solid fa-moon"></i><span>Sunset ${daily.sunset && daily.sunset[0] ? formatHour(daily.sunset[0]) : "--"}</span></div>
-              <p>${weatherLabel(current.weather_code)}</p>
             </div>
           </section>
 
           <section class="weather-panel">
-            <h2 style="text-align:center;">PoP Graph (time)</h2>
+            <h2 style="text-align:center;">PoP</h2>
             <canvas id="weather-pop-graph"></canvas>
           </section>
         </div>
 
-        <h2 class="wx-strip-label">Time</h2>
+        <h2 class="wx-strip-label">Hourly</h2>
         <div class="wx-scroller" id="weather-hourly-cards">${hourlyCards.join("")}</div>
 
-        <h2 class="wx-strip-label">Day</h2>
+        <h2 class="wx-strip-label">Daily</h2>
         <div class="wx-scroller" id="weather-daily-cards">${dailyCards.join("")}</div>
       </section>
     `;
