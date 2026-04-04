@@ -281,7 +281,7 @@
     return `<div class="wx-card-line"><i class="fa-solid ${icon}"${style}></i><span>${text}</span></div>`;
   }
 
-  function buildCard(title, iconClass, temp, desc, pop, windSpeed, windDirDeg, aqi, sunrise, sunset, outlook) {
+  function buildCard(title, iconClass, temp, desc, pop, windSpeed, windDirDeg, aqi, sunrise, sunset) {
     const rot = Number.isFinite(Number(windDirDeg)) ? `transform: rotate(${Number(windDirDeg)}deg);` : "";
     return `
       <article class="wx-card">
@@ -297,7 +297,6 @@
         ${statRow("fa-lungs", `AQI ${aqi}`)}
         ${statRow("fa-sun", `Sunrise ${sunrise}`)}
         ${statRow("fa-moon", `Sunset ${sunset}`)}
-        <div class="wx-card-outlook">${outlook}</div>
       </article>
     `;
   }
