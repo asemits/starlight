@@ -70,14 +70,36 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isOwner(uid);
 
-      allow create, update: if isOwner(uid)
+      allow create: if isOwner(uid)
         && hasOnlyKeys(request.resource.data, [
-          'uid', 'emailHash', 'providers', 'usernameHash', 'updatedAt'
+          'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt'
         ])
         && request.resource.data.uid == request.auth.uid
         && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
         && (!('usernameHash' in request.resource.data) || isNonEmptyString(request.resource.data.usernameHash, 128))
+        && (!('usernameChangedAt' in request.resource.data) || request.resource.data.usernameChangedAt is timestamp)
         && (!('providers' in request.resource.data) || request.resource.data.providers is list);
+
+      allow update: if isOwner(uid)
+        && hasOnlyKeys(request.resource.data, [
+          'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
+        && (!('usernameHash' in request.resource.data) || isNonEmptyString(request.resource.data.usernameHash, 128))
+        && (!('usernameChangedAt' in request.resource.data) || request.resource.data.usernameChangedAt is timestamp)
+        && (!('providers' in request.resource.data) || request.resource.data.providers is list)
+        && (
+          request.resource.data.usernameHash == resource.data.usernameHash
+          || (
+            ('usernameChangedAt' in request.resource.data)
+            && request.resource.data.usernameChangedAt == request.time
+            && (
+              !('usernameChangedAt' in resource.data)
+              || request.time >= resource.data.usernameChangedAt + duration.value(7, 'd')
+            )
+          )
+        );
 
       allow delete: if isOwner(uid);
     }
@@ -89,7 +111,8 @@ service cloud.firestore {
         && hasOnlyKeys(request.resource.data, ['uid', 'usernameHash', 'updatedAt'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.usernameHash == usernameHash
-        && isNonEmptyString(request.resource.data.usernameHash, 128);
+        && isNonEmptyString(request.resource.data.usernameHash, 128)
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.usernameHash == usernameHash;
 
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }

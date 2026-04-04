@@ -1,5 +1,6 @@
 (function () {
   const VERIFICATION_WINDOW_MS = 5 * 60 * 1000;
+  const USERNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
   const TOS_REQUIRED_MS = 30 * 1000;
   const USER_DOC_COLLECTION = "users";
   const USERNAME_COLLECTION = "usernames";
@@ -249,11 +250,12 @@
     await firestore.collection(USER_DOC_COLLECTION).doc(user.uid).set(payload, { merge: true });
   }
 
-  async function reserveUsername(user, username) {
+  async function reserveUsername(user, username, options) {
     const firestore = db();
     if (!firestore || !user) {
       throw new Error("Database unavailable.");
     }
+    const enforceCooldown = Boolean(options && options.enforceCooldown);
     const clean = String(username || "").trim();
     const normalized = normalizeUsername(clean);
     if (!normalized || !/^[a-z0-9_.-]{3,24}$/.test(normalized)) {
@@ -274,14 +276,16 @@
       }
 
       const oldHash = userDoc.exists && userDoc.data() && userDoc.data().usernameHash ? String(userDoc.data().usernameHash) : "";
-      const oldLower = userDoc.exists && userDoc.data() && userDoc.data().usernameLower ? String(userDoc.data().usernameLower) : "";
+      const oldChangedAtMs = userDoc.exists && userDoc.data() && userDoc.data().usernameChangedAt ? toMillis(userDoc.data().usernameChangedAt) : 0;
+      if (enforceCooldown && oldHash && oldHash !== normalizedHash && oldChangedAtMs) {
+        const unlockAtMs = oldChangedAtMs + USERNAME_CHANGE_COOLDOWN_MS;
+        if (Date.now() < unlockAtMs) {
+          throw new Error("You can change your username once every 7 days.");
+        }
+      }
       if (oldHash && oldHash !== normalizedHash) {
         const oldRef = firestore.collection(USERNAME_COLLECTION).doc(oldHash);
         tx.delete(oldRef);
-      }
-      if (oldLower && oldLower !== normalized) {
-        const oldPlainRef = firestore.collection(USERNAME_COLLECTION).doc(oldLower);
-        tx.delete(oldPlainRef);
       }
 
       tx.set(usernameRef, {
@@ -294,6 +298,7 @@
         uid: user.uid,
         providers: (user.providerData || []).map((item) => item.providerId).filter(Boolean),
         usernameHash: normalizedHash,
+        usernameChangedAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     });
@@ -323,7 +328,7 @@
           <header class="starlight-home-hero">
             <p class="starlight-home-kicker">Dashboard</p>
             <h1>${escapeHtml(config.siteName)}</h1>
-            <p class="starlight-home-tagline">Welcome back.</p>
+            <p class="starlight-home-tagline">welcome back</p>
           </header>
 
           <section class="starlight-dashboard-section">
@@ -955,7 +960,37 @@
     }
   }
 
-  function mountSettingsAuthPanel(forceRefresh) {
+  async function changeUsernameInSettings() {
+    const user = currentUser();
+    if (!user) {
+      setStatus("settings-username-status", "You must be logged in.", false);
+      return;
+    }
+
+    const input = document.getElementById("settings-username-input");
+    const username = String(input && input.value ? input.value : "").trim();
+    if (!/^[A-Za-z0-9_.-]{3,24}$/.test(username)) {
+      setStatus("settings-username-status", "Use 3-24 characters: letters, numbers, underscore, period, or dash.", false);
+      return;
+    }
+
+    if (String(user.displayName || "").trim().toLowerCase() === username.toLowerCase()) {
+      setStatus("settings-username-status", "That is already your username.", false);
+      return;
+    }
+
+    try {
+      await reserveUsername(user, username, { enforceCooldown: true });
+      await user.updateProfile({ displayName: username });
+      await ensureUserDoc(user, username);
+      setStatus("settings-username-status", "Username updated.", true);
+      mountSettingsAuthPanel(true);
+    } catch (error) {
+      setStatus("settings-username-status", error && error.message ? error.message : "Could not update username.", false);
+    }
+  }
+
+  async function mountSettingsAuthPanel(forceRefresh) {
     const aside = document.querySelector("[data-settings-tab='widget']")?.closest("aside");
     const section = document.querySelector("section > [data-settings-panel='layout']")?.parentElement;
     if (!aside || !section) {
@@ -978,6 +1013,22 @@
     }
 
     const user = currentUser();
+    const firestore = db();
+    let usernameChangedAtMs = 0;
+    if (firestore && user) {
+      try {
+        const userSnap = await firestore.collection(USER_DOC_COLLECTION).doc(user.uid).get();
+        if (userSnap.exists) {
+          usernameChangedAtMs = toMillis(userSnap.data().usernameChangedAt);
+        }
+      } catch (_error) {
+      }
+    }
+    const nextAllowedMs = usernameChangedAtMs > 0 ? usernameChangedAtMs + USERNAME_CHANGE_COOLDOWN_MS : 0;
+    const canChangeNow = !nextAllowedMs || Date.now() >= nextAllowedMs;
+    const nextAllowedText = nextAllowedMs
+      ? new Date(nextAllowedMs).toLocaleString()
+      : "Now";
     const googleLinked = isGoogleLinked(user);
     const hasMfa = Boolean(user && user.multiFactor && Array.isArray(user.multiFactor.enrolledFactors) && user.multiFactor.enrolledFactors.length > 0);
 
@@ -1015,6 +1066,18 @@
         <div id="mfa-recaptcha"></div>
         <p id="settings-mfa-status" class="text-sm mt-3"></p>
       </article>
+
+      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
+        <label class="block mb-2 text-sm text-gray-300">Username</label>
+        <p class="text-sm text-gray-300 mb-2">Current username: ${escapeHtml(String(user && user.displayName ? user.displayName : "Not set"))}</p>
+        <p class="text-sm text-gray-300 mb-3">Next allowed change: ${escapeHtml(nextAllowedText)}</p>
+        <div class="flex flex-wrap gap-2">
+          <input id="settings-username-input" type="text" minlength="3" maxlength="24" pattern="[A-Za-z0-9_.-]{3,24}" class="flex-1 min-w-[220px] bg-black border border-white/20 p-3 rounded-xl text-white outline-none" placeholder="New username" />
+          <button id="settings-username-save" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition" ${canChangeNow ? "" : "disabled"}>Save Username</button>
+        </div>
+        <p class="text-sm text-gray-300 mt-2">You can change your username once every 7 days.</p>
+        <p id="settings-username-status" class="text-sm mt-3"></p>
+      </article>
     `;
     section.appendChild(panel);
 
@@ -1041,6 +1104,11 @@
     const disableBtn = document.getElementById("mfa-disable");
     if (disableBtn) {
       disableBtn.addEventListener("click", disableMfaInSettings);
+    }
+
+    const usernameBtn = document.getElementById("settings-username-save");
+    if (usernameBtn) {
+      usernameBtn.addEventListener("click", changeUsernameInSettings);
     }
   }
 
