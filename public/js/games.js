@@ -576,16 +576,6 @@
 	}
 
 	async function setRating(game, rating) {
-		const authReady = await ensureAuthReady();
-		if (!authReady) {
-			return;
-		}
-
-		const refs = statRefs(game.path);
-		if (!refs) {
-			return;
-		}
-
 		const prev = statsForPath(game.path);
 		const nextRating = prev.myRating === Number(rating) ? 0 : Number(rating);
 		mergeStatCache(game.path, {
@@ -593,6 +583,18 @@
 			thumbsDown: prev.thumbsDown + ((nextRating === -1 ? 1 : 0) - (prev.myRating === -1 ? 1 : 0)),
 			myRating: nextRating
 		});
+
+		const authReady = await ensureAuthReady();
+		if (!authReady) {
+			mergeStatCache(game.path, prev);
+			throw new Error("auth-not-ready");
+		}
+
+		const refs = statRefs(game.path);
+		if (!refs) {
+			mergeStatCache(game.path, prev);
+			throw new Error("missing-refs");
+		}
 
 		try {
 			await window.starlightDb.runTransaction(async (tx) => {
@@ -1009,8 +1011,6 @@
 		overlay.querySelector("#overlay-up").addEventListener("click", async () => {
 			setRating(game, 1)
 				.catch(() => {
-				})
-				.finally(() => {
 					renderOverlayStats(overlay, game.path);
 					queueRender();
 				});
@@ -1021,8 +1021,6 @@
 		overlay.querySelector("#overlay-down").addEventListener("click", async () => {
 			setRating(game, -1)
 				.catch(() => {
-				})
-				.finally(() => {
 					renderOverlayStats(overlay, game.path);
 					queueRender();
 				});
@@ -1405,8 +1403,6 @@
 				if (game) {
 					setRating(game, rating)
 						.catch(() => {
-						})
-						.finally(() => {
 							renderHero(root);
 							renderPopular(root);
 							renderCards(root, false);
