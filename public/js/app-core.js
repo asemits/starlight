@@ -510,11 +510,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       widget = document.createElement("section");
       widget.id = "starlight-info-widget";
       widget.innerHTML = `
-        <header class="starlight-widget-handle" data-widget-handle>
-          <span>Date, Time, Battery</span>
-        </header>
-        <p class="starlight-widget-date" data-widget-date></p>
-        <p class="starlight-widget-battery" data-widget-battery></p>
+        <div class="starlight-widget-handle" data-widget-handle>
+            <p class="starlight-widget-date" data-widget-date></p>
+            <p class="starlight-widget-battery" data-widget-battery></p>
+        </div>
       `;
       document.body.appendChild(widget);
 
