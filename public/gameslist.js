@@ -410,11 +410,6 @@ window.GAMES_LIST = [
         url: "retroping.html"
     },
     {
-        title: "Pixel Speedrun",
-        image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSDXW8zH2vIr9LKgztdVm5NbIUOkKi9MoPlTA&s", 
-        url: "ragdollsoccer.html"
-    },
-    {
         title: "Parking Furry",
         image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQnECnC1Hr6aSLpXJn0NIVVPVmYM8UbbgMwMQ&s", 
         url: "parkingfurry.html"
@@ -608,11 +603,6 @@ window.GAMES_LIST = [
         title: "Ace Attorney - Justice for All",
         image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU7EX-6WLA9kqcuL1StiGo_PSEK69BCGqvfw&s", 
         url: "aceaj.html"
-    },
-    {
-        title: "Ace Attorney - Trails and Tribulations",
-        image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSSb_Wc-7egGAnk8eLkmtpp6axYGmIeheUK5w&s", 
-        url: "silk.html"
     },
     {
         title: "One Piece",
