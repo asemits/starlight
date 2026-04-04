@@ -15,6 +15,11 @@
   const WRAP_MODE_KEY = "site-wrap-mode";
   const WRAP_ENABLED_KEY = "site-wrap-enabled";
   const WRAP_LAST_URL_KEY = "site-wrap-last-url";
+  const WIDGET_ENABLED_KEY = "info-widget-enabled";
+  const WIDGET_TIME_MODE_KEY = "info-widget-time-mode";
+  const WIDGET_FORMAT_KEY = "info-widget-format";
+  const WIDGET_POS_X_KEY = "info-widget-pos-x";
+  const WIDGET_POS_Y_KEY = "info-widget-pos-y";
 
   function normalizeTarget(input) {
     const raw = String(input || "").trim();
@@ -98,8 +103,14 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       return Boolean(win);
     }
 
-    const target = sameTab ? "_self" : "_blank";
-    const win = window.open("about:blank", target, "noopener");
+    if (sameTab) {
+      document.open();
+      document.write(wrapperHtml(frameUrl));
+      document.close();
+      return true;
+    }
+
+    const win = window.open("about:blank", "_blank", "noopener");
     if (!win) {
       return false;
     }
@@ -293,7 +304,44 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   window.openWrappedNow = function openWrappedNow(mode) {
     const nextMode = mode === "blob" ? "blob" : "about-blank";
     localStorage.setItem(WRAP_MODE_KEY, nextMode);
-    launchWrapped(nextMode, window.location.href, false);
+    launchWrapped(nextMode, window.location.href, true);
+  };
+
+  window.getInfoWidgetEnabled = function getInfoWidgetEnabled() {
+    return localStorage.getItem(WIDGET_ENABLED_KEY) === "off" ? "off" : "on";
+  };
+
+  window.getInfoWidgetFormat = function getInfoWidgetFormat() {
+    return localStorage.getItem(WIDGET_FORMAT_KEY) || "%Y-%m-%d %H:%M:%S";
+  };
+
+  window.getInfoWidgetTimeMode = function getInfoWidgetTimeMode() {
+    return localStorage.getItem(WIDGET_TIME_MODE_KEY) === "24" ? "24" : "12";
+  };
+
+  window.changeInfoWidgetEnabled = function changeInfoWidgetEnabled(value) {
+    localStorage.setItem(WIDGET_ENABLED_KEY, value === "off" ? "off" : "on");
+    mountInfoWidget();
+  };
+
+  window.changeInfoWidgetFormat = function changeInfoWidgetFormat(value) {
+    localStorage.setItem(WIDGET_FORMAT_KEY, String(value || "%Y-%m-%d %H:%M:%S"));
+    renderInfoWidgetNow();
+  };
+
+  window.changeInfoWidgetTimeMode = function changeInfoWidgetTimeMode(value) {
+    localStorage.setItem(WIDGET_TIME_MODE_KEY, value === "24" ? "24" : "12");
+    renderInfoWidgetNow();
+  };
+
+  window.resetInfoWidgetPosition = function resetInfoWidgetPosition() {
+    localStorage.removeItem(WIDGET_POS_X_KEY);
+    localStorage.removeItem(WIDGET_POS_Y_KEY);
+    const widget = document.getElementById("starlight-info-widget");
+    if (widget) {
+      widget.style.left = "24px";
+      widget.style.top = "90px";
+    }
   };
 
   window.mountSoundboardRoute = function mountSoundboardRoute() {
@@ -331,6 +379,193 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   }
 
   saveSidebarPosition(localStorage.getItem("sidebar-pos") || "top");
+
+  let widgetBatteryLevel = null;
+  let widgetBatteryCharging = false;
+  let widgetBatteryBound = false;
+  let widgetTick = 0;
+
+  function pad2(input) {
+    return String(input).padStart(2, "0");
+  }
+
+  function getWidgetDateParts(date) {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hour24 = date.getHours();
+    const hour12 = hour24 % 12 || 12;
+    const minute = date.getMinutes();
+    const second = date.getSeconds();
+    const dayNamesShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dayNamesLong = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const monthShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthLong = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    return {
+      year,
+      month,
+      day,
+      hour24,
+      hour12,
+      minute,
+      second,
+      ampm: hour24 >= 12 ? "PM" : "AM",
+      dowShort: dayNamesShort[date.getDay()],
+      dowLong: dayNamesLong[date.getDay()],
+      monthShort: monthShort[date.getMonth()],
+      monthLong: monthLong[date.getMonth()]
+    };
+  }
+
+  function formatWidgetDate(date, format, timeMode) {
+    const value = String(format || "%Y-%m-%d %H:%M:%S");
+    const p = getWidgetDateParts(date);
+    const tokens = {
+      "%Y": String(p.year),
+      "%y": String(p.year).slice(-2),
+      "%m": pad2(p.month),
+      "%d": pad2(p.day),
+      "%e": String(p.day),
+      "%H": pad2(p.hour24),
+      "%I": pad2(p.hour12),
+      "%M": pad2(p.minute),
+      "%S": pad2(p.second),
+      "%p": p.ampm,
+      "%a": p.dowShort,
+      "%A": p.dowLong,
+      "%b": p.monthShort,
+      "%B": p.monthLong,
+      "%%": "%"
+    };
+
+    let normalized = value;
+    if (timeMode === "12") {
+      normalized = normalized.replaceAll("%H", "%I");
+      if (!normalized.includes("%p")) {
+        normalized += " %p";
+      }
+    } else {
+      normalized = normalized.replaceAll("%I", "%H").replaceAll(" %p", "").replaceAll("%p", "");
+    }
+
+    return normalized.replace(/%[YymdeHIMSpaAbB%]/g, (match) => (match in tokens ? tokens[match] : match));
+  }
+
+  function getWidgetBatteryText() {
+    if (typeof widgetBatteryLevel !== "number") {
+      return "Battery: N/A";
+    }
+    const pct = Math.round(widgetBatteryLevel * 100);
+    return "Battery: " + pct + "%" + (widgetBatteryCharging ? " (charging)" : "");
+  }
+
+  function renderInfoWidgetNow() {
+    const node = document.getElementById("starlight-info-widget");
+    if (!node) {
+      return;
+    }
+    const dateTextNode = node.querySelector("[data-widget-date]");
+    const batteryNode = node.querySelector("[data-widget-battery]");
+    if (!dateTextNode || !batteryNode) {
+      return;
+    }
+    const format = window.getInfoWidgetFormat();
+    const mode = window.getInfoWidgetTimeMode();
+    dateTextNode.textContent = formatWidgetDate(new Date(), format, mode);
+    batteryNode.textContent = getWidgetBatteryText();
+  }
+
+  function bindWidgetBattery() {
+    if (widgetBatteryBound || !navigator.getBattery) {
+      return;
+    }
+    widgetBatteryBound = true;
+    navigator.getBattery().then((battery) => {
+      function updateBatteryState() {
+        widgetBatteryLevel = battery.level;
+        widgetBatteryCharging = battery.charging;
+        renderInfoWidgetNow();
+      }
+      updateBatteryState();
+      battery.addEventListener("levelchange", updateBatteryState);
+      battery.addEventListener("chargingchange", updateBatteryState);
+    }).catch(() => {});
+  }
+
+  function mountInfoWidget() {
+    const existing = document.getElementById("starlight-info-widget");
+    if (window.getInfoWidgetEnabled() !== "on") {
+      if (existing) {
+        existing.remove();
+      }
+      if (widgetTick) {
+        clearInterval(widgetTick);
+        widgetTick = 0;
+      }
+      return;
+    }
+
+    let widget = existing;
+    if (!widget) {
+      widget = document.createElement("section");
+      widget.id = "starlight-info-widget";
+      widget.innerHTML = `
+        <header class="starlight-widget-handle" data-widget-handle>
+          <span>Date, Time, Battery</span>
+        </header>
+        <p class="starlight-widget-date" data-widget-date></p>
+        <p class="starlight-widget-battery" data-widget-battery></p>
+      `;
+      document.body.appendChild(widget);
+
+      const savedX = Number(localStorage.getItem(WIDGET_POS_X_KEY));
+      const savedY = Number(localStorage.getItem(WIDGET_POS_Y_KEY));
+      const x = Number.isFinite(savedX) ? savedX : 24;
+      const y = Number.isFinite(savedY) ? savedY : 90;
+      widget.style.left = x + "px";
+      widget.style.top = y + "px";
+
+      const handle = widget.querySelector("[data-widget-handle]");
+      let dragActive = false;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      function onMove(event) {
+        if (!dragActive) {
+          return;
+        }
+        const nextX = Math.max(0, Math.min(window.innerWidth - widget.offsetWidth, event.clientX - offsetX));
+        const nextY = Math.max(0, Math.min(window.innerHeight - widget.offsetHeight, event.clientY - offsetY));
+        widget.style.left = nextX + "px";
+        widget.style.top = nextY + "px";
+        localStorage.setItem(WIDGET_POS_X_KEY, String(Math.round(nextX)));
+        localStorage.setItem(WIDGET_POS_Y_KEY, String(Math.round(nextY)));
+      }
+
+      function stopDrag() {
+        dragActive = false;
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", stopDrag);
+      }
+
+      if (handle) {
+        handle.addEventListener("pointerdown", (event) => {
+          dragActive = true;
+          const rect = widget.getBoundingClientRect();
+          offsetX = event.clientX - rect.left;
+          offsetY = event.clientY - rect.top;
+          document.addEventListener("pointermove", onMove);
+          document.addEventListener("pointerup", stopDrag);
+        });
+      }
+    }
+
+    if (!widgetTick) {
+      widgetTick = window.setInterval(renderInfoWidgetNow, 1000);
+    }
+    bindWidgetBattery();
+    renderInfoWidgetNow();
+  }
 
   (function initGlobalParticles() {
     const canvas = document.getElementById("global-particles");
@@ -474,4 +709,6 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   if (window.getWrapEnabled() === "on" && !isWrappedInnerPage()) {
     launchWrapped(window.getWrapMode(), window.location.href, true);
   }
+
+  mountInfoWidget();
 })();

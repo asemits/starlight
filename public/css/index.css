@@ -23,3 +23,42 @@
 	opacity: 0;
 	transform: translateY(-8px);
 }
+
+#starlight-info-widget {
+	position: fixed;
+	left: 24px;
+	top: 90px;
+	z-index: 2000;
+	min-width: 230px;
+	max-width: 320px;
+	padding: 8px 10px 10px;
+	border-radius: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	background: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(8px);
+	color: rgba(255, 255, 255, 0.92);
+	box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+	user-select: none;
+}
+
+.starlight-widget-handle {
+	cursor: grab;
+	font-size: 11px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: rgba(255, 255, 255, 0.7);
+	padding-bottom: 6px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+	margin-bottom: 8px;
+}
+
+.starlight-widget-date,
+.starlight-widget-battery {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.starlight-widget-battery {
+	color: rgba(255, 255, 255, 0.75);
+}
