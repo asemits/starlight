@@ -46,14 +46,15 @@ service cloud.firestore {
     }
 
     match /gameStats/{gameId}/players/{uid} {
-      allow read: if isOwner(uid);
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
 
       allow create, update: if isOwner(uid)
         && hasOnlyKeys(request.resource.data, [
           'uid',
           'rating', 'lastPlayedAt', 'lastRatedAt', 'clickCount',
           'activeSession', 'activeGamePath', 'activeAt',
-          'gamePath', 'gameName', 'gameImage'
+          'gamePath', 'gameName', 'gameImage', 'sourceBase',
+          'isFavorite', 'favoritedAt'
         ])
         && (!('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid)
         && (!('rating' in request.resource.data) || (request.resource.data.rating is int && request.resource.data.rating in [-1, 0, 1]))
@@ -62,7 +63,10 @@ service cloud.firestore {
         && (!('activeGamePath' in request.resource.data) || request.resource.data.activeGamePath is string)
         && (!('gamePath' in request.resource.data) || request.resource.data.gamePath is string)
         && (!('gameName' in request.resource.data) || request.resource.data.gameName is string)
-        && (!('gameImage' in request.resource.data) || request.resource.data.gameImage is string);
+        && (!('gameImage' in request.resource.data) || request.resource.data.gameImage is string)
+        && (!('sourceBase' in request.resource.data) || request.resource.data.sourceBase is string)
+        && (!('isFavorite' in request.resource.data) || request.resource.data.isFavorite is bool)
+        && (!('favoritedAt' in request.resource.data) || request.resource.data.favoritedAt is timestamp);
 
       allow delete: if isOwner(uid);
     }
@@ -72,23 +76,31 @@ service cloud.firestore {
 
       allow create: if isOwner(uid)
         && hasOnlyKeys(request.resource.data, [
-          'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt'
-        ])
-        && request.resource.data.uid == request.auth.uid
-        && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
-        && (!('usernameHash' in request.resource.data) || isNonEmptyString(request.resource.data.usernameHash, 128))
-        && (!('usernameChangedAt' in request.resource.data) || request.resource.data.usernameChangedAt is timestamp)
-        && (!('providers' in request.resource.data) || request.resource.data.providers is list);
-
-      allow update: if isOwner(uid)
-        && hasOnlyKeys(request.resource.data, [
-          'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt'
+          'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt',
+          'email', 'username', 'usernameLower'
         ])
         && request.resource.data.uid == request.auth.uid
         && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
         && (!('usernameHash' in request.resource.data) || isNonEmptyString(request.resource.data.usernameHash, 128))
         && (!('usernameChangedAt' in request.resource.data) || request.resource.data.usernameChangedAt is timestamp)
         && (!('providers' in request.resource.data) || request.resource.data.providers is list)
+        && (!('email' in request.resource.data) || request.resource.data.email is string)
+        && (!('username' in request.resource.data) || request.resource.data.username is string)
+        && (!('usernameLower' in request.resource.data) || request.resource.data.usernameLower is string);
+
+      allow update: if isOwner(uid)
+        && hasOnlyKeys(request.resource.data, [
+          'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt',
+          'email', 'username', 'usernameLower'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
+        && (!('usernameHash' in request.resource.data) || isNonEmptyString(request.resource.data.usernameHash, 128))
+        && (!('usernameChangedAt' in request.resource.data) || request.resource.data.usernameChangedAt is timestamp)
+        && (!('providers' in request.resource.data) || request.resource.data.providers is list)
+        && (!('email' in request.resource.data) || request.resource.data.email is string)
+        && (!('username' in request.resource.data) || request.resource.data.username is string)
+        && (!('usernameLower' in request.resource.data) || request.resource.data.usernameLower is string)
         && (
           request.resource.data.usernameHash == resource.data.usernameHash
           || (
@@ -96,6 +108,7 @@ service cloud.firestore {
             && request.resource.data.usernameChangedAt == request.time
             && (
               !('usernameChangedAt' in resource.data)
+              || !(resource.data.usernameChangedAt is timestamp)
               || request.time >= resource.data.usernameChangedAt + duration.value(7, 'd')
             )
           )

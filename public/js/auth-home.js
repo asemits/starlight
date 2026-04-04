@@ -342,7 +342,6 @@
           <section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
               <h2>Favorites</h2>
-              <a href="/games" class="nav-link starlight-dashboard-link">Manage favorites</a>
             </div>
             <div id="dashboard-favorites" class="starlight-dashboard-grid"></div>
           </section>
@@ -431,11 +430,14 @@
       const list = sourceDocs.map((doc) => {
         const data = doc.data() || {};
         return {
+          docPath: doc.ref.path,
           gameName: String(data.gameName || "Unknown game"),
           gameImage: String(data.gameImage || ""),
           gamePath: String(data.gamePath || ""),
+          sourceBase: String(data.sourceBase || ""),
           clickCount: Number(data.clickCount || 0),
           rating: Number(data.rating || 0),
+          isFavorite: Boolean(data.isFavorite),
           lastPlayedAtMs: toMillis(data.lastPlayedAt),
           lastRatedAtMs: toMillis(data.lastRatedAt)
         };
@@ -447,8 +449,8 @@
         .slice(0, 8);
 
       const favorites = list
-        .filter((item) => item.rating === 1)
-        .sort((a, b) => b.lastRatedAtMs - a.lastRatedAtMs)
+        .filter((item) => item.isFavorite)
+        .sort((a, b) => b.lastPlayedAtMs - a.lastPlayedAtMs)
         .slice(0, 8);
 
       const totalPlays = list.reduce((sum, item) => sum + Math.max(0, item.clickCount), 0);
@@ -456,19 +458,23 @@
       const thumbsUpGiven = list.filter((item) => item.rating === 1).length;
       const thumbsDownGiven = list.filter((item) => item.rating === -1).length;
 
-      function tileMarkup(item) {
+      function tileMarkup(item, favoriteMode) {
         const imageMarkup = item.gameImage ? `<img src="${escapeHtml(item.gameImage)}" alt="${escapeHtml(item.gameName)}">` : "<div class=\"starlight-dashboard-fallback\"><i class=\"fa-solid fa-gamepad\"></i></div>";
+        const removeFavorite = favoriteMode
+          ? `<button type="button" class="starlight-dashboard-remove-favorite" data-remove-favorite="1" data-game-path="${escapeHtml(item.gamePath)}" data-source-base="${escapeHtml(item.sourceBase)}" aria-label="Remove from favorites"><i class="fa-solid fa-trash"></i></button>`
+          : "";
         return `
-          <a href="/games" class="nav-link starlight-dashboard-item">
+          <a href="/games" class="nav-link starlight-dashboard-item" data-game-path="${escapeHtml(item.gamePath)}" data-source-base="${escapeHtml(item.sourceBase)}">
             <div class="starlight-dashboard-thumb">${imageMarkup}</div>
             <h3>${escapeHtml(item.gameName)}</h3>
             <p>Plays: ${item.clickCount}</p>
+            ${removeFavorite}
           </a>
         `;
       }
 
-      recentNode.innerHTML = recent.length ? recent.map(tileMarkup).join("") : '<p class="starlight-dashboard-empty">No recent games yet.</p>';
-      favoritesNode.innerHTML = favorites.length ? favorites.map(tileMarkup).join("") : '<p class="starlight-dashboard-empty">No favorites yet. Thumbs-up games in Games.</p>';
+      recentNode.innerHTML = recent.length ? recent.map((item) => tileMarkup(item, false)).join("") : '<p class="starlight-dashboard-empty">No recent games yet.</p>';
+      favoritesNode.innerHTML = favorites.length ? favorites.map((item) => tileMarkup(item, true)).join("") : '<p class="starlight-dashboard-empty">No favorites yet. Star games in Games.</p>';
 
       statsNode.innerHTML = `
         <article class="starlight-stat-card"><h3>Total Plays</h3><p>${totalPlays}</p></article>
@@ -476,6 +482,23 @@
         <article class="starlight-stat-card"><h3>Thumbs Up Given</h3><p>${thumbsUpGiven}</p></article>
         <article class="starlight-stat-card"><h3>Thumbs Down Given</h3><p>${thumbsDownGiven}</p></article>
       `;
+
+      favoritesNode.querySelectorAll("[data-remove-favorite='1']").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const path = button.getAttribute("data-game-path") || "";
+          const sourceBase = button.getAttribute("data-source-base") || "";
+          if (!path || !window.StarlightGames || typeof window.StarlightGames.setFavoriteByPath !== "function") {
+            return;
+          }
+          try {
+            await window.StarlightGames.setFavoriteByPath(path, sourceBase, false);
+            await loadSignedInDashboard();
+          } catch (_error) {
+          }
+        });
+      });
     } catch (_error) {
       recentNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load recent games.</p>';
       favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load favorites.</p>';

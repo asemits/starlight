@@ -146,7 +146,8 @@
 			thumbsUp: 0,
 			thumbsDown: 0,
 			currentPlayers: 0,
-			myRating: 0
+			myRating: 0,
+			isFavorite: false
 		};
 	}
 
@@ -508,7 +509,8 @@
 						thumbsUp: Number(stats.thumbsUp || 0),
 						thumbsDown: Number(stats.thumbsDown || 0),
 						currentPlayers: Number(stats.currentPlayers || 0),
-						myRating: Number(player.rating || 0)
+						myRating: Number(player.rating || 0),
+						isFavorite: Boolean(player.isFavorite)
 					});
 				} catch (_error) {
 					state.statsCache.set(item.path, {
@@ -517,11 +519,65 @@
 						thumbsUp: 0,
 						thumbsDown: 0,
 						currentPlayers: 0,
-						myRating: 0
+						myRating: 0,
+						isFavorite: false
 					});
 				}
 			})
 		);
+	}
+
+	async function setFavorite(game, favoriteOn) {
+		const prev = statsForPath(game.path);
+		mergeStatCache(game.path, { isFavorite: Boolean(favoriteOn) });
+
+		const authReady = await ensureAuthReady();
+		if (!authReady) {
+			mergeStatCache(game.path, prev);
+			throw new Error("auth-not-ready");
+		}
+
+		const refs = statRefs(game.path);
+		if (!refs) {
+			mergeStatCache(game.path, prev);
+			throw new Error("missing-refs");
+		}
+
+		try {
+			await window.starlightDb.runTransaction(async (tx) => {
+				const [statsDoc, playerDoc] = await Promise.all([tx.get(refs.statsRef), tx.get(refs.playerRef)]);
+				const now = firebase.firestore.FieldValue.serverTimestamp();
+				const currentUid = window.starlightAuth && window.starlightAuth.currentUser ? window.starlightAuth.currentUser.uid : null;
+
+				if (!statsDoc.exists) {
+					tx.set(refs.statsRef, {
+						name: game.name,
+						path: game.path,
+						sourceBase: normalizeSourceBase(game.sourceBase),
+						image: game.image,
+						plays: 0,
+						uniqueClicks: 0,
+						thumbsUp: 0,
+						thumbsDown: 0,
+						currentPlayers: 0,
+						updatedAt: now
+					}, { merge: true });
+				}
+
+				tx.set(refs.playerRef, {
+					uid: currentUid,
+					gamePath: game.path,
+					gameName: game.name,
+					gameImage: game.image || "",
+					sourceBase: normalizeSourceBase(game.sourceBase),
+					isFavorite: Boolean(favoriteOn),
+					favoritedAt: favoriteOn ? now : firebase.firestore.FieldValue.delete()
+				}, { merge: true });
+			});
+		} catch (error) {
+			mergeStatCache(game.path, prev);
+			throw error;
+		}
 	}
 
 	function mergeStatCache(path, patch) {
@@ -767,6 +823,7 @@
 						${statIcon("fa-user-group", stats.currentPlayers, "Currently Playing")}
 					</div>
 					<div class="game-card-actions">
+						<button type="button" class="rate-btn ${stats.isFavorite ? "active" : ""}" data-action="favorite" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}"><i class="fa-solid fa-star"></i><span>${stats.isFavorite ? "Saved" : "Save"}</span></button>
 						<button type="button" class="rate-btn ${stats.myRating === 1 ? "active" : ""}" data-action="rate" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}" data-rate="1"><i class="fa-solid fa-thumbs-up"></i><span>${stats.thumbsUp}</span></button>
 						<button type="button" class="rate-btn ${stats.myRating === -1 ? "active" : ""}" data-action="rate" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}" data-rate="-1"><i class="fa-solid fa-thumbs-down"></i><span>${stats.thumbsDown}</span></button>
 					</div>
@@ -913,6 +970,11 @@
 
 		const up = overlay.querySelector("#overlay-up");
 		const down = overlay.querySelector("#overlay-down");
+		const favorite = overlay.querySelector("#overlay-favorite");
+		if (favorite) {
+			favorite.classList.toggle("active", Boolean(stats.isFavorite));
+			favorite.innerHTML = `<i class="fa-solid fa-star"></i><span>${stats.isFavorite ? "Saved" : "Save"}</span>`;
+		}
 		if (up) {
 			up.classList.toggle("active", stats.myRating === 1);
 			up.innerHTML = `<i class="fa-solid fa-thumbs-up"></i><span>${stats.thumbsUp}</span>`;
@@ -956,6 +1018,7 @@
 				</div>
 				<div class="bar-stats" id="game-stats"></div>
 				<div class="bar-right">
+					<button type="button" class="bar-btn" id="overlay-favorite"></button>
 					<button type="button" class="bar-btn" id="overlay-up"></button>
 					<button type="button" class="bar-btn" id="overlay-down"></button>
 					<div class="bar-btn" id="fps-value">FPS: --</div>
@@ -1045,6 +1108,17 @@
 
 		overlay.querySelector("#overlay-down").addEventListener("click", async () => {
 			setRating(game, -1)
+				.catch(() => {
+					renderOverlayStats(overlay, game.path);
+					queueRender();
+				});
+			renderOverlayStats(overlay, game.path);
+			queueRender();
+		});
+
+		overlay.querySelector("#overlay-favorite").addEventListener("click", async () => {
+			const current = statsForPath(game.path);
+			setFavorite(game, !current.isFavorite)
 				.catch(() => {
 					renderOverlayStats(overlay, game.path);
 					queueRender();
@@ -1439,6 +1513,27 @@
 				return;
 			}
 
+			const favoriteButton = target.closest("[data-action='favorite']");
+			if (favoriteButton) {
+				event.stopPropagation();
+				const path = favoriteButton.getAttribute("data-path") || "";
+				const sourceBase = favoriteButton.getAttribute("data-base") || PRIMARY_CDN_BASE;
+				const game = findGame(path, sourceBase);
+				if (game) {
+					const current = statsForPath(game.path);
+					setFavorite(game, !current.isFavorite)
+						.catch(() => {
+							renderHero(root);
+							renderPopular(root);
+							renderCards(root, false);
+						});
+					renderHero(root);
+					renderPopular(root);
+					renderCards(root, false);
+				}
+				return;
+			}
+
 			const pageButton = target.closest("[data-action='page']");
 			if (pageButton) {
 				state.page = Number(pageButton.getAttribute("data-page") || "1");
@@ -1554,5 +1649,16 @@
 		}
 	});
 
-	window.StarlightGames = { mount, render };
+	window.StarlightGames = {
+		mount,
+		render,
+		setFavoriteByPath: async function setFavoriteByPath(path, sourceBase, favoriteOn) {
+			const game = findGame(path, sourceBase || PRIMARY_CDN_BASE);
+			if (!game) {
+				return;
+			}
+			await setFavorite(game, Boolean(favoriteOn));
+			queueRender();
+		}
+	};
 })();
