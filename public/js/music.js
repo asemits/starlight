@@ -1,195 +1,5 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>starlight</title>
-    <link rel="icon" type="image/x-icon" href="logos/logo.png"> 
-<<<<<<< Updated upstream
-    <!-- scripts -->
-  <script src="vendor/tailwindcss/tailwindcss.js"></script>
-  <script src="vendor/firebase/firebase-app-compat.js"></script>
-  <script src="vendor/firebase/firebase-auth-compat.js"></script>
-  <script src="vendor/firebase/firebase-firestore-compat.js"></script>
-=======
-    <!-- fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap" rel="stylesheet">
-    <link href="https://fonts.cdnfonts.com/css/minecraft-3" rel="stylesheet">
-    <link href="https://fonts.cdnfonts.com/css/minecrafter-alt" rel="stylesheet">
-        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=Fira+Code:wght@300;400&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Oxanium:wght@200..800&display=swap" rel="stylesheet">
-    <!-- scripts -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="public/js/music.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
->>>>>>> Stashed changes
-    <!-- css -->
-    <link rel="stylesheet" href="css/sidebar.css">
-    <link rel="stylesheet" href="css/index.css">
-  <link rel="stylesheet" href="vendor/fontawesome/all.min.css">
-  <link rel="stylesheet" href="vendor/soundboard/style.css">
-</head>
-<body class="bg-black text-white">
-    <canvas id="global-particles"></canvas>
-    <nav class="sidebar" id="sidebar">
-      <img src="logos/logo.png" class="sidebar-logo">
-        <ul>
-            <li>
-                <a href="/" class="nav-link">
-                    <div class="icon"><i class="fa-solid fa-house"></i></div>
-                <span class="text" data-home-nav-label>Home</span>
-                </a>
-            </li>
-            <li>
-                <a href="/games" class="nav-link">
-                    <div class="icon"><i class="fa-solid fa-gamepad"></i></div>
-                    <span class="text">Games</span>
-                </a>
-            </li>
-            <li>
-                <a href="/proxy" class="nav-link">
-                    <div class="icon"><i class="fa-solid fa-globe"></i></div>
-                    <span class="text">Proxy</span>
-                </a>
-            </li>
-            <li>
-                <a href="/social" class="nav-link">
-                    <div class="icon"><i class="fa-solid fa-comments"></i></div>
-                    <span class="text">Social</span>
-                </a>
-            </li>
-            <li>
-                <a href="/apps" class="nav-link">
-                    <div class="icon"><i class="fa-solid fa-shapes"></i></div>
-                    <span class="text">Apps</span>
-                </a>
-            </li>            
-            <li>
-                <a href="/settings" class="nav-link">
-                    <div class="icon"><i class="fa-solid fa-cog"></i></div>
-                    <span class="text">Settings</span>
-                </a>
-            </li>
-        </ul>
-    </nav>
-    <div id="app-content" class="p-8 pt-24"></div>
-    <script src="js/app-core.js"></script>
-    <script src="js/games.js"></script>
-    <script src="js/weather.js"></script>
-    <script src="js/auth-home.js"></script>
-    <script src="js/routes/home-route.js"></script>
-    <script src="js/routes/games-route.js"></script>
-    <script src="js/routes/proxy-route.js"></script>
-    <script src="js/routes/social-route.js"></script>
-    <script src="js/routes/weather-route.js"></script>
-    <script src="js/routes/settings-route.js"></script>
-    <script src="js/routes/music-route.js"></script>    
-    <script src="js/routes/apps-route.js"></script>
-    <script src="js/routes/soundboard-route.js"></script>
-    <script src="js/routes/notfound-route.js"></script>
-<<<<<<< Updated upstream
-    <script src="js/index-init.js"></script>
-=======
-    <script>
-      (function () {
-        const ANTI_CLOSE_KEY = 'starlight-anti-close-enabled';
-        let skipOnce = false;
-
-        function antiCloseEnabled() {
-          const value = localStorage.getItem(ANTI_CLOSE_KEY);
-          if (value === null) {
-            localStorage.setItem(ANTI_CLOSE_KEY, 'on');
-            return true;
-          }
-          return value === 'on';
-        }
-
-        window.StarlightAntiClose = {
-          enable() {
-            localStorage.setItem(ANTI_CLOSE_KEY, 'on');
-          },
-          disable() {
-            localStorage.setItem(ANTI_CLOSE_KEY, 'off');
-          },
-          bypassNextClose() {
-            skipOnce = true;
-            window.setTimeout(() => {
-              skipOnce = false;
-            }, 1000);
-          }
-        };
-
-        window.addEventListener('beforeunload', (event) => {
-          if (skipOnce || !antiCloseEnabled()) {
-            return;
-          }
-          event.preventDefault();
-          event.returnValue = '';
-        });
-      })();
-
-        const appContent = document.getElementById('app-content');
-        const routes = window.StarlightRouteModules || {};
-
-        let routeToken = 0;
-        async function router() {
-            let path = window.location.pathname;
-
-            if (window.StarlightAuthUI) {
-              path = window.StarlightAuthUI.guardedPath(path);
-              window.StarlightAuthUI.syncLockedState(path);
-            }
-
-            const route = routes[path] || routes['404'];
-            if (!route || typeof route.render !== 'function') {
-              return;
-            }
-
-            const token = ++routeToken;
-            appContent.classList.add('route-exit');
-            await new Promise((resolve) => setTimeout(resolve, 170));
-            if (token !== routeToken) {
-              return;
-            }
-
-            appContent.innerHTML = route.render();
-            appContent.classList.remove('route-exit');
-            appContent.classList.add('route-enter');
-            requestAnimationFrame(() => {
-              appContent.classList.remove('route-enter');
-            });
-
-          if (typeof route.afterRender === 'function') {
-            route.afterRender(path);
-          }
-        }
-        window.router = router;
-        document.addEventListener('click', (e) => {
-            const link = e.target.closest('.nav-link');
-            if (link) {
-                e.preventDefault(); 
-                const url = link.getAttribute('href');
-                if (window.StarlightAuthUI && !window.StarlightAuthUI.isLoggedIn() && url !== '/') {
-                    window.StarlightAuthUI.showLockedMessage();
-                    window.history.replaceState({}, '', '/');
-                    router();
-                    return;
-                }
-                window.history.pushState({}, '', url);
-                router();
-            }
-        });
-        window.addEventListener('popstate', router);
-        window.addEventListener('DOMContentLoaded', () => {
-          if (window.StarlightAuthUI) {
-            window.StarlightAuthUI.init();
-          }
-          router();
-        });
-
-        const PROXY_URL = "https://script.google.com/macros/s/AKfycbx8oqYPseZoVohUBfMTdw-CkxSUsg7KPHoywtwi-ltfg_sweNFJoO_fiyLFIk_02CVsMA/exec";
-const audio = document.getElementById('mainAudio');
+const PROXY_URL = "https://script.google.com/macros/s/AKfycbx8oqYPseZoVohUBfMTdw-CkxSUsg7KPHoywtwi-ltfg_sweNFJoO_fiyLFIk_02CVsMA/exec";
+function getAudio() { return document.getElementById('mainAudio'); }
 let currentTrackData = null;
 let favorites = JSON.parse(localStorage.getItem('cl-favs')) || [];
 
@@ -525,28 +335,33 @@ async function getTunneledBlob(url, type) {
 ══════════════════════════════════════════════════════ */
 function drawPiPFrame() {
     const canvas = document.getElementById('pipCanvas');
-    if (!canvas || !currentTrackData) return;
+    const audio = getAudio();
+    if (!canvas || !currentTrackData || !audio) return;
     const ctx = canvas.getContext('2d');
     const img = document.getElementById('current-art');
     ctx.fillStyle = "#000"; ctx.fillRect(0,0,500,500);
     ctx.globalAlpha = 0.4; ctx.drawImage(img,-50,-50,600,600); ctx.globalAlpha = 1.0;
     ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0,380,500,120);
-    ctx.fillStyle = "#26ff9a"; ctx.font = "bold 28px DM Sans"; ctx.fillText(currentTrackData.title.substring(0,25),25,430);
-    ctx.fillStyle = "#fff"; ctx.font = "20px DM Sans"; ctx.fillText(currentTrackData.artist,25,470);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 28px Nunito"; ctx.fillText(currentTrackData.title.substring(0,25),25,430);
+    ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "20px Nunito"; ctx.fillText(currentTrackData.artist,25,470);
     if (!audio.paused) {
-        ctx.strokeStyle = "#26ff9a"; ctx.lineWidth = 4; ctx.beginPath();
+        ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 3; ctx.beginPath();
         for (let i=0; i<500; i+=10) ctx.lineTo(i, 380 + Math.sin(Date.now()/150+i)*15);
         ctx.stroke(); requestAnimationFrame(drawPiPFrame);
     }
 }
 async function togglePiP() {
     const pipVideo = document.getElementById('pipVideo');
+    const audio = getAudio();
     try {
-        if (document.pictureInPictureElement) { await document.exitPictureInPicture(); }
-        else {
+        if (document.pictureInPictureElement) {
+            await document.exitPictureInPicture();
+        } else {
             if (!currentTrackData) return alert("Play music first!");
             pipVideo.srcObject = document.getElementById('pipCanvas').captureStream();
-            drawPiPFrame(); await pipVideo.play(); await pipVideo.requestPictureInPicture();
+            drawPiPFrame();
+            await pipVideo.play();
+            await pipVideo.requestPictureInPicture();
         }
     } catch(e) { console.error("PiP:", e); }
 }
@@ -592,7 +407,7 @@ async function playTrack(apiUrl, title, artist, img) {
 
     const blobUrl = await getTunneledBlob(apiUrl, 'stream');
     if (blobUrl) {
-        audio.src = blobUrl; audio.play();
+        getAudio().src = blobUrl; getAudio().play();
         document.getElementById('status-msg').textContent = "Live";
     }
 
@@ -602,8 +417,8 @@ async function playTrack(apiUrl, title, artist, img) {
 }
 
 function togglePlay() {
-    if (!audio.src) return;
-    audio.paused ? audio.play() : audio.pause();
+const audio = getAudio(); if (!audio.src) return;
+audio.paused ? audio.play() : audio.pause();
 }
 
 let loopMode = 0; // 0 = off, 1 = loop one, 2 = loop all
@@ -660,25 +475,6 @@ function toggleLoop() {
   }
 }
 /* Auto-advance to next in queue when track ends */
-audio.onended = () => {
-  if (loopMode === 1) {
-    // Loop one — replay same track
-    audio.currentTime = 0;
-    audio.play();
-  } else if (loopMode === 2) {
-    // Loop all — play next, or restart queue from playlist if empty
-    if (getQueue().length) {
-      playNextInQueue();
-    } else if (currentTrackData) {
-      // Restart current track if nothing in queue
-      audio.currentTime = 0;
-      audio.play();
-    }
-  } else {
-    // No loop — play next in queue if available
-    if (getQueue().length) playNextInQueue();
-  }
-};
 
 /* ══════════════════════════════════════════════════════
    FAVORITES
@@ -818,46 +614,42 @@ async function fetchMusic(mode) {
 }
 
 function manualSeek(val) {
-    if (audio.duration) audio.currentTime = (val/100) * audio.duration;
+    const audio = getAudio();
+    if (audio && audio.duration) audio.currentTime = (val/100) * audio.duration;
 }
 
 /* ══════════════════════════════════════════════════════
    AUDIO EVENTS
 ══════════════════════════════════════════════════════ */
-audio.onplay = () => {
+document.addEventListener('audioReady', function() {
+  const audio = getAudio();
+  audio.onplay = () => {
     document.getElementById('progress-path').classList.add('animate-wiggle');
     document.getElementById('play-icon').className = 'fa-solid fa-pause';
     document.getElementById('art-wrap').classList.add('playing');
     document.getElementById('player-eq').classList.remove('eq-paused');
     document.getElementById('hero-eq').classList.remove('eq-paused');
     drawPiPFrame();
-};
-audio.onpause = () => {
+  };
+  audio.onpause = () => {
     document.getElementById('progress-path').classList.remove('animate-wiggle');
     document.getElementById('play-icon').className = 'fa-solid fa-play';
     document.getElementById('art-wrap').classList.remove('playing');
     document.getElementById('player-eq').classList.add('eq-paused');
     document.getElementById('hero-eq').classList.add('eq-paused');
-};
-audio.ontimeupdate = () => {
+  };
+  audio.ontimeupdate = () => {
     const pct = (audio.currentTime / audio.duration) * 100 || 0;
     document.getElementById('seek-slider').value = pct;
     document.getElementById('progress-path').style.strokeDasharray = `${pct * 10}, 1000`;
-};
-
-/* ══════════════════════════════════════════════════════
-   INIT
-══════════════════════════════════════════════════════ */
-window.onload = () => {
-    fetchMusic('trending');
-    updateFavUI();
-    renderPlaylist();
-    renderQueue();
-    updateBadges();
-    attachScrollListener('trending-container');
-    attachScrollListener('search-container');
-};
-    </script>
->>>>>>> Stashed changes
-  </body>
-</html> 
+  };
+  audio.onended = () => {
+    if (loopMode === 1) { audio.currentTime = 0; audio.play(); }
+    else if (loopMode === 2) {
+      if (getQueue().length) playNextInQueue();
+      else { audio.currentTime = 0; audio.play(); }
+    } else {
+      if (getQueue().length) playNextInQueue();
+    }
+  };
+});
