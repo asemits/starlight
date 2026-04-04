@@ -6,8 +6,8 @@
 
   const config = {
     siteName: "starlight",
-    heroTagline: "Your launchpad for games, tools, and everything in between.",
-    heroSubtext: "Use the cards below to jump in quickly. Edit this in public/js/auth-home.js under HOME_FEATURES.",
+    heroTagline: "your launchpad for games, tools, and everything in between",
+    heroSubtext: "",
     tosText: `Starlight Terms of Service\n\n1. Use this site responsibly.\n2. Do not abuse or disrupt services.\n3. Respect applicable laws and school/workplace policies.\n4. Accounts violating these terms may be restricted.\n\nEdit this text directly in public/js/auth-home.js.`,
     features: [
       {
