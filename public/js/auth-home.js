@@ -199,6 +199,15 @@
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
 
+  function closeSiteView() {
+    window.close();
+    window.setTimeout(() => {
+      if (!window.closed) {
+        window.location.replace("about:blank");
+      }
+    }, 80);
+  }
+
   async function ensureUserDoc(user, usernameMaybe) {
     const firestore = db();
     if (!firestore || !user) {
@@ -541,8 +550,8 @@
     showModal("Terms of Service", `
       <div class="starlight-tos-block">${escapeHtml(config.tosText).replaceAll("\n", "<br>")}</div>
       <p id="signup-status" class="starlight-status"></p>
-      <button type="button" id="signup-tos-continue" class="starlight-btn starlight-btn-primary">I Agree, Continue</button>
-      <button type="button" id="signup-google" class="starlight-btn starlight-btn-google"><i class="fa-brands fa-google"></i> Sign up with Google</button>
+      <button type="button" id="signup-tos-continue" class="starlight-btn starlight-btn-primary">I Agree</button>
+      <button type="button" id="signup-tos-decline" class="starlight-btn starlight-btn-muted">I Decline</button>
     `);
 
     const continueBtn = document.getElementById("signup-tos-continue");
@@ -556,23 +565,11 @@
       });
     }
 
-    const googleBtn = document.getElementById("signup-google");
-    if (googleBtn) {
-      googleBtn.addEventListener("click", async () => {
-        const instance = auth();
-        if (!instance) {
-          return;
-        }
-        try {
-          const provider = new firebase.auth.GoogleAuthProvider();
-          const result = await instance.signInWithPopup(provider);
-          await ensureUserDoc(result.user, result.user.displayName || "");
-          closeModal();
-        } catch (error) {
-          setStatus("signup-status", error && error.message ? error.message : "Google sign up failed.", false);
-        }
-      });
+    const declineBtn = document.getElementById("signup-tos-decline");
+    if (declineBtn) {
+      declineBtn.addEventListener("click", closeSiteView);
     }
+
   }
 
   function openSignupFormModal() {
@@ -590,6 +587,7 @@
         <input id="signup-confirm-password" type="password" required autocomplete="new-password" />
         <p id="signup-form-status" class="starlight-status"></p>
         <button type="submit" class="starlight-btn starlight-btn-primary">Create Account</button>
+        <button type="button" id="signup-google" class="starlight-btn starlight-btn-google"><i class="fa-brands fa-google"></i> Sign up with Google</button>
       </form>
     `);
 
@@ -652,6 +650,24 @@
           openVerifyEmailModal();
         } catch (error) {
           setStatus("signup-form-status", error && error.message ? error.message : "Sign up failed.", false);
+        }
+      });
+    }
+
+    const googleBtn = document.getElementById("signup-google");
+    if (googleBtn) {
+      googleBtn.addEventListener("click", async () => {
+        const instance = auth();
+        if (!instance) {
+          return;
+        }
+        try {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          const result = await instance.signInWithPopup(provider);
+          await ensureUserDoc(result.user, result.user.displayName || "");
+          closeModal();
+        } catch (error) {
+          setStatus("signup-form-status", error && error.message ? error.message : "Google sign up failed.", false);
         }
       });
     }
