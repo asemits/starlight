@@ -252,9 +252,6 @@
       `;
     }).join("");
 
-    const user = currentUser();
-    const signedInCopy = user ? `<p class="starlight-auth-badge">Signed in as ${escapeHtml(user.email || user.displayName || "user")}</p>` : "";
-
     root.innerHTML = `
       <section class="starlight-home-shell">
         <header class="starlight-home-hero">
@@ -262,7 +259,6 @@
           <h1>${escapeHtml(config.siteName)}</h1>
           <p class="starlight-home-tagline">${escapeHtml(config.heroTagline)}</p>
           <p class="starlight-home-subtext">${escapeHtml(config.heroSubtext)}</p>
-          ${signedInCopy}
         </header>
         <section class="starlight-home-grid">
           ${featureCards}
