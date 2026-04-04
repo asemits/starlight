@@ -76,6 +76,14 @@
     return Boolean(user && !user.isAnonymous);
   }
 
+  function updateHomeNavLabel() {
+    const node = document.querySelector("[data-home-nav-label]");
+    if (!node) {
+      return;
+    }
+    node.textContent = isLoggedIn() ? "Dashboard" : "Home";
+  }
+
   function isGoogleLinked(user) {
     if (!user || !Array.isArray(user.providerData)) {
       return false;
@@ -643,6 +651,7 @@
   }
 
   function syncLockedState(path) {
+    updateHomeNavLabel();
     const locked = !isLoggedIn();
     document.body.classList.toggle("auth-locked", locked);
     document.body.setAttribute("data-auth-lock", locked ? "on" : "off");
@@ -1349,6 +1358,7 @@
   function onAuthChanged(user) {
     state.user = user || null;
     state.authReady = true;
+    updateHomeNavLabel();
     if (user) {
       startAutoSyncLoop();
       syncUserData("auto", true);
@@ -1362,6 +1372,7 @@
 
   function init() {
     bootstrapModalHost();
+    updateHomeNavLabel();
 
     const instance = auth();
     if (!instance) {

@@ -387,7 +387,8 @@ body.auth-locked .sidebar .nav-link.auth-disabled {
 
 .starlight-dashboard-grid {
 	display: grid;
-	grid-template-columns: 1fr;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 400px));
+	justify-content: start;
 	gap: 14px;
 }
 
@@ -409,7 +410,7 @@ body.auth-locked .sidebar .nav-link.auth-disabled {
 
 .starlight-dashboard-thumb {
 	position: relative;
-	height: clamp(120px, 18vw, 162px);
+	height: 162px;
 	border-radius: 12px;
 	overflow: hidden;
 	background: rgba(0, 0, 0, 0.45);
@@ -432,10 +433,16 @@ body.auth-locked .sidebar .nav-link.auth-disabled {
 	z-index: 1;
 	width: 100%;
 	height: 100%;
-	object-fit: cover;
+	object-fit: contain;
 	object-position: center;
 	image-rendering: auto;
 	transform: translateZ(0);
+}
+
+@media (max-width: 700px) {
+	.starlight-dashboard-grid {
+		grid-template-columns: 1fr;
+	}
 }
 
 .starlight-dashboard-fallback {
