@@ -11,8 +11,14 @@
           "source": "**",
           "headers": [
             { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-            { "key": "Content-Security-Policy", "value": "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' blob:; style-src * 'unsafe-inline'; font-src * data:; connect-src *; img-src * data: blob:; frame-src * blob: data:;" },
+            { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src 'self' https: blob: data: about:; worker-src 'self' blob:; manifest-src 'self';" },
             { "key": "X-Content-Type-Options", "value": "nosniff" },
+            { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+            { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self)" },
+            { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
+            { "key": "Cross-Origin-Resource-Policy", "value": "same-site" },
+            { "key": "X-Permitted-Cross-Domain-Policies", "value": "none" },
+            { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
             { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
           ]
         }
@@ -34,8 +40,14 @@
           "source": "**",
           "headers": [
             { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-            { "key": "Content-Security-Policy", "value": "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' blob:; style-src * 'unsafe-inline'; font-src * data:; connect-src *; img-src * data: blob:; frame-src * blob: data:;" },
+            { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src 'self' https: blob: data: about:; worker-src 'self' blob:; manifest-src 'self';" },
             { "key": "X-Content-Type-Options", "value": "nosniff" },
+            { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+            { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self)" },
+            { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
+            { "key": "Cross-Origin-Resource-Policy", "value": "same-site" },
+            { "key": "X-Permitted-Cross-Domain-Policies", "value": "none" },
+            { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
             { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
           ]
         }
@@ -52,8 +64,14 @@
           "source": "**",
           "headers": [
             { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-            { "key": "Content-Security-Policy", "value": "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' blob:; style-src * 'unsafe-inline'; font-src * data:; connect-src *; img-src * data: blob:; frame-src * blob: data:;" },
+            { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src 'self' https: blob: data: about:; worker-src 'self' blob:; manifest-src 'self';" },
             { "key": "X-Content-Type-Options", "value": "nosniff" },
+            { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+            { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self)" },
+            { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
+            { "key": "Cross-Origin-Resource-Policy", "value": "same-site" },
+            { "key": "X-Permitted-Cross-Domain-Policies", "value": "none" },
+            { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
             { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
           ]
         }

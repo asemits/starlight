@@ -46,7 +46,7 @@ service cloud.firestore {
     }
 
     match /gameStats/{gameId}/players/{uid} {
-      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow read: if isOwner(uid);
 
       allow create, update: if isOwner(uid)
         && hasOnlyKeys(request.resource.data, [
