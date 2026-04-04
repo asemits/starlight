@@ -247,6 +247,211 @@
     }, 80);
   }
 
+  function getActionParams() {
+    const params = new URLSearchParams(window.location.search);
+    const mode = String(params.get("mode") || "");
+    const oobCode = String(params.get("oobCode") || "");
+    if (!oobCode) {
+      return null;
+    }
+    if (mode !== "resetPassword" && mode !== "verifyEmail") {
+      return null;
+    }
+    return { mode, oobCode };
+  }
+
+  function clearActionParams() {
+    if (window.location.pathname !== "/" || !window.location.search) {
+      return;
+    }
+    window.history.replaceState({}, "", "/");
+  }
+
+  function renderActionHome(root, action) {
+    if (!root || !action) {
+      return false;
+    }
+
+    if (action.mode === "verifyEmail") {
+      root.innerHTML = `
+        <section class="starlight-home-shell starlight-dashboard-shell">
+          <header class="starlight-home-hero">
+            <p class="starlight-home-kicker">Account</p>
+            <h1>Confirm Email</h1>
+            <p class="starlight-home-tagline">secure your account access</p>
+          </header>
+
+          <section class="starlight-dashboard-section">
+            <div class="starlight-dashboard-head">
+              <h2>Email Confirmation</h2>
+            </div>
+            <form id="starlight-verify-action-form" class="starlight-auth-form">
+              <p>Use the button below to confirm your email address for this account.</p>
+              <p id="verify-action-status" class="starlight-status"></p>
+              <button type="submit" class="starlight-btn starlight-btn-primary">Confirm Email</button>
+              <button id="verify-action-home" type="button" class="starlight-btn starlight-btn-muted">Back Home</button>
+            </form>
+          </section>
+        </section>
+      `;
+
+      const form = document.getElementById("starlight-verify-action-form");
+      const homeBtn = document.getElementById("verify-action-home");
+      if (homeBtn) {
+        homeBtn.addEventListener("click", () => {
+          clearActionParams();
+          if (typeof window.router === "function") {
+            window.router();
+          }
+        });
+      }
+      if (form) {
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const instance = auth();
+          if (!instance) {
+            setStatus("verify-action-status", "Authentication is unavailable.", false);
+            return;
+          }
+          try {
+            await instance.applyActionCode(action.oobCode);
+            setStatus("verify-action-status", "Email confirmed. You can now log in.", true);
+            clearActionParams();
+          } catch (error) {
+            setStatus("verify-action-status", error && error.message ? error.message : "Could not confirm email.", false);
+          }
+        });
+      }
+      return true;
+    }
+
+    root.innerHTML = `
+      <section class="starlight-home-shell starlight-dashboard-shell">
+        <header class="starlight-home-hero">
+          <p class="starlight-home-kicker">Account</p>
+          <h1>Reset Password</h1>
+          <p class="starlight-home-tagline">set a new secure password</p>
+        </header>
+
+        <section class="starlight-dashboard-section">
+          <div class="starlight-dashboard-head">
+            <h2>Password Reset</h2>
+          </div>
+          <form id="starlight-reset-action-form" class="starlight-auth-form">
+            <p id="reset-action-email" class="starlight-strength-text"></p>
+            <label>New Password</label>
+            <input id="reset-action-password" type="password" required autocomplete="new-password" />
+            <div class="starlight-strength-wrap">
+              <div id="reset-action-strength-bar" class="starlight-strength-bar"></div>
+            </div>
+            <p id="reset-action-strength-text" class="starlight-strength-text">Strength: Weak</p>
+            <p class="starlight-strength-text">Password must be at least 12 characters with letters, numbers, and special characters.</p>
+            <label>Confirm Password</label>
+            <input id="reset-action-confirm-password" type="password" required autocomplete="new-password" />
+            <p id="reset-action-status" class="starlight-status"></p>
+            <button type="submit" class="starlight-btn starlight-btn-primary">Update Password</button>
+            <button id="reset-action-home" type="button" class="starlight-btn starlight-btn-muted">Back Home</button>
+          </form>
+        </section>
+      </section>
+    `;
+
+    const form = document.getElementById("starlight-reset-action-form");
+    const passwordInput = document.getElementById("reset-action-password");
+    const confirmInput = document.getElementById("reset-action-confirm-password");
+    const strengthBar = document.getElementById("reset-action-strength-bar");
+    const strengthText = document.getElementById("reset-action-strength-text");
+    const emailText = document.getElementById("reset-action-email");
+    const homeBtn = document.getElementById("reset-action-home");
+
+    if (homeBtn) {
+      homeBtn.addEventListener("click", () => {
+        clearActionParams();
+        if (typeof window.router === "function") {
+          window.router();
+        }
+      });
+    }
+
+    function refreshStrength() {
+      const score = passwordScore(String(passwordInput && passwordInput.value ? passwordInput.value : ""));
+      const strength = passwordStrengthLabel(score);
+      if (strengthBar) {
+        strengthBar.style.width = `${score}%`;
+        strengthBar.style.background = strength.color;
+      }
+      if (strengthText) {
+        strengthText.textContent = `Strength: ${strength.label}`;
+        strengthText.style.color = strength.color;
+      }
+    }
+
+    if (passwordInput) {
+      passwordInput.addEventListener("input", refreshStrength);
+      refreshStrength();
+    }
+
+    const instance = auth();
+    if (!instance) {
+      setStatus("reset-action-status", "Authentication is unavailable.", false);
+      return true;
+    }
+
+    instance.verifyPasswordResetCode(action.oobCode).then((email) => {
+      if (emailText) {
+        emailText.textContent = `Email: ${String(email || "")}`;
+      }
+    }).catch((error) => {
+      setStatus("reset-action-status", error && error.message ? error.message : "This reset link is invalid or expired.", false);
+    });
+
+    if (form) {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const password = String(passwordInput && passwordInput.value ? passwordInput.value : "");
+        const confirmPassword = String(confirmInput && confirmInput.value ? confirmInput.value : "");
+
+        if (!password || !confirmPassword) {
+          setStatus("reset-action-status", "All fields are required.", false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setStatus("reset-action-status", "Passwords do not match.", false);
+          return;
+        }
+        if (!passwordIsValid(password)) {
+          setStatus("reset-action-status", "Password must be at least 12 characters with letters, numbers, and special characters.", false);
+          return;
+        }
+
+        try {
+          const email = await instance.verifyPasswordResetCode(action.oobCode);
+          try {
+            await instance.signInWithEmailAndPassword(email, password);
+            await instance.signOut();
+            setStatus("reset-action-status", "You cannot reuse your previous password.", false);
+            return;
+          } catch (previousPasswordError) {
+            const code = previousPasswordError && previousPasswordError.code ? String(previousPasswordError.code) : "";
+            if (code && code !== "auth/wrong-password" && code !== "auth/user-not-found" && code !== "auth/invalid-login-credentials") {
+              setStatus("reset-action-status", previousPasswordError.message || "Could not verify your previous password.", false);
+              return;
+            }
+          }
+
+          await instance.confirmPasswordReset(action.oobCode, password);
+          setStatus("reset-action-status", "Password updated. You can now log in.", true);
+          clearActionParams();
+        } catch (error) {
+          setStatus("reset-action-status", error && error.message ? error.message : "Could not reset password.", false);
+        }
+      });
+    }
+
+    return true;
+  }
+
   async function ensureUserDoc(user, usernameMaybe) {
     const firestore = db();
     if (!firestore || !user) {
@@ -436,6 +641,11 @@
   function renderHome(selector) {
     const root = document.querySelector(selector);
     if (!root) {
+      return;
+    }
+
+    const action = getActionParams();
+    if (action && renderActionHome(root, action)) {
       return;
     }
 
@@ -1277,6 +1487,8 @@
     const nextManualSyncMs = lastManualSyncMs > 0 ? lastManualSyncMs + MANUAL_SYNC_INTERVAL_MS : 0;
     const canManualSyncNow = !nextManualSyncMs || Date.now() >= nextManualSyncMs;
     const nextManualSyncText = nextManualSyncMs ? new Date(nextManualSyncMs).toLocaleString() : "Now";
+    const nextAutoSyncMs = lastAutoSyncMs > 0 ? lastAutoSyncMs + AUTO_SYNC_INTERVAL_MS : 0;
+    const nextAutoSyncText = nextAutoSyncMs ? new Date(nextAutoSyncMs).toLocaleString() : "Now";
     const lastSyncMs = Math.max(lastManualSyncMs, lastAutoSyncMs);
     const lastSyncText = lastSyncMs ? new Date(lastSyncMs).toLocaleString() : "Never";
     const googleLinked = isGoogleLinked(user);
@@ -1337,6 +1549,7 @@
         <label class="block mb-2 text-sm text-gray-300">Data Sync</label>
         <p class="text-sm text-gray-300 mb-1">Auto sync: every 30 minutes</p>
         <p class="text-sm text-gray-300 mb-1">Last sync: ${escapeHtml(lastSyncText)}</p>
+        <p class="text-sm text-gray-300 mb-1">Next auto sync: ${escapeHtml(nextAutoSyncText)}</p>
         <p class="text-sm text-gray-300 mb-3">Next manual sync: ${escapeHtml(nextManualSyncText)}</p>
         <button id="settings-sync-now" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition" ${canManualSyncNow ? "" : "disabled"}>Sync Now</button>
         <p id="settings-sync-status" class="text-sm mt-3"></p>
