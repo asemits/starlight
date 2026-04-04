@@ -205,14 +205,9 @@ window.GAMES_LIST = [
         url: "tag.html"
     },
     {
-        title: "YoHoHo.io",
+        title: "Yohoho.io",
         image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTDa_9_qcWGmU124Wh8X84f9hcAJAghMsosiw&s", 
         url: "yohoho.html"
-    },
-    {
-        title: "10 Minutes Till Dawn",
-        image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRivCAuwA5fsCSJ9UlaqTSZIOpaay6nBmdbog&s", 
-        url: "10mintilldawn.html"
     },
     {
         title: "Baldi's Basics",

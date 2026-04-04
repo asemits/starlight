@@ -33,7 +33,7 @@
         icon: "fa-solid fa-gear",
         href: "/settings"
       },
-            {
+      {
         title: "private",
         description: "We care about your privacy. All sensitive info is encrypted and we never sell your data to data brokers.",
         icon: "fa-solid fa-lock",
