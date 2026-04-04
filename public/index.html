@@ -121,6 +121,14 @@
                           <option value="right" ${localStorage.getItem('sidebar-pos') === 'right' ? 'selected' : ''}>Right</option>
                         </select>
                       </article>
+
+                      <article class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <label class="block mb-2 text-sm text-gray-300">Measurement System</label>
+                        <select onchange="changeMeasurementSystem(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                          <option value="imperial" ${window.getMeasurementSystem() === 'metric' ? '' : 'selected'}>Imperial (F, mph)</option>
+                          <option value="metric" ${window.getMeasurementSystem() === 'metric' ? 'selected' : ''}>Metric (C, km/h)</option>
+                        </select>
+                      </article>
                     </div>
 
                     <div data-settings-panel="games" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">

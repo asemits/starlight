@@ -149,6 +149,21 @@
     return d.toLocaleDateString([], { weekday: "short" });
   }
 
+  function measurementSystem() {
+    if (window.getMeasurementSystem) {
+      return window.getMeasurementSystem();
+    }
+    return "imperial";
+  }
+
+  function tempUnitLabel(system) {
+    return system === "metric" ? "C" : "F";
+  }
+
+  function windUnitLabel(system) {
+    return system === "metric" ? "km/h" : "mph";
+  }
+
   async function fetchJson(url) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 7000);
@@ -201,7 +216,10 @@
 
   async function getWeatherPayload() {
     const geo = await resolveGeo();
-    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+    const system = measurementSystem();
+    const tempUnit = system === "metric" ? "celsius" : "fahrenheit";
+    const windUnit = system === "metric" ? "kmh" : "mph";
+    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&temperature_unit=${tempUnit}&wind_speed_unit=${windUnit}&timezone=auto`;
     const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${geo.lat}&longitude=${geo.lon}&current=us_aqi&timezone=auto`;
     const alertsUrl = `https://api.weather.gov/alerts/active?point=${geo.lat},${geo.lon}`;
 
@@ -211,7 +229,7 @@
       fetchJson(alertsUrl).catch(() => ({ features: [] }))
     ]);
 
-    return { geo, forecast, aqi, alerts };
+    return { geo, forecast, aqi, alerts, system };
   }
 
   function renderPoPGraph(canvas, labels, values) {
@@ -321,11 +339,21 @@
       return;
     }
 
-    const { geo, forecast, aqi, alerts } = state.data;
+    const { geo, forecast, aqi, alerts, system } = state.data;
     const hourly = forecast.hourly || {};
     const daily = forecast.daily || {};
     const current = forecast.current || {};
     const aqiNow = aqi && aqi.current ? aqi.current.us_aqi : null;
+    const tempUnit = tempUnitLabel(system);
+    const windUnit = windUnitLabel(system);
+
+    const widgetTemp = `${Math.round(current.temperature_2m || 0)}${tempUnit}`;
+    window.dispatchEvent(new CustomEvent("starlight:weather-current", {
+      detail: {
+        icon: weatherIconClass(current.weather_code),
+        temp: widgetTemp
+      }
+    }));
 
     const hourlyCards = [];
     const hourlyCount = Math.min(12, (hourly.time || []).length);
@@ -333,10 +361,10 @@
       hourlyCards.push(buildCard(
         formatHour(hourly.time[i]),
         weatherIconClass(hourly.weather_code[i]),
-        `${Math.round(hourly.temperature_2m[i])}F`,
+        `${Math.round(hourly.temperature_2m[i])}${tempUnit}`,
         weatherLabel(hourly.weather_code[i]),
         `${Math.round(hourly.precipitation_probability[i] || 0)}%`,
-        `${Math.round(hourly.wind_speed_10m[i] || 0)} mph`,
+        `${Math.round(hourly.wind_speed_10m[i] || 0)} ${windUnit}`,
         windDirShort(hourly.wind_direction_10m[i]),
         `${aqiNow ?? "N/A"} ${aqiText(aqiNow)}`,
         daily.sunrise && daily.sunrise[0] ? formatHour(daily.sunrise[0]) : "--",
@@ -360,10 +388,10 @@
       dailyCards.push(buildCard(
         formatDay(daily.time[i]),
         weatherIconClass(daily.weather_code[i]),
-        `${Math.round(daily.temperature_2m_max[i])}F / ${Math.round(daily.temperature_2m_min[i])}F`,
+        `${Math.round(daily.temperature_2m_max[i])}${tempUnit} / ${Math.round(daily.temperature_2m_min[i])}${tempUnit}`,
         weatherLabel(daily.weather_code[i]),
         "--",
-        `${Math.round(current.wind_speed_10m || 0)} mph`,
+        `${Math.round(current.wind_speed_10m || 0)} ${windUnit}`,
         windDirShort(current.wind_direction_10m),
         `${aqiNow ?? "N/A"} ${aqiText(aqiNow)}`,
         daily.sunrise && daily.sunrise[i] ? formatHour(daily.sunrise[i]) : "--",
@@ -406,11 +434,11 @@
             <h2>Weather</h2>
             <p>${geo.place || "Unknown location"}</p>
             <div class="wx-now-icon"><i class="fa-solid ${weatherIconClass(current.weather_code)}"></i></div>
-            <p class="wx-temp">${Math.round(current.temperature_2m || 0)}F</p>
+            <p class="wx-temp">${Math.round(current.temperature_2m || 0)}${tempUnit}</p>
             <p class="wx-text">${weatherLabel(current.weather_code)}</p>
             <div class="wx-mini">
               <div class="wx-mini-row"><i class="fa-solid fa-cloud-rain"></i><span>PoP ${Math.round(hourly.precipitation_probability && hourly.precipitation_probability[0] || 0)}%</span></div>
-              <div class="wx-mini-row"><i class="fa-solid fa-wind"></i><span>Speed ${Math.round(current.wind_speed_10m || 0)} mph</span></div>
+              <div class="wx-mini-row"><i class="fa-solid fa-wind"></i><span>Speed ${Math.round(current.wind_speed_10m || 0)} ${windUnit}</span></div>
               <div class="wx-mini-row"><i class="fa-solid fa-location-arrow" style="transform: rotate(${Number(current.wind_direction_10m || 0)}deg);"></i><span>Direction ${windDirShort(current.wind_direction_10m)}</span></div>
               <div class="wx-mini-row"><i class="fa-solid fa-lungs"></i><span>AQI ${aqiNow ?? "N/A"} (${aqiText(aqiNow)})</span></div>
               <div class="wx-mini-row"><i class="fa-solid fa-sun"></i><span>Sunrise ${daily.sunrise && daily.sunrise[0] ? formatHour(daily.sunrise[0]) : "--"}</span></div>
@@ -458,5 +486,9 @@
     load();
   }
 
-  window.StarlightWeather = { mount };
+  function refresh() {
+    load();
+  }
+
+  window.StarlightWeather = { mount, refresh };
 })();

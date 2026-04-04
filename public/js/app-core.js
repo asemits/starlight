@@ -20,6 +20,8 @@
   const WIDGET_FORMAT_KEY = "info-widget-format";
   const WIDGET_POS_X_KEY = "info-widget-pos-x";
   const WIDGET_POS_Y_KEY = "info-widget-pos-y";
+  const MEASUREMENT_SYSTEM_KEY = "starlight-measurement-system";
+  const WIDGET_WEATHER_CACHE_KEY = "starlight-widget-weather-current";
 
   function normalizeTarget(input) {
     const raw = String(input || "").trim();
@@ -131,6 +133,19 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   window.changeSidebarPos = function changeSidebarPos(newPos) {
     saveSidebarPosition(newPos);
+  };
+
+  window.getMeasurementSystem = function getMeasurementSystem() {
+    return localStorage.getItem(MEASUREMENT_SYSTEM_KEY) === "metric" ? "metric" : "imperial";
+  };
+
+  window.changeMeasurementSystem = function changeMeasurementSystem(value) {
+    const system = value === "metric" ? "metric" : "imperial";
+    localStorage.setItem(MEASUREMENT_SYSTEM_KEY, system);
+    window.dispatchEvent(new CustomEvent("starlight:measurement-changed", { detail: { system } }));
+    if (window.location.pathname === "/weather" && window.StarlightWeather && typeof window.StarlightWeather.refresh === "function") {
+      window.StarlightWeather.refresh();
+    }
   };
 
   window.changeGamesPaginationMode = function changeGamesPaginationMode(newMode) {
@@ -395,6 +410,21 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   let widgetBatteryCharging = false;
   let widgetBatteryBound = false;
   let widgetTick = 0;
+  let widgetWeatherIcon = "fa-cloud";
+  let widgetWeatherTemp = "--";
+
+  function readWidgetWeatherFromCache() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(WIDGET_WEATHER_CACHE_KEY) || "{}");
+      if (parsed && typeof parsed === "object") {
+        widgetWeatherIcon = typeof parsed.icon === "string" && parsed.icon ? parsed.icon : "fa-cloud";
+        widgetWeatherTemp = typeof parsed.temp === "string" && parsed.temp ? parsed.temp : "--";
+      }
+    } catch (_error) {
+      widgetWeatherIcon = "fa-cloud";
+      widgetWeatherTemp = "--";
+    }
+  }
 
   function pad2(input) {
     return String(input).padStart(2, "0");
@@ -491,14 +521,18 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       return;
     }
     const dateTextNode = node.querySelector("[data-widget-date]");
+    const weatherIconNode = node.querySelector("[data-widget-weather-icon]");
+    const weatherTempNode = node.querySelector("[data-widget-weather-temp]");
     const batteryIconNode = node.querySelector("[data-widget-battery-icon]");
     const batteryNode = node.querySelector("[data-widget-battery]");
-    if (!dateTextNode || !batteryIconNode || !batteryNode) {
+    if (!dateTextNode || !weatherIconNode || !weatherTempNode || !batteryIconNode || !batteryNode) {
       return;
     }
     const format = window.getInfoWidgetFormat();
     const mode = window.getInfoWidgetTimeMode();
     dateTextNode.textContent = formatWidgetDate(new Date(), format, mode);
+    weatherIconNode.className = "fa-solid " + widgetWeatherIcon;
+    weatherTempNode.textContent = widgetWeatherTemp;
     batteryIconNode.className = "fa-solid " + getWidgetBatteryIconClass();
     batteryNode.textContent = getWidgetBatteryText();
   }
@@ -542,6 +576,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
           <i class="fa-solid fa-grip-lines starlight-widget-grip"></i>
         </header>
         <div class="starlight-widget-body">
+          <div class="starlight-widget-row starlight-widget-weather-row">
+            <i class="fa-solid fa-cloud" data-widget-weather-icon></i>
+            <p class="starlight-widget-weather-temp" data-widget-weather-temp>--</p>
+          </div>
           <div class="starlight-widget-row">
             <i class="fa-regular fa-clock"></i>
             <p class="starlight-widget-date" data-widget-date></p>
@@ -754,6 +792,22 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   if (window.getWrapEnabled() === "on" && !isWrappedInnerPage()) {
     launchWrapped(window.getWrapMode(), window.location.href, true);
   }
+
+  window.addEventListener("starlight:weather-current", (event) => {
+    const detail = event && event.detail ? event.detail : null;
+    if (!detail) {
+      return;
+    }
+    widgetWeatherIcon = typeof detail.icon === "string" && detail.icon ? detail.icon : "fa-cloud";
+    widgetWeatherTemp = typeof detail.temp === "string" && detail.temp ? detail.temp : "--";
+    try {
+      localStorage.setItem(WIDGET_WEATHER_CACHE_KEY, JSON.stringify({ icon: widgetWeatherIcon, temp: widgetWeatherTemp }));
+    } catch (_error) {
+    }
+    renderInfoWidgetNow();
+  });
+
+  readWidgetWeatherFromCache();
 
   mountInfoWidget();
 })();

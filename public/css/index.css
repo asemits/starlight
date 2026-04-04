@@ -75,6 +75,17 @@
 	gap: 8px;
 }
 
+.starlight-widget-weather-row {
+	margin-bottom: 1px;
+}
+
+.starlight-widget-weather-temp {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
 .starlight-widget-row i {
 	width: 14px;
 	text-align: center;
