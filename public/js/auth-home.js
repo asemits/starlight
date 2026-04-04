@@ -480,10 +480,6 @@
             </div>
             <div id="dashboard-stats" class="starlight-dashboard-stats"></div>
           </section>
-
-          <div class="starlight-home-auth-actions">
-            <button id="starlight-logout" type="button" class="starlight-btn starlight-btn-muted">Log Out</button>
-          </div>
         </section>
       `;
       loadSignedInDashboard();
@@ -517,16 +513,6 @@
       signupBtn.addEventListener("click", openSignupTosModal);
     }
 
-    const logoutBtn = document.getElementById("starlight-logout");
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", async () => {
-        const instance = auth();
-        if (!instance) {
-          return;
-        }
-        await instance.signOut();
-      });
-    }
   }
 
   async function loadSignedInDashboard() {
@@ -1186,6 +1172,61 @@
     }
   }
 
+  async function logoutInSettings() {
+    const instance = auth();
+    if (!instance) {
+      setStatus("settings-danger-status", "You are not logged in.", false);
+      return;
+    }
+    try {
+      await instance.signOut();
+    } catch (error) {
+      setStatus("settings-danger-status", error && error.message ? error.message : "Could not log out.", false);
+    }
+  }
+
+  async function deleteAccountInSettings() {
+    const user = currentUser();
+    if (!user) {
+      setStatus("settings-danger-status", "You must be logged in.", false);
+      return;
+    }
+
+    const confirmed = window.confirm("Delete your account permanently? This cannot be undone.");
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const firestore = db();
+      if (firestore) {
+        const userRef = firestore.collection(USER_DOC_COLLECTION).doc(user.uid);
+        const userSnap = await userRef.get();
+        const batch = firestore.batch();
+        batch.delete(userRef);
+
+        if (userSnap.exists) {
+          const userData = userSnap.data() || {};
+          const usernameHash = String(userData.usernameHash || "");
+          if (usernameHash) {
+            batch.delete(firestore.collection(USERNAME_COLLECTION).doc(usernameHash));
+          }
+        }
+
+        await batch.commit();
+      }
+
+      await user.delete();
+    } catch (error) {
+      const code = error && error.code ? String(error.code) : "";
+      if (code === "auth/requires-recent-login") {
+        setStatus("settings-danger-status", "Please sign in again, then retry deleting your account.", false);
+        return;
+      }
+      setStatus("settings-danger-status", error && error.message ? error.message : "Could not delete account.", false);
+    }
+  }
+
   async function mountSettingsAuthPanel(forceRefresh) {
     const aside = document.querySelector("[data-settings-tab='widget']")?.closest("aside");
     const section = document.querySelector("section > [data-settings-panel='layout']")?.parentElement;
@@ -1300,6 +1341,16 @@
         <button id="settings-sync-now" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition" ${canManualSyncNow ? "" : "disabled"}>Sync Now</button>
         <p id="settings-sync-status" class="text-sm mt-3"></p>
       </article>
+
+      <article class="relative bg-white/5 p-6 rounded-2xl border border-red-400/30 sm:col-span-2">
+        <label class="block mb-2 text-sm text-red-200">Danger Zone</label>
+        <p class="text-sm text-red-100/90 mb-3">These actions affect your account and cannot be reversed.</p>
+        <div class="flex flex-wrap gap-2">
+          <button id="settings-danger-logout" type="button" class="px-4 py-3 rounded-xl border border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30 transition">Log Out</button>
+          <button id="settings-danger-delete" type="button" class="px-4 py-3 rounded-xl border border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30 transition">Delete Account</button>
+        </div>
+        <p id="settings-danger-status" class="text-sm mt-3"></p>
+      </article>
     `;
     section.appendChild(panel);
 
@@ -1345,6 +1396,16 @@
           }
         }
       });
+    }
+
+    const logoutDangerBtn = document.getElementById("settings-danger-logout");
+    if (logoutDangerBtn) {
+      logoutDangerBtn.addEventListener("click", logoutInSettings);
+    }
+
+    const deleteDangerBtn = document.getElementById("settings-danger-delete");
+    if (deleteDangerBtn) {
+      deleteDangerBtn.addEventListener("click", deleteAccountInSettings);
     }
 
     if (typeof window.switchSettingsCategory === "function" && (activeCategory === "account" || forceRefresh)) {
