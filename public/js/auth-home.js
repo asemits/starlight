@@ -16,20 +16,20 @@
     tosText: `Starlight Terms of Service\n\nEffective Date: April 4, 2026\n\nThese Terms of Service ("Terms") govern your access to and use of Starlight (the "Service"). By creating an account, accessing, or using the Service, you agree to be bound by these Terms. If you do not agree, do not use the Service.\n\n1. Eligibility and Account Responsibility\nYou are responsible for ensuring your use of the Service is lawful in your jurisdiction and permitted by your school, workplace, or organization policies. You are responsible for all activity that occurs under your account credentials.\n\n2. Acceptable Use\nYou agree not to:\n- Interfere with, disrupt, or degrade the Service or related infrastructure.\n- Attempt unauthorized access to accounts, systems, or data.\n- Use automated means to abuse, scrape, or overload the Service beyond normal use.\n- Use the Service for unlawful, fraudulent, or harmful activity.\n\n3. User Conduct\nYou must use the Service in a respectful and lawful manner. Harassment, malicious behavior, impersonation, or deliberate misuse of platform features may result in restriction or termination of access.\n\n4. Account Security\nYou must maintain the confidentiality of your login credentials and promptly report suspected unauthorized access. We are not responsible for losses arising from your failure to safeguard account credentials.\n\n5. Service Features and Availability\nThe Service may change over time. We may modify, suspend, or discontinue any feature, in whole or in part, at any time, with or without notice, to maintain security, compliance, or operational stability.\n\n6. Third-Party Content and Services\nThe Service may display or link to third-party content, games, resources, or platforms. We do not control third-party services and are not responsible for their availability, content, policies, or practices.\n\n7. Intellectual Property\nAll service branding, site design elements, and operator-provided materials are protected by applicable intellectual property laws. You may not copy, modify, distribute, or exploit protected materials except as expressly permitted by law or written authorization.\n\n8. Enforcement and Suspension\nWe may investigate potential violations of these Terms and may suspend, restrict, or terminate access where necessary to protect users, platform integrity, legal compliance, or security.\n\n9. Disclaimers\nThe Service is provided on an "as is" and "as available" basis. To the maximum extent permitted by law, we disclaim warranties of any kind, whether express or implied, including merchantability, fitness for a particular purpose, and non-infringement.\n\n10. Limitation of Liability\nTo the maximum extent permitted by law, the site operator and affiliated service providers are not liable for indirect, incidental, special, consequential, or punitive damages, or for loss of data, revenue, or profits arising from or related to use of the Service.\n\n11. Indemnification\nYou agree to indemnify and hold harmless the site operator from claims, losses, liabilities, damages, and expenses arising out of your misuse of the Service, violation of these Terms, or violation of applicable law.\n\n12. Changes to Terms\nWe may revise these Terms from time to time. Updated Terms become effective when posted, unless otherwise stated. Continued use of the Service after updates constitutes acceptance of the revised Terms.\n\n13. Termination\nYou may stop using the Service at any time. Provisions that by their nature should survive termination, including security, liability, and enforcement provisions, remain in effect.\n\n14. Contact\nQuestions about these Terms should be directed to the site operator through the official support or contact channel published with the Service.`,
     features: [
       {
-        title: "Games",
-        description: "Browse and launch your game library.",
+        title: "games",
+        description: "browse our large game library",
         icon: "fa-solid fa-gamepad",
         href: "/games"
       },
       {
-        title: "Apps",
-        description: "Open utility apps like weather and soundboard.",
+        title: "apps",
+        description: "open utility apps like notepad, timer, soundboard, weather and more",
         icon: "fa-solid fa-shapes",
         href: "/apps"
       },
       {
-        title: "Settings",
-        description: "Tune layout, effects, widgets, and account options.",
+        title: "settings",
+        description: "personalize layout, effects, widgets, and account options",
         icon: "fa-solid fa-gear",
         href: "/settings"
       }
