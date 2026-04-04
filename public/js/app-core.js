@@ -68,7 +68,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Starlight Wrapper</title>
+<title>Starlight</title>
 <style>
 html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
 iframe { width: 100%; height: 100%; border: 0; display: block; }
