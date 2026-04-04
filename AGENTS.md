@@ -4,3 +4,4 @@ If the user says that what you are doing is wrong, do not try and use it again a
 When providing Firebase rules, make sure that they are secure. For example, make sure that if a node is being created for a specific user account, make sure that ONLY that acccount's UID can access it. Make sure that no sensitive data is being stored in plain text.
 Accurately decide whether it is better to use Firestore or Realtime Database (RTDB) for the requested feature (if required).
 Make sure the implemented feature is secure, and again, absolutely no sensitive data of the users' is being stored in plain text.
+Make sure absolutely nothing uses Math.random(); as it has been proven to be reverse engineered. Always use crypto.getRandomValues(); instead.
