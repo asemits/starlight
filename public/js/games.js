@@ -876,19 +876,21 @@
 	}
 
 	function heroImageChain(game) {
+		const logo = normalizeImageUrl("/logos/logo.png", game.sourceBase);
 		const candidates = [
-			...thumbFallback(game.path, game.sourceBase).split("|"),
 			game.image || "",
-			"/logos/logo.png"
+			...thumbFallback(game.path, game.sourceBase).split("|"),
+			logo
 		];
 		const chain = [];
 		for (const candidate of candidates) {
 			const normalized = normalizeImageUrl(candidate, game.sourceBase);
-			if (!normalized || chain.includes(normalized)) {
+			if (!normalized || normalized === logo || chain.includes(normalized)) {
 				continue;
 			}
 			chain.push(normalized);
 		}
+		chain.push(logo);
 		return chain;
 	}
 
