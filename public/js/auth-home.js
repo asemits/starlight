@@ -911,7 +911,10 @@
         const password = String(document.getElementById("login-password").value || "");
         try {
           const result = await instance.signInWithEmailAndPassword(email, password);
-          await ensureUserDoc(result.user, result.user.displayName || "");
+          try {
+            await ensureUserDoc(result.user, result.user.displayName || "");
+          } catch (_error) {
+          }
           closeModal();
         } catch (error) {
           setStatus("login-status", error && error.message ? error.message : "Login failed.", false);
@@ -929,7 +932,10 @@
         try {
           const provider = new firebase.auth.GoogleAuthProvider();
           const result = await instance.signInWithPopup(provider);
-          await ensureUserDoc(result.user, result.user.displayName || "");
+          try {
+            await ensureUserDoc(result.user, result.user.displayName || "");
+          } catch (_error) {
+          }
           closeModal();
         } catch (error) {
           setStatus("login-status", error && error.message ? error.message : "Google login failed.", false);
@@ -1079,7 +1085,10 @@
         try {
           const provider = new firebase.auth.GoogleAuthProvider();
           const result = await instance.signInWithPopup(provider);
-          await ensureUserDoc(result.user, result.user.displayName || "");
+          try {
+            await ensureUserDoc(result.user, result.user.displayName || "");
+          } catch (_error) {
+          }
           closeModal();
         } catch (error) {
           setStatus("signup-form-status", error && error.message ? error.message : "Google sign up failed.", false);
