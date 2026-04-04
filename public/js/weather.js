@@ -219,7 +219,7 @@
     const system = measurementSystem();
     const tempUnit = system === "metric" ? "celsius" : "fahrenheit";
     const windUnit = system === "metric" ? "kmh" : "mph";
-    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&temperature_unit=${tempUnit}&wind_speed_unit=${windUnit}&timezone=auto`;
+    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&temperature_unit=${tempUnit}&wind_speed_unit=${windUnit}&timezone=auto`;
     const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${geo.lat}&longitude=${geo.lon}&current=us_aqi&timezone=auto`;
     const alertsUrl = `https://api.weather.gov/alerts/active?point=${geo.lat},${geo.lon}`;
 
@@ -392,7 +392,7 @@
         weatherIconClass(daily.weather_code[i]),
         `${Math.round(daily.temperature_2m_max[i])}${tempUnit} / ${Math.round(daily.temperature_2m_min[i])}${tempUnit}`,
         weatherLabel(daily.weather_code[i]),
-        "--",
+        `${Math.round((daily.precipitation_probability_max && daily.precipitation_probability_max[i]) || 0)}%`,
         `${Math.round(current.wind_speed_10m || 0)} ${windUnit}`,
         windDirShort(current.wind_direction_10m),
         `${aqiNow ?? "N/A"} ${aqiText(aqiNow)}`,

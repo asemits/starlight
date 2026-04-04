@@ -20,6 +20,9 @@
   const WIDGET_FORMAT_KEY = "info-widget-format";
   const WIDGET_POS_X_KEY = "info-widget-pos-x";
   const WIDGET_POS_Y_KEY = "info-widget-pos-y";
+  const WIDGET_SHOW_WEATHER_KEY = "info-widget-show-weather";
+  const WIDGET_SHOW_DATETIME_KEY = "info-widget-show-datetime";
+  const WIDGET_SHOW_BATTERY_KEY = "info-widget-show-battery";
   const MEASUREMENT_SYSTEM_KEY = "starlight-measurement-system";
   const WIDGET_WEATHER_CACHE_KEY = "starlight-widget-weather-current";
 
@@ -188,6 +191,159 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
   };
 
+  window.getGamesParticlesShape = function getGamesParticlesShape() {
+    const value = localStorage.getItem("games-particles-shape");
+    return value === "square" || value === "triangle" ? value : "circle";
+  };
+
+  window.getGamesParticlesFrequency = function getGamesParticlesFrequency() {
+    const value = localStorage.getItem("games-particles-frequency");
+    return value === "low" || value === "high" ? value : "normal";
+  };
+
+  window.getGamesParticlesSize = function getGamesParticlesSize() {
+    const value = localStorage.getItem("games-particles-size");
+    return value === "small" || value === "large" ? value : "medium";
+  };
+
+  window.changeGamesParticlesShape = function changeGamesParticlesShape(newShape) {
+    const value = newShape === "square" || newShape === "triangle" ? newShape : "circle";
+    localStorage.setItem("games-particles-shape", value);
+    if (window.updateGlobalParticlesSettings) {
+      window.updateGlobalParticlesSettings();
+    }
+    if (window.location.pathname === "/games" && window.StarlightGames) {
+      window.StarlightGames.render();
+    }
+  };
+
+  window.changeGamesParticlesFrequency = function changeGamesParticlesFrequency(newFrequency) {
+    const value = newFrequency === "low" || newFrequency === "high" ? newFrequency : "normal";
+    localStorage.setItem("games-particles-frequency", value);
+    if (window.updateGlobalParticlesSettings) {
+      window.updateGlobalParticlesSettings();
+    }
+    if (window.location.pathname === "/games" && window.StarlightGames) {
+      window.StarlightGames.render();
+    }
+  };
+
+  window.changeGamesParticlesSize = function changeGamesParticlesSize(newSize) {
+    const value = newSize === "small" || newSize === "large" ? newSize : "medium";
+    localStorage.setItem("games-particles-size", value);
+    if (window.updateGlobalParticlesSettings) {
+      window.updateGlobalParticlesSettings();
+    }
+    if (window.location.pathname === "/games" && window.StarlightGames) {
+      window.StarlightGames.render();
+    }
+  };
+
+  function refreshSettingsView(preferredCategory) {
+    if (window.location.pathname !== "/settings") {
+      return;
+    }
+    const activePanel = document.querySelector("[data-settings-panel]:not(.hidden)");
+    const activeCategory = preferredCategory || (activePanel ? activePanel.getAttribute("data-settings-panel") : "layout");
+    if (typeof window.router === "function") {
+      Promise.resolve(window.router()).finally(() => {
+        if (typeof window.switchSettingsCategory === "function") {
+          window.switchSettingsCategory(activeCategory || "layout");
+        }
+      });
+      return;
+    }
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
+  function resetSettingsCard(cardId) {
+    if (cardId === "layout-sidebar") {
+      window.changeSidebarPos("top");
+      return;
+    }
+    if (cardId === "layout-measurement") {
+      window.changeMeasurementSystem("imperial");
+      return;
+    }
+    if (cardId === "games-pagination") {
+      window.changeGamesPaginationMode("numbered");
+      return;
+    }
+    if (cardId === "particles-enabled") {
+      window.changeGamesParticlesEnabled("on");
+      return;
+    }
+    if (cardId === "particles-bonds") {
+      window.changeGamesParticlesBonds("off");
+      return;
+    }
+    if (cardId === "particles-color") {
+      window.changeGamesParticlesColor("#ffffff");
+      return;
+    }
+    if (cardId === "particles-shape") {
+      window.changeGamesParticlesShape("circle");
+      return;
+    }
+    if (cardId === "particles-frequency") {
+      window.changeGamesParticlesFrequency("normal");
+      return;
+    }
+    if (cardId === "particles-size") {
+      window.changeGamesParticlesSize("medium");
+      return;
+    }
+    if (cardId === "shortcut-main") {
+      localStorage.removeItem(SHORTCUT_KEY);
+      window.changeShortcutEnabled("off");
+      window.changeShortcutTarget("/");
+      return;
+    }
+    if (cardId === "cloak-main") {
+      window.changeWrapEnabled("off");
+      window.changeWrapMode("about-blank");
+      return;
+    }
+    if (cardId === "cloak-open") {
+      window.changeWrapMode("about-blank");
+      return;
+    }
+    if (cardId === "widget-main") {
+      window.changeInfoWidgetEnabled("on");
+      window.changeInfoWidgetTimeMode("12");
+      return;
+    }
+    if (cardId === "widget-format") {
+      window.changeInfoWidgetFormat("%Y-%m-%d %H:%M:%S");
+      window.resetInfoWidgetPosition();
+      return;
+    }
+    if (cardId === "widget-content") {
+      window.changeInfoWidgetSectionVisibility("weather", "on");
+      window.changeInfoWidgetSectionVisibility("datetime", "on");
+      window.changeInfoWidgetSectionVisibility("battery", "on");
+    }
+  }
+
+  window.resetSettingsCard = function exposedResetSettingsCard(cardId) {
+    resetSettingsCard(String(cardId || ""));
+    refreshSettingsView();
+  };
+
+  window.resetSettingsCategory = function resetSettingsCategory(category) {
+    const map = {
+      layout: ["layout-sidebar", "layout-measurement"],
+      games: ["games-pagination"],
+      particles: ["particles-enabled", "particles-bonds", "particles-color", "particles-shape", "particles-frequency", "particles-size"],
+      shortcut: ["shortcut-main"],
+      cloak: ["cloak-main", "cloak-open"],
+      widget: ["widget-main", "widget-format", "widget-content"]
+    };
+    const keys = map[String(category || "")] || [];
+    keys.forEach((key) => resetSettingsCard(key));
+    refreshSettingsView(String(category || "layout"));
+  };
+
   window.switchSettingsCategory = function switchSettingsCategory(category) {
     document.querySelectorAll("[data-settings-tab]").forEach((button) => {
       const active = button.getAttribute("data-settings-tab") === category;
@@ -343,6 +499,33 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   window.getInfoWidgetTimeMode = function getInfoWidgetTimeMode() {
     return localStorage.getItem(WIDGET_TIME_MODE_KEY) === "24" ? "24" : "12";
+  };
+
+  window.getInfoWidgetSectionVisibility = function getInfoWidgetSectionVisibility(section) {
+    const keyMap = {
+      weather: WIDGET_SHOW_WEATHER_KEY,
+      datetime: WIDGET_SHOW_DATETIME_KEY,
+      battery: WIDGET_SHOW_BATTERY_KEY
+    };
+    const key = keyMap[String(section || "")];
+    if (!key) {
+      return "on";
+    }
+    return localStorage.getItem(key) === "off" ? "off" : "on";
+  };
+
+  window.changeInfoWidgetSectionVisibility = function changeInfoWidgetSectionVisibility(section, value) {
+    const keyMap = {
+      weather: WIDGET_SHOW_WEATHER_KEY,
+      datetime: WIDGET_SHOW_DATETIME_KEY,
+      battery: WIDGET_SHOW_BATTERY_KEY
+    };
+    const key = keyMap[String(section || "")];
+    if (!key) {
+      return;
+    }
+    localStorage.setItem(key, value === "off" ? "off" : "on");
+    renderInfoWidgetNow();
   };
 
   window.changeInfoWidgetEnabled = function changeInfoWidgetEnabled(value) {
@@ -559,6 +742,9 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     if (!node) {
       return;
     }
+    const weatherRow = node.querySelector('[data-widget-section="weather"]');
+    const dateRow = node.querySelector('[data-widget-section="datetime"]');
+    const batteryRow = node.querySelector('[data-widget-section="battery"]');
     const dateTextNode = node.querySelector("[data-widget-date]");
     const weatherIconNode = node.querySelector("[data-widget-weather-icon]");
     const weatherTempNode = node.querySelector("[data-widget-weather-temp]");
@@ -569,6 +755,20 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
     const format = window.getInfoWidgetFormat();
     const mode = window.getInfoWidgetTimeMode();
+    const showWeather = window.getInfoWidgetSectionVisibility("weather") === "on";
+    const showDatetime = window.getInfoWidgetSectionVisibility("datetime") === "on";
+    const showBattery = window.getInfoWidgetSectionVisibility("battery") === "on";
+
+    if (weatherRow) {
+      weatherRow.style.display = showWeather ? "flex" : "none";
+    }
+    if (dateRow) {
+      dateRow.style.display = showDatetime ? "flex" : "none";
+    }
+    if (batteryRow) {
+      batteryRow.style.display = showBattery ? "flex" : "none";
+    }
+
     dateTextNode.textContent = formatWidgetDate(new Date(), format, mode);
     weatherIconNode.className = "fa-solid " + widgetWeatherIcon;
     weatherTempNode.textContent = formatWidgetWeatherTemp();
@@ -615,15 +815,15 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
           <i class="fa-solid fa-grip-lines starlight-widget-grip"></i>
         </header>
         <div class="starlight-widget-body">
-          <div class="starlight-widget-row starlight-widget-weather-row">
+          <div class="starlight-widget-row starlight-widget-weather-row" data-widget-section="weather">
             <i class="fa-solid fa-cloud" data-widget-weather-icon></i>
             <p class="starlight-widget-weather-temp" data-widget-weather-temp>--</p>
           </div>
-          <div class="starlight-widget-row">
+          <div class="starlight-widget-row" data-widget-section="datetime">
             <i class="fa-regular fa-clock"></i>
             <p class="starlight-widget-date" data-widget-date></p>
           </div>
-          <div class="starlight-widget-row">
+          <div class="starlight-widget-row" data-widget-section="battery">
             <i class="fa-solid fa-battery-half" data-widget-battery-icon></i>
             <p class="starlight-widget-battery" data-widget-battery></p>
           </div>
@@ -701,7 +901,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       return {
         enabled: localStorage.getItem("games-particles-enabled") !== "off",
         color: ensureHexColor(localStorage.getItem("games-particles-color") || "#ffffff"),
-        bondsOn: localStorage.getItem("games-particles-bonds") === "on"
+        bondsOn: localStorage.getItem("games-particles-bonds") === "on",
+        shape: window.getGamesParticlesShape(),
+        frequency: window.getGamesParticlesFrequency(),
+        size: window.getGamesParticlesSize()
       };
     }
 
@@ -716,7 +919,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
 
     function makeParticles() {
-      const count = Math.max(42, Math.floor((width * height) / 18000));
+      const multiplier = settings.frequency === "low" ? 0.6 : settings.frequency === "high" ? 1.7 : 1;
+      const count = Math.max(24, Math.floor((width * height * multiplier) / 18000));
       particles.length = 0;
       for (let i = 0; i < count; i += 1) {
         particles.push({
@@ -727,6 +931,28 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
           r: 0.8 + Math.random() * 2.2
         });
       }
+    }
+
+    function drawParticle(particle) {
+      const sizeMultiplier = settings.size === "small" ? 0.7 : settings.size === "large" ? 1.5 : 1;
+      const size = particle.r * sizeMultiplier;
+      ctx.fillStyle = toRgba(settings.color, 0.85);
+      if (settings.shape === "square") {
+        ctx.fillRect(particle.x - size, particle.y - size, size * 2, size * 2);
+        return;
+      }
+      if (settings.shape === "triangle") {
+        ctx.beginPath();
+        ctx.moveTo(particle.x, particle.y - size * 1.3);
+        ctx.lineTo(particle.x - size * 1.1, particle.y + size * 0.9);
+        ctx.lineTo(particle.x + size * 1.1, particle.y + size * 0.9);
+        ctx.closePath();
+        ctx.fill();
+        return;
+      }
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, size, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     function resize() {
@@ -755,10 +981,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
           particle.vy *= -1;
         }
 
-        ctx.beginPath();
-        ctx.fillStyle = toRgba(settings.color, 0.85);
-        ctx.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2);
-        ctx.fill();
+        drawParticle(particle);
       }
 
       if (settings.bondsOn) {
@@ -790,6 +1013,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       settings.enabled = next.enabled;
       settings.color = next.color;
       settings.bondsOn = next.bondsOn;
+      settings.shape = next.shape;
+      settings.frequency = next.frequency;
+      settings.size = next.size;
+      makeParticles();
       canvas.style.display = settings.enabled ? "block" : "none";
     };
 
