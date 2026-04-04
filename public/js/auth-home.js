@@ -1,6 +1,8 @@
 (function () {
   const VERIFICATION_WINDOW_MS = 5 * 60 * 1000;
   const USERNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+  const AUTO_SYNC_INTERVAL_MS = 30 * 60 * 1000;
+  const MANUAL_SYNC_INTERVAL_MS = 5 * 60 * 1000;
   const TOS_REQUIRED_MS = 30 * 1000;
   const USER_DOC_COLLECTION = "users";
   const USERNAME_COLLECTION = "usernames";
@@ -43,7 +45,8 @@
     resendAllowedAt: 0,
     verifyTimerId: 0,
     verificationId: "",
-    recaptcha: null
+    recaptcha: null,
+    autoSyncTimerId: 0
   };
 
   function escapeHtml(value) {
@@ -306,6 +309,115 @@
     return clean;
   }
 
+  function collectSyncSettingsSnapshot() {
+    const keys = [
+      "sidebar-pos",
+      "games-pagination-mode",
+      "games-particles-enabled",
+      "games-particles-bonds",
+      "games-particles-color",
+      "games-particles-shape",
+      "games-particles-frequency",
+      "games-particles-size",
+      "tab-shortcut-combo",
+      "tab-shortcut-target",
+      "tab-shortcut-enabled",
+      "site-wrap-mode",
+      "site-wrap-enabled",
+      "site-wrap-last-url",
+      "starlight-anti-close-enabled",
+      "info-widget-enabled",
+      "info-widget-time-mode",
+      "info-widget-format",
+      "info-widget-pos-x",
+      "info-widget-pos-y",
+      "info-widget-show-weather",
+      "info-widget-show-datetime",
+      "info-widget-show-battery",
+      "starlight-measurement-system"
+    ];
+    const snapshot = {};
+    keys.forEach((key) => {
+      const value = localStorage.getItem(key);
+      if (value !== null) {
+        snapshot[key] = String(value).slice(0, 2048);
+      }
+    });
+    return snapshot;
+  }
+
+  async function syncUserData(mode, silent) {
+    const user = currentUser();
+    const firestore = db();
+    if (!user || !firestore) {
+      return false;
+    }
+
+    const isManual = mode === "manual";
+    const userRef = firestore.collection(USER_DOC_COLLECTION).doc(user.uid);
+    const snapshot = collectSyncSettingsSnapshot();
+
+    try {
+      await firestore.runTransaction(async (tx) => {
+        const userDoc = await tx.get(userRef);
+        const data = userDoc.exists ? (userDoc.data() || {}) : {};
+        const lastManualMs = toMillis(data.lastManualSyncAt);
+        const lastAutoMs = toMillis(data.lastAutoSyncAt);
+        const nowMs = Date.now();
+
+        if (isManual && lastManualMs && nowMs - lastManualMs < MANUAL_SYNC_INTERVAL_MS) {
+          throw new Error("Manual sync is available once every 5 minutes.");
+        }
+        if (!isManual && lastAutoMs && nowMs - lastAutoMs < AUTO_SYNC_INTERVAL_MS) {
+          throw new Error("Auto sync interval has not elapsed.");
+        }
+
+        const payload = {
+          uid: user.uid,
+          providers: (user.providerData || []).map((item) => item.providerId).filter(Boolean),
+          settings: snapshot,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        if (isManual) {
+          payload.lastManualSyncAt = firebase.firestore.FieldValue.serverTimestamp();
+          if (data.lastAutoSyncAt) {
+            payload.lastAutoSyncAt = data.lastAutoSyncAt;
+          }
+        } else {
+          payload.lastAutoSyncAt = firebase.firestore.FieldValue.serverTimestamp();
+          if (data.lastManualSyncAt) {
+            payload.lastManualSyncAt = data.lastManualSyncAt;
+          }
+        }
+
+        tx.set(userRef, payload, { merge: true });
+      });
+      return true;
+    } catch (error) {
+      if (!silent) {
+        setStatus("settings-sync-status", error && error.message ? error.message : "Could not sync data.", false);
+      }
+      return false;
+    }
+  }
+
+  function startAutoSyncLoop() {
+    if (state.autoSyncTimerId) {
+      window.clearInterval(state.autoSyncTimerId);
+      state.autoSyncTimerId = 0;
+    }
+    state.autoSyncTimerId = window.setInterval(() => {
+      syncUserData("auto", true);
+    }, 60 * 1000);
+  }
+
+  function stopAutoSyncLoop() {
+    if (state.autoSyncTimerId) {
+      window.clearInterval(state.autoSyncTimerId);
+      state.autoSyncTimerId = 0;
+    }
+  }
+
   function renderHome(selector) {
     const root = document.querySelector(selector);
     if (!root) {
@@ -416,15 +528,29 @@
     statsNode.innerHTML = '';
 
     try {
-      const snap = await firestore.collectionGroup("players").where("uid", "==", user.uid).limit(120).get();
-      let sourceDocs = snap.docs;
+      let sourceDocs = [];
+      try {
+        const snap = await firestore.collectionGroup("players").where("uid", "==", user.uid).limit(120).get();
+        sourceDocs = snap.docs;
+      } catch (_queryError) {
+        sourceDocs = [];
+      }
+
       if (!sourceDocs.length) {
-        const fallbackSnap = await firestore
-          .collectionGroup("players")
-          .where(firebase.firestore.FieldPath.documentId(), "==", user.uid)
-          .limit(120)
-          .get();
-        sourceDocs = fallbackSnap.docs;
+        try {
+          const statsSnap = await firestore.collection("gameStats").orderBy("updatedAt", "desc").limit(220).get();
+          const playerDocs = await Promise.all(statsSnap.docs.map(async (statsDoc) => {
+            try {
+              const playerDoc = await statsDoc.ref.collection("players").doc(user.uid).get();
+              return playerDoc.exists ? playerDoc : null;
+            } catch (_playerError) {
+              return null;
+            }
+          }));
+          sourceDocs = playerDocs.filter(Boolean);
+        } catch (_fallbackError) {
+          sourceDocs = [];
+        }
       }
 
       const list = sourceDocs.map((doc) => {
@@ -1038,11 +1164,16 @@
     const user = currentUser();
     const firestore = db();
     let usernameChangedAtMs = 0;
+    let lastManualSyncMs = 0;
+    let lastAutoSyncMs = 0;
     if (firestore && user) {
       try {
         const userSnap = await firestore.collection(USER_DOC_COLLECTION).doc(user.uid).get();
         if (userSnap.exists) {
-          usernameChangedAtMs = toMillis(userSnap.data().usernameChangedAt);
+          const userData = userSnap.data() || {};
+          usernameChangedAtMs = toMillis(userData.usernameChangedAt);
+          lastManualSyncMs = toMillis(userData.lastManualSyncAt);
+          lastAutoSyncMs = toMillis(userData.lastAutoSyncAt);
         }
       } catch (_error) {
       }
@@ -1052,6 +1183,10 @@
     const nextAllowedText = nextAllowedMs
       ? new Date(nextAllowedMs).toLocaleString()
       : "Now";
+    const nextManualSyncMs = lastManualSyncMs > 0 ? lastManualSyncMs + MANUAL_SYNC_INTERVAL_MS : 0;
+    const canManualSyncNow = !nextManualSyncMs || Date.now() >= nextManualSyncMs;
+    const nextManualSyncText = nextManualSyncMs ? new Date(nextManualSyncMs).toLocaleString() : "Now";
+    const lastAutoSyncText = lastAutoSyncMs ? new Date(lastAutoSyncMs).toLocaleString() : "Never";
     const googleLinked = isGoogleLinked(user);
     const hasMfa = Boolean(user && user.multiFactor && Array.isArray(user.multiFactor.enrolledFactors) && user.multiFactor.enrolledFactors.length > 0);
 
@@ -1101,6 +1236,15 @@
         <p class="text-sm text-gray-300 mt-2">You can change your username once every 7 days.</p>
         <p id="settings-username-status" class="text-sm mt-3"></p>
       </article>
+
+      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
+        <label class="block mb-2 text-sm text-gray-300">Data Sync</label>
+        <p class="text-sm text-gray-300 mb-1">Auto sync: every 30 minutes</p>
+        <p class="text-sm text-gray-300 mb-1">Last auto sync: ${escapeHtml(lastAutoSyncText)}</p>
+        <p class="text-sm text-gray-300 mb-3">Next manual sync: ${escapeHtml(nextManualSyncText)}</p>
+        <button id="settings-sync-now" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition" ${canManualSyncNow ? "" : "disabled"}>Sync Now</button>
+        <p id="settings-sync-status" class="text-sm mt-3"></p>
+      </article>
     `;
     section.appendChild(panel);
 
@@ -1133,6 +1277,17 @@
     if (usernameBtn) {
       usernameBtn.addEventListener("click", changeUsernameInSettings);
     }
+
+    const syncBtn = document.getElementById("settings-sync-now");
+    if (syncBtn) {
+      syncBtn.addEventListener("click", async () => {
+        const ok = await syncUserData("manual", false);
+        if (ok) {
+          setStatus("settings-sync-status", "Data synced.", true);
+          mountSettingsAuthPanel(true);
+        }
+      });
+    }
   }
 
   function bootstrapModalHost() {
@@ -1148,6 +1303,12 @@
   function onAuthChanged(user) {
     state.user = user || null;
     state.authReady = true;
+    if (user) {
+      startAutoSyncLoop();
+      syncUserData("auto", true);
+    } else {
+      stopAutoSyncLoop();
+    }
     if (typeof window.router === "function") {
       window.router();
     }

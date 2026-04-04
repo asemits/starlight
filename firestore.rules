@@ -77,21 +77,7 @@ service cloud.firestore {
       allow create: if isOwner(uid)
         && hasOnlyKeys(request.resource.data, [
           'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt',
-          'email', 'username', 'usernameLower'
-        ])
-        && request.resource.data.uid == request.auth.uid
-        && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
-        && (!('usernameHash' in request.resource.data) || isNonEmptyString(request.resource.data.usernameHash, 128))
-        && (!('usernameChangedAt' in request.resource.data) || request.resource.data.usernameChangedAt is timestamp)
-        && (!('providers' in request.resource.data) || request.resource.data.providers is list)
-        && (!('email' in request.resource.data) || request.resource.data.email is string)
-        && (!('username' in request.resource.data) || request.resource.data.username is string)
-        && (!('usernameLower' in request.resource.data) || request.resource.data.usernameLower is string);
-
-      allow update: if isOwner(uid)
-        && hasOnlyKeys(request.resource.data, [
-          'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt',
-          'email', 'username', 'usernameLower'
+          'email', 'username', 'usernameLower', 'settings', 'lastManualSyncAt', 'lastAutoSyncAt'
         ])
         && request.resource.data.uid == request.auth.uid
         && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
@@ -101,6 +87,26 @@ service cloud.firestore {
         && (!('email' in request.resource.data) || request.resource.data.email is string)
         && (!('username' in request.resource.data) || request.resource.data.username is string)
         && (!('usernameLower' in request.resource.data) || request.resource.data.usernameLower is string)
+        && (!('settings' in request.resource.data) || request.resource.data.settings is map)
+        && (!('lastManualSyncAt' in request.resource.data) || request.resource.data.lastManualSyncAt is timestamp)
+        && (!('lastAutoSyncAt' in request.resource.data) || request.resource.data.lastAutoSyncAt is timestamp);
+
+      allow update: if isOwner(uid)
+        && hasOnlyKeys(request.resource.data, [
+          'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt',
+          'email', 'username', 'usernameLower', 'settings', 'lastManualSyncAt', 'lastAutoSyncAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
+        && (!('usernameHash' in request.resource.data) || isNonEmptyString(request.resource.data.usernameHash, 128))
+        && (!('usernameChangedAt' in request.resource.data) || request.resource.data.usernameChangedAt is timestamp)
+        && (!('providers' in request.resource.data) || request.resource.data.providers is list)
+        && (!('email' in request.resource.data) || request.resource.data.email is string)
+        && (!('username' in request.resource.data) || request.resource.data.username is string)
+        && (!('usernameLower' in request.resource.data) || request.resource.data.usernameLower is string)
+        && (!('settings' in request.resource.data) || request.resource.data.settings is map)
+        && (!('lastManualSyncAt' in request.resource.data) || request.resource.data.lastManualSyncAt is timestamp)
+        && (!('lastAutoSyncAt' in request.resource.data) || request.resource.data.lastAutoSyncAt is timestamp)
         && (
           request.resource.data.usernameHash == resource.data.usernameHash
           || (
@@ -111,6 +117,26 @@ service cloud.firestore {
               || !(resource.data.usernameChangedAt is timestamp)
               || request.time >= resource.data.usernameChangedAt + duration.value(7, 'd')
             )
+          )
+        )
+        && (
+          !('lastManualSyncAt' in request.resource.data)
+          || !('lastManualSyncAt' in resource.data)
+          || !(resource.data.lastManualSyncAt is timestamp)
+          || request.resource.data.lastManualSyncAt == resource.data.lastManualSyncAt
+          || (
+            request.resource.data.lastManualSyncAt == request.time
+            && request.time >= resource.data.lastManualSyncAt + duration.value(5, 'm')
+          )
+        )
+        && (
+          !('lastAutoSyncAt' in request.resource.data)
+          || !('lastAutoSyncAt' in resource.data)
+          || !(resource.data.lastAutoSyncAt is timestamp)
+          || request.resource.data.lastAutoSyncAt == resource.data.lastAutoSyncAt
+          || (
+            request.resource.data.lastAutoSyncAt == request.time
+            && request.time >= resource.data.lastAutoSyncAt + duration.value(30, 'm')
           )
         );
 
