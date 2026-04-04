@@ -161,7 +161,7 @@
     return `
       <div class="starlight-modal-layer" style="position:fixed;inset:0;display:grid;place-items:center;padding:14px;z-index:1;">
         <div class="starlight-modal-backdrop" data-close-modal="1" style="position:absolute;inset:0;background:rgba(0,0,0,0.66);backdrop-filter:blur(4px);"></div>
-        <div class="starlight-modal-card" style="position:relative;z-index:1;width:min(94vw,580px);max-height:86vh;overflow-y:auto;">
+        <div class="starlight-modal-card" style="position:relative;top:auto;left:auto;transform:none;animation:none;margin:0;z-index:1;width:min(94vw,580px);max-height:86vh;overflow-y:auto;">
           <div class="starlight-modal-head">
             <h2>${escapeHtml(title)}</h2>
             <button type="button" class="starlight-modal-close" data-close-modal="1"><i class="fa-solid fa-xmark"></i></button>
