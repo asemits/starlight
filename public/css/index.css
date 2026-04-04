@@ -33,18 +33,29 @@
 	max-width: 320px;
 	padding: 8px 10px;
 	border-radius: 12px;
-	border: 1px solid rgba(255, 255, 255, 0.2);
-	background: rgba(0, 0, 0, 0.6);
-	backdrop-filter: blur(8px);
+	border: 1px solid rgba(255, 255, 255, 0.24);
+	background: linear-gradient(155deg, rgba(255,255,255,0.22), rgba(255,255,255,0.04) 42%, rgba(0,0,0,0.5) 100%);
+	backdrop-filter: blur(22px) saturate(170%);
+	-webkit-backdrop-filter: blur(22px) saturate(170%);
 	color: rgba(255, 255, 255, 0.92);
-	box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+	box-shadow: 0 18px 42px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255,255,255,0.4);
 	user-select: none;
+	overflow: hidden;
+}
+
+#starlight-info-widget::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	background: radial-gradient(135% 100% at 0% 0%, rgba(255,255,255,0.28), rgba(255,255,255,0.02) 48%, rgba(255,255,255,0));
 }
 
 .starlight-widget-handle {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
+	justify-content: flex-end;
 	cursor: grab;
 	font-size: 11px;
 	letter-spacing: 0.08em;
@@ -52,20 +63,20 @@
 	color: rgba(255, 255, 255, 0.7);
 	padding-bottom: 2px;
 	margin-bottom: 6px;
-}
-
-.starlight-widget-title {
-	font-size: 10px;
+	position: relative;
+	z-index: 1;
 }
 
 .starlight-widget-grip {
 	font-size: 11px;
-	opacity: 0.7;
+	opacity: 0.82;
 }
 
 .starlight-widget-body {
 	display: grid;
 	gap: 4px;
+	position: relative;
+	z-index: 1;
 }
 
 .starlight-widget-row {
@@ -78,7 +89,7 @@
 	width: 14px;
 	text-align: center;
 	font-size: 12px;
-	opacity: 0.9;
+	opacity: 0.95;
 }
 
 .starlight-widget-date,

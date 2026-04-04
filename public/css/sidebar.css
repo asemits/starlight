@@ -16,14 +16,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(10,10,10,0.7);
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
-  border: 0.5px solid var(--glass-border);
+  background: linear-gradient(145deg, rgba(255,255,255,0.2), rgba(255,255,255,0.03) 40%, rgba(5,5,5,0.45) 100%);
+  backdrop-filter: blur(28px) saturate(185%);
+  -webkit-backdrop-filter: blur(28px) saturate(185%);
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 999px;
   z-index: 10000000000000000000000000000000000000000000000;
   opacity: 1;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.08) inset;
+  box-shadow: 0 18px 45px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(255,255,255,0.08);
   transition: 
     top var(--speed) var(--spring), 
     left var(--speed) var(--spring), 
@@ -33,6 +33,28 @@
     width 0.4s var(--spring),
     height 0.4s var(--spring),
     border-color 0.4s ease;
+  overflow: hidden;
+}
+
+.sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(120% 100% at 15% 0%, rgba(255,255,255,0.28), rgba(255,255,255,0.03) 48%, rgba(255,255,255,0) 72%);
+}
+
+.sidebar::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.55), rgba(255,255,255,0));
+  opacity: 0.75;
+  pointer-events: none;
 }
 
 .sidebar, body[data-side="top"] .sidebar {
@@ -84,8 +106,8 @@ body[data-side="right"] .sidebar {
 }
 
 .sidebar:hover {
-  border-color: rgba(255,255,255,0.22);
-  box-shadow: 0 12px 60px rgba(0,0,0,0.7), 0 0 60px rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.34);
+  box-shadow: 0 22px 70px rgba(0,0,0,0.56), inset 0 1px 0 rgba(255,255,255,0.45), 0 0 28px rgba(255,255,255,0.13);
 }
 
 .sidebar .sidebar-logo {
@@ -109,6 +131,8 @@ body[data-side="right"] .sidebar .sidebar-logo {
   display: flex;
   align-items: center;
   gap: 10px;
+  position: relative;
+  z-index: 1;
 }
 
 body[data-side="left"] .sidebar ul, 
@@ -146,7 +170,7 @@ body[data-side="right"] .sidebar li a {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: var(--glass);
+  background: linear-gradient(135deg, rgba(255,255,255,0.23), rgba(255,255,255,0.04));
   opacity: 0;
   transition: opacity 0.3s ease;
 }
