@@ -17,20 +17,26 @@
     features: [
       {
         title: "games",
-        description: "browse our large game library",
+        description: "Browse our large game library",
         icon: "fa-solid fa-gamepad",
         href: "/games"
       },
       {
         title: "apps",
-        description: "open utility apps like notepad, timer, soundboard, weather and more",
+        description: "Open utility apps like notepad, timer, soundboard, weather and more",
         icon: "fa-solid fa-shapes",
         href: "/apps"
       },
       {
         title: "settings",
-        description: "personalize layout, effects, widgets, and account options",
+        description: "Personalize layout, effects, widgets, and account options",
         icon: "fa-solid fa-gear",
+        href: "/settings"
+      },
+            {
+        title: "private",
+        description: "we care about your privacy. All sensitive info is encrypted and we never sell your data to data brokers (they should be broke).",
+        icon: "fa-solid fa-lock",
         href: "/settings"
       }
     ]
