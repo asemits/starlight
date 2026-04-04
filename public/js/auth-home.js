@@ -3,6 +3,7 @@
   const TOS_REQUIRED_MS = 30 * 1000;
   const USER_DOC_COLLECTION = "users";
   const USERNAME_COLLECTION = "usernames";
+  const hashCache = new Map();
 
   const config = {
     siteName: "starlight",
@@ -88,6 +89,31 @@
     return String(username || "").trim().toLowerCase();
   }
 
+  function toMillis(value) {
+    if (!value) {
+      return 0;
+    }
+    if (typeof value.toMillis === "function") {
+      return value.toMillis();
+    }
+    if (typeof value.seconds === "number") {
+      return value.seconds * 1000;
+    }
+    return 0;
+  }
+
+  async function hashText(value) {
+    const input = String(value || "");
+    if (hashCache.has(input)) {
+      return hashCache.get(input);
+    }
+    const bytes = new TextEncoder().encode(input);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const hex = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    hashCache.set(input, hex);
+    return hex;
+  }
+
   function passwordScore(password) {
     let score = 0;
     if (password.length >= 12) score += 30;
@@ -149,8 +175,8 @@
     if (!modal) {
       return;
     }
-    modal.classList.remove("hidden");
     modal.innerHTML = modalShell(title, body);
+    modal.classList.remove("hidden");
     modal.querySelectorAll("[data-close-modal='1']").forEach((node) => {
       node.addEventListener("click", closeModal);
     });
@@ -177,14 +203,19 @@
       return;
     }
     const providers = (user.providerData || []).map((item) => item.providerId).filter(Boolean);
+    const emailHash = await hashText(String(user.email || "").toLowerCase());
     const payload = {
       uid: user.uid,
-      email: user.email || "",
+      emailHash,
       providers,
+      email: firebase.firestore.FieldValue.delete(),
+      username: firebase.firestore.FieldValue.delete(),
+      usernameLower: firebase.firestore.FieldValue.delete(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     if (usernameMaybe) {
-      payload.username = String(usernameMaybe).trim();
+      const normalized = normalizeUsername(usernameMaybe);
+      payload.usernameHash = await hashText(normalized);
     }
     await firestore.collection(USER_DOC_COLLECTION).doc(user.uid).set(payload, { merge: true });
   }
@@ -199,10 +230,11 @@
     if (!normalized || !/^[a-z0-9_.-]{3,24}$/.test(normalized)) {
       throw new Error("Username is invalid.");
     }
+    const normalizedHash = await hashText(normalized);
 
     await firestore.runTransaction(async (tx) => {
       const userRef = firestore.collection(USER_DOC_COLLECTION).doc(user.uid);
-      const usernameRef = firestore.collection(USERNAME_COLLECTION).doc(normalized);
+      const usernameRef = firestore.collection(USERNAME_COLLECTION).doc(normalizedHash);
       const [userDoc, usernameDoc] = await Promise.all([tx.get(userRef), tx.get(usernameRef)]);
 
       if (usernameDoc.exists) {
@@ -212,23 +244,29 @@
         }
       }
 
-      const oldUsername = userDoc.exists && userDoc.data() && userDoc.data().username ? String(userDoc.data().username) : "";
-      const oldNormalized = normalizeUsername(oldUsername);
-      if (oldNormalized && oldNormalized !== normalized) {
-        const oldRef = firestore.collection(USERNAME_COLLECTION).doc(oldNormalized);
+      const oldHash = userDoc.exists && userDoc.data() && userDoc.data().usernameHash ? String(userDoc.data().usernameHash) : "";
+      const oldLower = userDoc.exists && userDoc.data() && userDoc.data().usernameLower ? String(userDoc.data().usernameLower) : "";
+      if (oldHash && oldHash !== normalizedHash) {
+        const oldRef = firestore.collection(USERNAME_COLLECTION).doc(oldHash);
         tx.delete(oldRef);
+      }
+      if (oldLower && oldLower !== normalized) {
+        const oldPlainRef = firestore.collection(USERNAME_COLLECTION).doc(oldLower);
+        tx.delete(oldPlainRef);
       }
 
       tx.set(usernameRef, {
         uid: user.uid,
-        username: clean,
-        usernameLower: normalized,
+        usernameHash: normalizedHash,
+        username: firebase.firestore.FieldValue.delete(),
+        usernameLower: firebase.firestore.FieldValue.delete(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 
       tx.set(userRef, {
-        username: clean,
-        usernameLower: normalized,
+        usernameHash: normalizedHash,
+        username: firebase.firestore.FieldValue.delete(),
+        usernameLower: firebase.firestore.FieldValue.delete(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     });
@@ -252,7 +290,46 @@
       `;
     }).join("");
 
-    root.innerHTML = `
+    if (isLoggedIn()) {
+      root.innerHTML = `
+        <section class="starlight-home-shell starlight-dashboard-shell">
+          <header class="starlight-home-hero">
+            <p class="starlight-home-kicker">Dashboard</p>
+            <h1>${escapeHtml(config.siteName)}</h1>
+            <p class="starlight-home-tagline">Welcome back.</p>
+          </header>
+
+          <section class="starlight-dashboard-section">
+            <div class="starlight-dashboard-head">
+              <h2>Recently Played</h2>
+              <a href="/games" class="nav-link starlight-dashboard-link">Open games</a>
+            </div>
+            <div id="dashboard-recent" class="starlight-dashboard-grid"></div>
+          </section>
+
+          <section class="starlight-dashboard-section">
+            <div class="starlight-dashboard-head">
+              <h2>Favorites</h2>
+              <a href="/games" class="nav-link starlight-dashboard-link">Manage favorites</a>
+            </div>
+            <div id="dashboard-favorites" class="starlight-dashboard-grid"></div>
+          </section>
+
+          <section class="starlight-dashboard-section">
+            <div class="starlight-dashboard-head">
+              <h2>Your Stats</h2>
+            </div>
+            <div id="dashboard-stats" class="starlight-dashboard-stats"></div>
+          </section>
+
+          <div class="starlight-home-auth-actions">
+            <button id="starlight-logout" type="button" class="starlight-btn starlight-btn-muted">Log Out</button>
+          </div>
+        </section>
+      `;
+      loadSignedInDashboard();
+    } else {
+      root.innerHTML = `
       <section class="starlight-home-shell">
         <header class="starlight-home-hero">
           <p class="starlight-home-kicker">Welcome</p>
@@ -264,13 +341,12 @@
           ${featureCards}
         </section>
         <div class="starlight-home-auth-actions">
-          ${isLoggedIn() ? `<button id="starlight-logout" type="button" class="starlight-btn starlight-btn-muted">Log Out</button>` : `
             <button id="starlight-login" type="button" class="starlight-btn starlight-btn-muted">Log In</button>
             <button id="starlight-signup" type="button" class="starlight-btn starlight-btn-highlight">Sign Up</button>
-          `}
         </div>
       </section>
     `;
+    }
 
     const loginBtn = document.getElementById("starlight-login");
     if (loginBtn) {
@@ -291,6 +367,87 @@
         }
         await instance.signOut();
       });
+    }
+  }
+
+  async function loadSignedInDashboard() {
+    const firestore = db();
+    const user = currentUser();
+    const recentNode = document.getElementById("dashboard-recent");
+    const favoritesNode = document.getElementById("dashboard-favorites");
+    const statsNode = document.getElementById("dashboard-stats");
+    if (!firestore || !user || !recentNode || !favoritesNode || !statsNode) {
+      return;
+    }
+
+    recentNode.innerHTML = '<p class="starlight-dashboard-empty">Loading...</p>';
+    favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">Loading...</p>';
+    statsNode.innerHTML = '';
+
+    try {
+      const snap = await firestore.collectionGroup("players").where("uid", "==", user.uid).limit(120).get();
+      let sourceDocs = snap.docs;
+      if (!sourceDocs.length) {
+        const fallbackSnap = await firestore
+          .collectionGroup("players")
+          .where(firebase.firestore.FieldPath.documentId(), "==", user.uid)
+          .limit(120)
+          .get();
+        sourceDocs = fallbackSnap.docs;
+      }
+
+      const list = sourceDocs.map((doc) => {
+        const data = doc.data() || {};
+        return {
+          gameName: String(data.gameName || "Unknown game"),
+          gameImage: String(data.gameImage || ""),
+          gamePath: String(data.gamePath || ""),
+          clickCount: Number(data.clickCount || 0),
+          rating: Number(data.rating || 0),
+          lastPlayedAtMs: toMillis(data.lastPlayedAt),
+          lastRatedAtMs: toMillis(data.lastRatedAt)
+        };
+      });
+
+      const recent = list
+        .filter((item) => item.clickCount > 0)
+        .sort((a, b) => b.lastPlayedAtMs - a.lastPlayedAtMs)
+        .slice(0, 8);
+
+      const favorites = list
+        .filter((item) => item.rating === 1)
+        .sort((a, b) => b.lastRatedAtMs - a.lastRatedAtMs)
+        .slice(0, 8);
+
+      const totalPlays = list.reduce((sum, item) => sum + Math.max(0, item.clickCount), 0);
+      const gamesPlayed = list.filter((item) => item.clickCount > 0).length;
+      const thumbsUpGiven = list.filter((item) => item.rating === 1).length;
+      const thumbsDownGiven = list.filter((item) => item.rating === -1).length;
+
+      function tileMarkup(item) {
+        const imageMarkup = item.gameImage ? `<img src="${escapeHtml(item.gameImage)}" alt="${escapeHtml(item.gameName)}">` : "<div class=\"starlight-dashboard-fallback\"><i class=\"fa-solid fa-gamepad\"></i></div>";
+        return `
+          <a href="/games" class="nav-link starlight-dashboard-item">
+            <div class="starlight-dashboard-thumb">${imageMarkup}</div>
+            <h3>${escapeHtml(item.gameName)}</h3>
+            <p>Plays: ${item.clickCount}</p>
+          </a>
+        `;
+      }
+
+      recentNode.innerHTML = recent.length ? recent.map(tileMarkup).join("") : '<p class="starlight-dashboard-empty">No recent games yet.</p>';
+      favoritesNode.innerHTML = favorites.length ? favorites.map(tileMarkup).join("") : '<p class="starlight-dashboard-empty">No favorites yet. Thumbs-up games in Games.</p>';
+
+      statsNode.innerHTML = `
+        <article class="starlight-stat-card"><h3>Total Plays</h3><p>${totalPlays}</p></article>
+        <article class="starlight-stat-card"><h3>Games Played</h3><p>${gamesPlayed}</p></article>
+        <article class="starlight-stat-card"><h3>Thumbs Up Given</h3><p>${thumbsUpGiven}</p></article>
+        <article class="starlight-stat-card"><h3>Thumbs Down Given</h3><p>${thumbsDownGiven}</p></article>
+      `;
+    } catch (_error) {
+      recentNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load recent games.</p>';
+      favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load favorites.</p>';
+      statsNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load stats.</p>';
     }
   }
 

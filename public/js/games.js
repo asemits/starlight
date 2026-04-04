@@ -545,6 +545,7 @@
 			const increment = firebase.firestore.FieldValue.increment;
 			const now = firebase.firestore.FieldValue.serverTimestamp();
 			const isFirstClick = !playerDoc.exists;
+			const currentUid = window.starlightAuth && window.starlightAuth.currentUser ? window.starlightAuth.currentUser.uid : null;
 
 			if (!statsDoc.exists) {
 				tx.set(refs.statsRef, {
@@ -572,6 +573,10 @@
 			}, { merge: true });
 
 			tx.set(refs.playerRef, {
+				uid: currentUid,
+				gamePath: game.path,
+				gameName: game.name,
+				gameImage: game.image || "",
 				rating: playerDoc.exists ? Number(playerDoc.data().rating || 0) : 0,
 				clickCount: increment(1),
 				lastPlayedAt: now
@@ -612,6 +617,7 @@
 				const now = firebase.firestore.FieldValue.serverTimestamp();
 				const oldRating = playerDoc.exists ? Number(playerDoc.data().rating || 0) : 0;
 				const desiredRating = oldRating === Number(rating) ? 0 : Number(rating);
+				const currentUid = window.starlightAuth && window.starlightAuth.currentUser ? window.starlightAuth.currentUser.uid : null;
 
 				if (!statsDoc.exists) {
 					tx.set(refs.statsRef, {
@@ -640,6 +646,10 @@
 				}, { merge: true });
 
 				tx.set(refs.playerRef, {
+					uid: currentUid,
+					gamePath: game.path,
+					gameName: game.name,
+					gameImage: game.image || "",
 					rating: desiredRating,
 					lastRatedAt: now
 				}, { merge: true });
@@ -663,6 +673,7 @@
 				const now = firebase.firestore.FieldValue.serverTimestamp();
 				const increment = firebase.firestore.FieldValue.increment;
 				const hasPresence = playerDoc.exists && playerDoc.data() && playerDoc.data().activeSession;
+				const currentUid = window.starlightAuth && window.starlightAuth.currentUser ? window.starlightAuth.currentUser.uid : null;
 
 				if (!statsDoc.exists) {
 					tx.set(refs.statsRef, {
@@ -679,6 +690,10 @@
 				}
 
 				tx.set(refs.playerRef, {
+					uid: currentUid,
+					gamePath: game.path,
+					gameName: game.name,
+					gameImage: game.image || "",
 					activeSession: sessionKey,
 					activeGamePath: game.path,
 					activeAt: now
