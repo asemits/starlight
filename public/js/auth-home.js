@@ -200,6 +200,9 @@
   }
 
   function closeSiteView() {
+    if (window.StarlightAntiClose && typeof window.StarlightAntiClose.bypassNextClose === "function") {
+      window.StarlightAntiClose.bypassNextClose();
+    }
     window.close();
     window.setTimeout(() => {
       if (!window.closed) {

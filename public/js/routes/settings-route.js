@@ -140,6 +140,15 @@
                   <label class="block mb-2 text-sm text-gray-300">Open This Page When Triggered</label>
                   <input type="text" value="${window.getShortcutTarget()}" onchange="changeShortcutTarget(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" placeholder="/games">
                 </article>
+
+                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
+                  <button type="button" onclick="resetSettingsCard('shortcut-anticlose')" title="Reset Close Confirmation" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+                  <label class="block mb-2 text-sm text-gray-300">Close Confirmation</label>
+                  <select onchange="changeAntiCloseEnabled(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                    <option value="on" ${window.getAntiCloseEnabled() === 'on' ? 'selected' : ''}>On</option>
+                    <option value="off" ${window.getAntiCloseEnabled() === 'off' ? 'selected' : ''}>Off</option>
+                  </select>
+                </article>
               </div>
 
               <div data-settings-panel="cloak" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -15,6 +15,7 @@
   const WRAP_MODE_KEY = "site-wrap-mode";
   const WRAP_ENABLED_KEY = "site-wrap-enabled";
   const WRAP_LAST_URL_KEY = "site-wrap-last-url";
+  const ANTI_CLOSE_KEY = "starlight-anti-close-enabled";
   const WIDGET_ENABLED_KEY = "info-widget-enabled";
   const WIDGET_TIME_MODE_KEY = "info-widget-time-mode";
   const WIDGET_FORMAT_KEY = "info-widget-format";
@@ -305,6 +306,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       window.changeShortcutTarget("/");
       return;
     }
+    if (cardId === "shortcut-anticlose") {
+      window.changeAntiCloseEnabled("on");
+      return;
+    }
     if (cardId === "cloak-main") {
       window.changeWrapEnabled("off");
       window.changeWrapMode("about-blank");
@@ -341,7 +346,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       layout: ["layout-sidebar", "layout-measurement"],
       games: ["games-pagination"],
       particles: ["particles-enabled", "particles-bonds", "particles-color", "particles-shape", "particles-frequency", "particles-size"],
-      shortcut: ["shortcut-main"],
+      shortcut: ["shortcut-main", "shortcut-anticlose"],
       cloak: ["cloak-main", "cloak-open"],
       widget: ["widget-main", "widget-format", "widget-content"]
     };
@@ -420,6 +425,9 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     const nextRaw = normalizeTarget(localStorage.getItem(SHORTCUT_TARGET_KEY) || "/");
     const nextUrl = new URL(nextRaw, window.location.origin).toString();
     window.open(nextUrl, "_blank", "noopener");
+    if (window.StarlightAntiClose && typeof window.StarlightAntiClose.bypassNextClose === "function") {
+      window.StarlightAntiClose.bypassNextClose();
+    }
     window.close();
     if (!window.closed) {
       window.location.href = nextUrl;
@@ -459,6 +467,23 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   window.changeShortcutEnabled = function changeShortcutEnabled(value) {
     localStorage.setItem(SHORTCUT_ENABLED_KEY, value === "on" ? "on" : "off");
+  };
+
+  window.getAntiCloseEnabled = function getAntiCloseEnabled() {
+    return localStorage.getItem(ANTI_CLOSE_KEY) === "off" ? "off" : "on";
+  };
+
+  window.changeAntiCloseEnabled = function changeAntiCloseEnabled(value) {
+    const enabled = value === "off" ? "off" : "on";
+    localStorage.setItem(ANTI_CLOSE_KEY, enabled);
+    if (window.StarlightAntiClose) {
+      if (enabled === "on" && typeof window.StarlightAntiClose.enable === "function") {
+        window.StarlightAntiClose.enable();
+      }
+      if (enabled === "off" && typeof window.StarlightAntiClose.disable === "function") {
+        window.StarlightAntiClose.disable();
+      }
+    }
   };
 
   window.getWrapMode = function getWrapMode() {

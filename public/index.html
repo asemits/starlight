@@ -90,6 +90,43 @@
     <script src="js/routes/soundboard-route.js"></script>
     <script src="js/routes/notfound-route.js"></script>
     <script>
+      (function () {
+        const ANTI_CLOSE_KEY = 'starlight-anti-close-enabled';
+        let skipOnce = false;
+
+        function antiCloseEnabled() {
+          const value = localStorage.getItem(ANTI_CLOSE_KEY);
+          if (value === null) {
+            localStorage.setItem(ANTI_CLOSE_KEY, 'on');
+            return true;
+          }
+          return value === 'on';
+        }
+
+        window.StarlightAntiClose = {
+          enable() {
+            localStorage.setItem(ANTI_CLOSE_KEY, 'on');
+          },
+          disable() {
+            localStorage.setItem(ANTI_CLOSE_KEY, 'off');
+          },
+          bypassNextClose() {
+            skipOnce = true;
+            window.setTimeout(() => {
+              skipOnce = false;
+            }, 1000);
+          }
+        };
+
+        window.addEventListener('beforeunload', (event) => {
+          if (skipOnce || !antiCloseEnabled()) {
+            return;
+          }
+          event.preventDefault();
+          event.returnValue = '';
+        });
+      })();
+
         const appContent = document.getElementById('app-content');
         const routes = window.StarlightRouteModules || {};
 
