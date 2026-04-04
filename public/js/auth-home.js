@@ -240,9 +240,6 @@
       uid: user.uid,
       emailHash,
       providers,
-      email: firebase.firestore.FieldValue.delete(),
-      username: firebase.firestore.FieldValue.delete(),
-      usernameLower: firebase.firestore.FieldValue.delete(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     if (usernameMaybe) {
@@ -290,8 +287,6 @@
       tx.set(usernameRef, {
         uid: user.uid,
         usernameHash: normalizedHash,
-        username: firebase.firestore.FieldValue.delete(),
-        usernameLower: firebase.firestore.FieldValue.delete(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 
@@ -299,8 +294,6 @@
         uid: user.uid,
         providers: (user.providerData || []).map((item) => item.providerId).filter(Boolean),
         usernameHash: normalizedHash,
-        username: firebase.firestore.FieldValue.delete(),
-        usernameLower: firebase.firestore.FieldValue.delete(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     });
