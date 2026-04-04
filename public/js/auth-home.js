@@ -521,6 +521,7 @@
         <input id="login-password" type="password" required autocomplete="current-password" />
         <p id="login-status" class="starlight-status"></p>
         <button type="submit" class="starlight-btn starlight-btn-primary">Log In</button>
+        <button type="button" id="login-forgot-password" class="starlight-btn starlight-btn-muted">Forgot Password?</button>
         <button type="button" id="login-google" class="starlight-btn starlight-btn-google"><i class="fa-brands fa-google"></i> Continue with Google</button>
       </form>
     `);
@@ -560,6 +561,28 @@
           closeModal();
         } catch (error) {
           setStatus("login-status", error && error.message ? error.message : "Google login failed.", false);
+        }
+      });
+    }
+
+    const forgotBtn = document.getElementById("login-forgot-password");
+    if (forgotBtn) {
+      forgotBtn.addEventListener("click", async () => {
+        const instance = auth();
+        if (!instance) {
+          setStatus("login-status", "Authentication is unavailable.", false);
+          return;
+        }
+        const email = String(document.getElementById("login-email").value || "").trim();
+        if (!email) {
+          setStatus("login-status", "Enter your email first.", false);
+          return;
+        }
+        try {
+          await instance.sendPasswordResetEmail(email);
+          setStatus("login-status", "Password reset email sent.", true);
+        } catch (error) {
+          setStatus("login-status", error && error.message ? error.message : "Could not send password reset email.", false);
         }
       });
     }
