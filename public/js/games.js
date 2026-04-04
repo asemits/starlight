@@ -37,6 +37,16 @@
 		});
 	}
 
+	function randomToken(length) {
+		const bytes = new Uint8Array(length);
+		crypto.getRandomValues(bytes);
+		let output = "";
+		for (const byte of bytes) {
+			output += (byte % 36).toString(36);
+		}
+		return output;
+	}
+
 	function getPaginationMode() {
 		const mode = localStorage.getItem("games-pagination-mode");
 		return mode === "alphabetical" ? "alphabetical" : "numbered";
@@ -646,7 +656,7 @@
 			return function () {};
 		}
 
-		const sessionKey = "session_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+		const sessionKey = "session_" + Date.now() + "_" + randomToken(10);
 		try {
 			await window.starlightDb.runTransaction(async (tx) => {
 				const [statsDoc, playerDoc] = await Promise.all([tx.get(refs.statsRef), tx.get(refs.playerRef)]);

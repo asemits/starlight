@@ -79,524 +79,33 @@
     <script src="js/app-core.js"></script>
     <script src="js/games.js"></script>
     <script src="js/weather.js"></script>
+    <script src="js/auth-home.js"></script>
+    <script src="js/routes/home-route.js"></script>
+    <script src="js/routes/games-route.js"></script>
+    <script src="js/routes/proxy-route.js"></script>
+    <script src="js/routes/social-route.js"></script>
+    <script src="js/routes/weather-route.js"></script>
+    <script src="js/routes/settings-route.js"></script>
+    <script src="js/routes/apps-route.js"></script>
+    <script src="js/routes/soundboard-route.js"></script>
+    <script src="js/routes/notfound-route.js"></script>
     <script>
         const appContent = document.getElementById('app-content');
-        const pages = {
-            '/': `
-              <h1 class="text-3xl font-bold">Home</h1>
-            `,
-            '/games': `
-              <div id="games-root"></div>
-            `,
-            '/proxy': `
-              <h1 class="text-3xl font-bold">Proxy</h1>
-            `,
-            '/social': `
-              <h1 class="text-3xl font-bold">Social</h1>
-            `,
-            '/weather': `
-              <div id="weather-root"></div>
-            `,
-            '/settings': `
-              <div class="p-8 max-w-6xl mx-auto">
-                <h1 class="text-3xl font-bold font-orbitron mb-6">Settings</h1>
-                <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
-                  <aside class="bg-white/5 p-4 rounded-2xl border border-white/10 h-fit">
-                    <div class="flex items-center gap-2 mb-2">
-                      <button type="button" data-settings-tab="layout" onclick="switchSettingsCategory('layout')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 bg-white/15 border-white/30 text-white transition"><i class="fa-solid fa-bars"></i><span>Layout</span></button>
-                      <button type="button" onclick="resetSettingsCategory('layout')" title="Reset Layout defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                    </div>
-                    <div class="flex items-center gap-2 mb-2">
-                      <button type="button" data-settings-tab="games" onclick="switchSettingsCategory('games')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-gamepad"></i><span>Games</span></button>
-                      <button type="button" onclick="resetSettingsCategory('games')" title="Reset Games defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                    </div>
-                    <div class="flex items-center gap-2 mb-2">
-                      <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Particles</span></button>
-                      <button type="button" onclick="resetSettingsCategory('particles')" title="Reset Particles defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                    </div>
-                    <div class="flex items-center gap-2 mb-2">
-                      <button type="button" data-settings-tab="shortcut" onclick="switchSettingsCategory('shortcut')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-keyboard"></i><span>Shortcut</span></button>
-                      <button type="button" onclick="resetSettingsCategory('shortcut')" title="Reset Shortcut defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                    </div>
-                    <div class="flex items-center gap-2 mb-2">
-                      <button type="button" data-settings-tab="cloak" onclick="switchSettingsCategory('cloak')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-user-secret"></i><span>Tab Cloak</span></button>
-                      <button type="button" onclick="resetSettingsCategory('cloak')" title="Reset Tab Cloak defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <button type="button" data-settings-tab="widget" onclick="switchSettingsCategory('widget')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-table-cells-large"></i><span>Widget</span></button>
-                      <button type="button" onclick="resetSettingsCategory('widget')" title="Reset Widget defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                    </div>
-                  </aside>
+        const routes = window.StarlightRouteModules || {};
 
-                  <section>
-                    <div data-settings-panel="layout" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('layout-sidebar')" title="Reset Sidebar Position" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Sidebar Position</label>
-                        <select onchange="changeSidebarPos(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <option value="top" ${localStorage.getItem('sidebar-pos') === 'top' ? 'selected' : ''}>Top</option>
-                          <option value="bottom" ${localStorage.getItem('sidebar-pos') === 'bottom' ? 'selected' : ''}>Bottom</option>
-                          <option value="left" ${localStorage.getItem('sidebar-pos') === 'left' ? 'selected' : ''}>Left</option>
-                          <option value="right" ${localStorage.getItem('sidebar-pos') === 'right' ? 'selected' : ''}>Right</option>
-                        </select>
-                      </article>
-
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('layout-measurement')" title="Reset Measurement System" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Measurement System</label>
-                        <select onchange="changeMeasurementSystem(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <option value="imperial" ${window.getMeasurementSystem() === 'metric' ? '' : 'selected'}>Imperial (F, mph)</option>
-                          <option value="metric" ${window.getMeasurementSystem() === 'metric' ? 'selected' : ''}>Metric (C, km/h)</option>
-                        </select>
-                      </article>
-                    </div>
-
-                    <div data-settings-panel="games" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('games-pagination')" title="Reset Games Pagination" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Games Pagination</label>
-                        <select onchange="changeGamesPaginationMode(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <option value="numbered" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? '' : 'selected'}>Numbered</option>
-                          <option value="alphabetical" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? 'selected' : ''}>Alphabetical</option>
-                        </select>
-                      </article>
-                    </div>
-
-                    <div data-settings-panel="particles" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('particles-enabled')" title="Reset Particles" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Particles</label>
-                        <select onchange="changeGamesParticlesEnabled(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <option value="on" ${localStorage.getItem('games-particles-enabled') === 'off' ? '' : 'selected'}>On</option>
-                          <option value="off" ${localStorage.getItem('games-particles-enabled') === 'off' ? 'selected' : ''}>Off</option>
-                        </select>
-                      </article>
-
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('particles-bonds')" title="Reset Particle Bonds" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Particle Bonds</label>
-                        <select onchange="changeGamesParticlesBonds(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <option value="off" ${localStorage.getItem('games-particles-bonds') === 'on' ? '' : 'selected'}>Off</option>
-                          <option value="on" ${localStorage.getItem('games-particles-bonds') === 'on' ? 'selected' : ''}>On</option>
-                        </select>
-                      </article>
-
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('particles-color')" title="Reset Particle Color" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Particle Color</label>
-                        <input type="color" value="${localStorage.getItem('games-particles-color') || '#ffffff'}" onchange="changeGamesParticlesColor(this.value)" class="w-full h-12 bg-black border border-white/20 rounded-xl text-white outline-none">
-                      </article>
-
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('particles-shape')" title="Reset Particle Shape" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Particle Shape</label>
-                        <select onchange="changeGamesParticlesShape(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <option value="circle" ${window.getGamesParticlesShape() === 'circle' ? 'selected' : ''}>Circle</option>
-                          <option value="square" ${window.getGamesParticlesShape() === 'square' ? 'selected' : ''}>Square</option>
-                          <option value="triangle" ${window.getGamesParticlesShape() === 'triangle' ? 'selected' : ''}>Triangle</option>
-                        </select>
-                      </article>
-
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('particles-frequency')" title="Reset Particle Frequency" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Particle Frequency</label>
-                        <select onchange="changeGamesParticlesFrequency(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <option value="low" ${window.getGamesParticlesFrequency() === 'low' ? 'selected' : ''}>Low</option>
-                          <option value="normal" ${window.getGamesParticlesFrequency() === 'normal' ? 'selected' : ''}>Normal</option>
-                          <option value="high" ${window.getGamesParticlesFrequency() === 'high' ? 'selected' : ''}>High</option>
-                        </select>
-                      </article>
-
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('particles-size')" title="Reset Particle Size" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Particle Size</label>
-                        <select onchange="changeGamesParticlesSize(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <option value="small" ${window.getGamesParticlesSize() === 'small' ? 'selected' : ''}>Small</option>
-                          <option value="medium" ${window.getGamesParticlesSize() === 'medium' ? 'selected' : ''}>Medium</option>
-                          <option value="large" ${window.getGamesParticlesSize() === 'large' ? 'selected' : ''}>Large</option>
-                        </select>
-                      </article>
-                    </div>
-
-                    <div data-settings-panel="shortcut" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
-                        <button type="button" onclick="resetSettingsCard('shortcut-main')" title="Reset Shortcut" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Shortcut Enabled</label>
-                        <select onchange="changeShortcutEnabled(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-4">
-                          <option value="off" ${window.getShortcutEnabled() === 'on' ? '' : 'selected'}>Off</option>
-                          <option value="on" ${window.getShortcutEnabled() === 'on' ? 'selected' : ''}>On</option>
-                        </select>
-                        <label class="block mb-2 text-sm text-gray-300">Shortcut Combo</label>
-                        <div class="flex flex-wrap gap-2 mb-2">
-                          <input id="shortcut-combo-display" type="text" readonly value="${window.getShortcutDisplay()}" class="flex-1 min-w-[220px] bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <button type="button" onclick="startShortcutCapture()" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Record Combo</button>
-                        </div>
-                        <p id="shortcut-capture-status" class="text-sm text-gray-300 mb-4">Ready</p>
-                        <label class="block mb-2 text-sm text-gray-300">Open This Page When Triggered</label>
-                        <input type="text" value="${window.getShortcutTarget()}" onchange="changeShortcutTarget(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" placeholder="/games">
-                      </article>
-                    </div>
-
-                    <div data-settings-panel="cloak" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('cloak-main')" title="Reset Wrapper Settings" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Auto Open In Wrapper</label>
-                        <select onchange="changeWrapEnabled(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-4">
-                          <option value="off" ${window.getWrapEnabled() === 'on' ? '' : 'selected'}>Off</option>
-                          <option value="on" ${window.getWrapEnabled() === 'on' ? 'selected' : ''}>On</option>
-                        </select>
-                        <label class="block mb-2 text-sm text-gray-300">Wrapper Mode</label>
-                        <select onchange="changeWrapMode(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <option value="about-blank" ${window.getWrapMode() === 'about-blank' ? 'selected' : ''}>about:blank</option>
-                          <option value="blob" ${window.getWrapMode() === 'blob' ? 'selected' : ''}>blob:</option>
-                        </select>
-                      </article>
-
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('cloak-open')" title="Reset Open Immediately" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Open Immediately</label>
-                        <div class="flex flex-wrap gap-2">
-                          <button type="button" onclick="openWrappedNow('about-blank')" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Open about:blank</button>
-                          <button type="button" onclick="openWrappedNow('blob')" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Open blob:</button>
-                        </div>
-                      </article>
-                    </div>
-
-                    <div data-settings-panel="widget" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('widget-main')" title="Reset Widget Main" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Widget Enabled</label>
-                        <select onchange="changeInfoWidgetEnabled(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-4">
-                          <option value="on" ${window.getInfoWidgetEnabled() === 'on' ? 'selected' : ''}>On</option>
-                          <option value="off" ${window.getInfoWidgetEnabled() === 'off' ? 'selected' : ''}>Off</option>
-                        </select>
-
-                        <label class="block mb-2 text-sm text-gray-300">Time Mode</label>
-                        <select onchange="changeInfoWidgetTimeMode(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                          <option value="12" ${window.getInfoWidgetTimeMode() === '12' ? 'selected' : ''}>12-hour</option>
-                          <option value="24" ${window.getInfoWidgetTimeMode() === '24' ? 'selected' : ''}>24-hour / military</option>
-                        </select>
-                      </article>
-
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <button type="button" onclick="resetSettingsCard('widget-format')" title="Reset Widget Format" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Date/Time Format (strftime)</label>
-                        <input type="text" value="${window.getInfoWidgetFormat()}" onchange="changeInfoWidgetFormat(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-2" placeholder="%Y-%m-%d %H:%M:%S">
-                        <button type="button" onclick="resetInfoWidgetPosition()" class="w-full mt-2 mb-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Reset Widget Position</button>
-                        <a href="https://www.strfti.me/" target="_blank" rel="noopener" class="text-sm text-cyan-300 hover:text-cyan-200 underline">Format reference: strfti.me</a>
-                      </article>
-
-                      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
-                        <button type="button" onclick="resetSettingsCard('widget-content')" title="Reset Widget Content" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                        <label class="block mb-2 text-sm text-gray-300">Widget Content</label>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div>
-                            <label class="block mb-2 text-sm text-gray-300">Weather Row</label>
-                            <select onchange="changeInfoWidgetSectionVisibility('weather', this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                              <option value="on" ${window.getInfoWidgetSectionVisibility('weather') === 'on' ? 'selected' : ''}>Include</option>
-                              <option value="off" ${window.getInfoWidgetSectionVisibility('weather') === 'off' ? 'selected' : ''}>Exclude</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label class="block mb-2 text-sm text-gray-300">Date/Time Row</label>
-                            <select onchange="changeInfoWidgetSectionVisibility('datetime', this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                              <option value="on" ${window.getInfoWidgetSectionVisibility('datetime') === 'on' ? 'selected' : ''}>Include</option>
-                              <option value="off" ${window.getInfoWidgetSectionVisibility('datetime') === 'off' ? 'selected' : ''}>Exclude</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label class="block mb-2 text-sm text-gray-300">Battery Row</label>
-                            <select onchange="changeInfoWidgetSectionVisibility('battery', this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                              <option value="on" ${window.getInfoWidgetSectionVisibility('battery') === 'on' ? 'selected' : ''}>Include</option>
-                              <option value="off" ${window.getInfoWidgetSectionVisibility('battery') === 'off' ? 'selected' : ''}>Exclude</option>
-                            </select>
-                          </div>
-                        </div>
-                      </article>
-                    </div>
-                  </section>
-                </div>
-              </div>
-            `,
-            '/apps': `
-              <style>
-                @keyframes cardReveal {
-                  0%   { opacity: 0; transform: translateY(40px) scale(0.94); filter: blur(8px); }
-                  60%  { filter: blur(0px); }
-                  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
-                }
-
-                @keyframes scanline {
-                  0%   { transform: translateY(-100%); opacity: 1; }
-                  100% { transform: translateY(350%); opacity: 0; }
-                }
-
-                @keyframes shimmerBorder {
-                  0%, 100% { opacity: 0.4; }
-                  50%       { opacity: 1; }
-                }
-
-                .cards-container {
-                  display: flex;
-                  flex-wrap: wrap;
-                  gap: 24px;
-                  padding: 20px 40px 40px 4%;
-                  margin-left: 100px;
-                }
-
-                h1.tools-title, .titles {
-                  display: flex;
-                  justify-content: center;
-                  font-family: 'Cormorant Garamond', 'Georgia', serif;
-                  font-weight: 300;
-                  letter-spacing: 0.25em;
-                  text-transform: uppercase;
-                  color: rgba(255,255,255,0.9);
-                  text-shadow: 0 0 40px rgba(255,255,255,0.2);
-                  margin-bottom: 10px;
-                  opacity: 0;
-                  animation: cardReveal 0.5s ease 0.1s forwards;
-                }
-
-                .tool-card {
-                  width: 220px;
-                  height: 280px;
-                  background: rgba(255,255,255,0.04);
-                  backdrop-filter: blur(24px) saturate(160%);
-                  -webkit-backdrop-filter: blur(24px) saturate(160%);
-                  border: 0.5px solid rgba(255,255,255,0.12);
-                  border-radius: 20px;
-                  text-decoration: none;
-                  color: rgba(255,255,255,0.7);
-                  display: flex;
-                  flex-direction: column;
-                  align-items: center;
-                  justify-content: center;
-                  gap: 10px;
-                  position: relative;
-                  overflow: hidden;
-                  cursor: pointer;
-                  opacity: 0;
-                  animation: cardReveal 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-                  transition:
-                    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-                    box-shadow 0.5s ease,
-                    border-color 0.4s ease,
-                    background 0.4s ease;
-                }
-
-                .tool-card::after {
-                  content: '';
-                  position: absolute;
-                  top: 0; left: 0; right: 0;
-                  height: 1px;
-                  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-                  border-radius: 20px 20px 0 0;
-                  transition: opacity 0.4s ease;
-                }
-
-                .tool-card::before {
-                  content: '';
-                  position: absolute;
-                  top: 0; left: 0; right: 0;
-                  height: 35%;
-                  background: linear-gradient(to bottom, rgba(255,255,255,0.06), transparent);
-                  transform: translateY(-100%);
-                  pointer-events: none;
-                  z-index: 2;
-                }
-
-                .tool-card:hover::before {
-                  animation: scanline 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-                }
-
-                .tool-card:hover {
-                  transform: translateY(-12px) scale(1.03);
-                  background: rgba(255,255,255,0.08);
-                  border-color: rgba(255,255,255,0.28);
-                  box-shadow:
-                    0 30px 60px rgba(0,0,0,0.7),
-                    0 0 0 0.5px rgba(255,255,255,0.1),
-                    0 0 40px rgba(255,255,255,0.04),
-                    0 1px 0 rgba(255,255,255,0.15) inset;
-                }
-
-                .tool-card .corner {
-                  position: absolute;
-                  top: 12px; right: 12px;
-                  width: 10px; height: 10px;
-                  border-top: 0.5px solid rgba(255,255,255,0.3);
-                  border-right: 0.5px solid rgba(255,255,255,0.3);
-                  border-radius: 0 4px 0 0;
-                  transition: width 0.4s cubic-bezier(0.16,1,0.3,1), height 0.4s cubic-bezier(0.16,1,0.3,1), border-color 0.3s ease;
-                }
-                .tool-card:hover .corner {
-                  width: 18px; height: 18px;
-                  border-color: rgba(255,255,255,0.7);
-                }
-
-                .tool-card .corner-bl {
-                  position: absolute;
-                  bottom: 12px; left: 12px;
-                  width: 10px; height: 10px;
-                  border-bottom: 0.5px solid rgba(255,255,255,0.3);
-                  border-left: 0.5px solid rgba(255,255,255,0.3);
-                  border-radius: 0 0 0 4px;
-                  transition: width 0.4s cubic-bezier(0.16,1,0.3,1), height 0.4s cubic-bezier(0.16,1,0.3,1), border-color 0.3s ease;
-                }
-                .tool-card:hover .corner-bl {
-                  width: 18px; height: 18px;
-                  border-color: rgba(255,255,255,0.7);
-                }
-
-                .tool-card .glow-bar {
-                  position: absolute;
-                  bottom: 0; left: 20%; right: 20%;
-                  height: 1px;
-                  background: linear-gradient(to right, transparent, rgba(255,255,255,0.6), transparent);
-                  opacity: 0;
-                  transition: opacity 0.4s ease, left 0.4s ease, right 0.4s ease;
-                  z-index: 3;
-                  border-radius: 1px;
-                }
-                .tool-card:hover .glow-bar {
-                  opacity: 1;
-                  left: 10%;
-                  right: 10%;
-                }
-
-                .tool-card img {
-                  width: 72px; height: 72px;
-                  object-fit: contain;
-                  filter: brightness(0) invert(1) opacity(0.7);
-                  transition: transform 0.5s cubic-bezier(0.16,1,0.3,1), filter 0.4s ease;
-                  z-index: 1;
-                }
-                .tool-card:hover img {
-                  transform: scale(1.15) translateY(-4px);
-                  filter: brightness(0) invert(1) opacity(1) drop-shadow(0 0 12px rgba(255,255,255,0.5));
-                }
-
-                .tool-card .card-icon-fa {
-                  font-size: 52px;
-                  color: rgba(255,255,255,0.5);
-                  transition: transform 0.5s cubic-bezier(0.16,1,0.3,1), filter 0.4s ease, color 0.4s ease;
-                  z-index: 1;
-                }
-                .tool-card:hover .card-icon-fa {
-                  transform: scale(1.15) translateY(-4px);
-                  color: rgba(255,255,255,0.95);
-                  filter: drop-shadow(0 0 14px rgba(255,255,255,0.4));
-                }
-
-                .tool-card h2 {
-                  font-family: 'Geist', 'Segoe UI', sans-serif;
-                  font-size: 12px;
-                  font-weight: 300;
-                  letter-spacing: 0.2em;
-                  text-transform: uppercase;
-                  margin: 0;
-                  text-align: center;
-                  z-index: 1;
-                  color: rgba(255,255,255,0.6);
-                  transition: color 0.3s ease, text-shadow 0.3s ease;
-                }
-                .tool-card:hover h2 {
-                  color: rgba(255,255,255,0.95);
-                  text-shadow: 0 0 20px rgba(255,255,255,0.3);
-                }
-
-                .tool-card .card-desc {
-                  font-family: 'Geist', 'Segoe UI', sans-serif;
-                  font-size: 11px;
-                  font-weight: 200;
-                  color: rgba(255,255,255,0.0);
-                  text-align: center;
-                  padding: 0 18px;
-                  line-height: 1.7;
-                  letter-spacing: 0.04em;
-                  z-index: 1;
-                  max-height: 0;
-                  overflow: hidden;
-                  transition: max-height 0.5s cubic-bezier(0.16,1,0.3,1), color 0.4s ease, opacity 0.4s ease;
-                  opacity: 0;
-                }
-                .tool-card:hover .card-desc {
-                  max-height: 80px;
-                  color: rgba(255,255,255,0.45);
-                  opacity: 1;
-                }
-            </style>
-          <h1 class="tools-title"><i class="fa-solid fa-shapes"></i>‎ ‎ Apps</h1>
-          <br>
-          <div class="cards-container">
-              <a href="/soundboard" class="nav-link tool-card" style="animation-delay: 0.35s;">
-                  <i class="fa-solid fa-volume-high"></i>
-                  <h2>Soundboard</h2>
-                  <p class="card-desc">Play sound effects</p>
-                  <div class="glow-bar"></div>
-              </a>
-              <a href="/weather" class="nav-link tool-card" style="animation-delay: 0.4s;">
-                <i class="fa-solid fa-cloud-sun-rain"></i>
-                <h2>Weather</h2>
-                <p class="card-desc">Forecast and alerts</p>
-                <div class="glow-bar"></div>
-              </a>
-          </div>
-        `,
-        '/soundboard':`
-          <style>
-              #searchInput {
-                  border-radius:5px;
-                  background-color:Black;
-                  border:2px solid white;
-                  color:white;
-              }
-          </style>
-              <br>
-              <div id="controls">
-                  <button id="toggleFavorites" class="control-button favorites-toggle">Favorites: OFF</button>
-                  <button id="toggleButton" class="control-button overlap-toggle">Overlap: OFF</button>
-                  <button id="stopButton" class="control-button stop-button">Stop All Sounds</button>
-                  <button id="ttsToggle" class="control-button">TTS</button>
-                  <input id="searchInput" type="text" placeholder="Search buttons">
-              </div>
-              <div id="soundboard"></div>
-              <div id="ttsPanel" class="hidden" style="max-width:720px;margin:20px auto;padding:14px;border:1px solid rgba(255,255,255,0.25);border-radius:14px;background:rgba(0,0,0,0.45);">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
-                  <strong>TTS</strong>
-                  <button id="ttsClose" type="button" class="control-button">Close</button>
-                </div>
-                <textarea id="ttsText" class="w-full bg-black border border-white/20 p-2 rounded mb-2" rows="3" placeholder="Enter text"></textarea>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                  <select id="ttsLangFilter" class="bg-black border border-white/20 p-2 rounded"></select>
-                  <select id="ttsVoice" class="bg-black border border-white/20 p-2 rounded"></select>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-top:8px;">
-                  <label>Volume <input id="ttsVolume" type="range" min="0" max="1" step="0.01" value="1"></label><span id="ttsVolumeVal">1.00</span>
-                  <label>Rate <input id="ttsRate" type="range" min="0.5" max="2" step="0.1" value="1"></label><span id="ttsRateVal">1.0</span>
-                  <label>Pitch <input id="ttsPitch" type="range" min="0" max="2" step="0.01" value="1"></label><span id="ttsPitchVal">1.00</span>
-                </div>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
-                  <button id="ttsSpeak" type="button" class="control-button">Speak</button>
-                  <button id="ttsPause" type="button" class="control-button">Pause</button>
-                  <button id="ttsResume" type="button" class="control-button">Resume</button>
-                  <button id="ttsStop" type="button" class="control-button">Stop</button>
-                  <button id="ttsReset" type="button" class="control-button">Reset</button>
-                </div>
-                <p id="ttsStatus" style="margin-top:8px;">Idle</p>
-                <div id="ttsSpeaking" class="hidden" style="display:flex;gap:8px;align-items:center;">
-                  <span>Speaking:</span><strong id="ttsCurrentWord">-</strong>
-                </div>
-              </div>`,
-          '404': `
-          <h1 class="text-3xl font-bold text-red-500">404 Not Found</h1>
-          `
-        };
         let routeToken = 0;
         async function router() {
-            const path = window.location.pathname;
-            console.log("Current Pathname:", path);
+            let path = window.location.pathname;
+
+            if (window.StarlightAuthUI) {
+              path = window.StarlightAuthUI.guardedPath(path);
+              window.StarlightAuthUI.syncLockedState(path);
+            }
+
+            const route = routes[path] || routes['404'];
+            if (!route || typeof route.render !== 'function') {
+              return;
+            }
 
             const token = ++routeToken;
             appContent.classList.add('route-exit');
@@ -605,40 +114,40 @@
               return;
             }
 
-            appContent.innerHTML = pages[path] || pages['404'];
+            appContent.innerHTML = route.render();
             appContent.classList.remove('route-exit');
             appContent.classList.add('route-enter');
             requestAnimationFrame(() => {
               appContent.classList.remove('route-enter');
             });
 
-          if (path === '/settings') {
-            switchSettingsCategory('layout');
-          }
-
-          if (path === '/games' && window.StarlightGames) {
-            window.StarlightGames.mount('#games-root');
-          }
-
-          if (path === '/soundboard' && window.mountSoundboardRoute) {
-            window.mountSoundboardRoute();
-          }
-
-          if (path === '/weather' && window.StarlightWeather) {
-            window.StarlightWeather.mount('#weather-root');
+          if (typeof route.afterRender === 'function') {
+            route.afterRender(path);
           }
         }
+        window.router = router;
         document.addEventListener('click', (e) => {
             const link = e.target.closest('.nav-link');
             if (link) {
                 e.preventDefault(); 
                 const url = link.getAttribute('href');
+                if (window.StarlightAuthUI && !window.StarlightAuthUI.isLoggedIn() && url !== '/') {
+                    window.StarlightAuthUI.showLockedMessage();
+                    window.history.replaceState({}, '', '/');
+                    router();
+                    return;
+                }
                 window.history.pushState({}, '', url);
                 router();
             }
         });
         window.addEventListener('popstate', router);
-        window.addEventListener('DOMContentLoaded', router);
+        window.addEventListener('DOMContentLoaded', () => {
+          if (window.StarlightAuthUI) {
+            window.StarlightAuthUI.init();
+          }
+          router();
+        });
     </script>
   </body>
 </html> 

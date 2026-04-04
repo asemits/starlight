@@ -103,3 +103,335 @@
 .starlight-widget-battery {
 	color: rgba(255, 255, 255, 0.75);
 }
+
+body.auth-locked .sidebar .nav-link.auth-disabled {
+	opacity: 0.35;
+	filter: grayscale(1);
+	pointer-events: none;
+}
+
+.starlight-home-shell {
+	max-width: 1080px;
+	margin: 0 auto;
+	padding: 24px 0 40px;
+	display: grid;
+	gap: 24px;
+}
+
+.starlight-home-hero {
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	background: radial-gradient(circle at 20% 10%, rgba(80, 165, 255, 0.2), rgba(20, 20, 35, 0.78) 54%, rgba(8, 8, 12, 0.92));
+	border-radius: 24px;
+	padding: 28px;
+	box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+	animation: homeRise 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.starlight-home-kicker {
+	margin: 0 0 8px;
+	font-size: 13px;
+	letter-spacing: 0.28em;
+	text-transform: uppercase;
+	color: rgba(186, 224, 255, 0.88);
+	font-family: "Oxanium", sans-serif;
+}
+
+.starlight-home-hero h1 {
+	margin: 0;
+	font-family: "Orbitron", sans-serif;
+	font-size: clamp(2.2rem, 7vw, 4.4rem);
+	font-weight: 800;
+	line-height: 1;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: #eef7ff;
+	text-shadow: 0 0 18px rgba(138, 201, 255, 0.34);
+}
+
+.starlight-home-tagline {
+	margin: 14px 0 0;
+	font-size: clamp(1.05rem, 2vw, 1.25rem);
+	font-family: "Montserrat", sans-serif;
+	color: rgba(255, 255, 255, 0.9);
+}
+
+.starlight-home-subtext {
+	margin: 12px 0 0;
+	font-size: 0.95rem;
+	font-family: "Montserrat", sans-serif;
+	color: rgba(223, 228, 239, 0.82);
+}
+
+.starlight-auth-badge {
+	display: inline-flex;
+	margin: 18px 0 0;
+	padding: 7px 14px;
+	font-size: 0.82rem;
+	letter-spacing: 0.05em;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.12);
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	font-family: "Oxanium", sans-serif;
+}
+
+.starlight-home-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 14px;
+}
+
+.starlight-home-feature {
+	text-decoration: none;
+	border-radius: 18px;
+	padding: 18px;
+	min-height: 180px;
+	display: grid;
+	align-content: start;
+	gap: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	background: linear-gradient(160deg, rgba(255, 255, 255, 0.1), rgba(20, 20, 35, 0.75));
+	box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
+	transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+	animation: homeRise 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.starlight-home-feature:hover {
+	transform: translateY(-4px);
+	border-color: rgba(125, 192, 255, 0.58);
+	box-shadow: 0 18px 34px rgba(0, 0, 0, 0.4);
+}
+
+.starlight-home-feature-icon {
+	width: 45px;
+	height: 45px;
+	display: grid;
+	place-items: center;
+	border-radius: 12px;
+	background: rgba(85, 162, 255, 0.24);
+	color: #ddecff;
+	font-size: 19px;
+}
+
+.starlight-home-feature h3 {
+	margin: 0;
+	font-family: "Oxanium", sans-serif;
+	font-size: 1.06rem;
+	color: #f5fbff;
+}
+
+.starlight-home-feature p {
+	margin: 0;
+	font-size: 0.9rem;
+	line-height: 1.55;
+	color: rgba(230, 236, 249, 0.84);
+	font-family: "Montserrat", sans-serif;
+}
+
+.starlight-home-auth-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 4px;
+}
+
+.starlight-btn {
+	border-radius: 12px;
+	padding: 12px 16px;
+	font-size: 0.9rem;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	font-family: "Oxanium", sans-serif;
+	transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.starlight-btn:hover {
+	transform: translateY(-2px);
+	filter: brightness(1.08);
+}
+
+.starlight-btn-primary {
+	background: #2f87ff;
+	color: #fff;
+	border-color: rgba(103, 176, 255, 0.9);
+}
+
+.starlight-btn-highlight {
+	background: linear-gradient(135deg, #43b1ff, #2f67ff);
+	color: #fff;
+	border-color: rgba(154, 213, 255, 0.9);
+	box-shadow: 0 8px 20px rgba(47, 112, 255, 0.35);
+}
+
+.starlight-btn-muted {
+	background: rgba(255, 255, 255, 0.1);
+	color: rgba(255, 255, 255, 0.92);
+}
+
+.starlight-btn-google {
+	background: rgba(255, 255, 255, 0.92);
+	color: #111;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+}
+
+#starlight-auth-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 60000;
+}
+
+#starlight-auth-modal.hidden {
+	display: none;
+}
+
+.starlight-modal-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.66);
+	backdrop-filter: blur(4px);
+}
+
+.starlight-modal-card {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: min(94vw, 580px);
+	max-height: 86vh;
+	overflow-y: auto;
+	border-radius: 18px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	background: linear-gradient(150deg, rgba(31, 31, 56, 0.98), rgba(8, 8, 14, 0.97));
+	box-shadow: 0 26px 60px rgba(0, 0, 0, 0.5);
+	animation: homeRise 0.35s ease;
+}
+
+.starlight-modal-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 16px 18px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.starlight-modal-head h2 {
+	margin: 0;
+	font-family: "Orbitron", sans-serif;
+	font-size: 1.15rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.starlight-modal-close {
+	width: 34px;
+	height: 34px;
+	border-radius: 999px;
+	border: 1px solid rgba(255, 255, 255, 0.22);
+	background: rgba(255, 255, 255, 0.08);
+	color: #fff;
+}
+
+.starlight-modal-body {
+	padding: 18px;
+	font-family: "Montserrat", sans-serif;
+}
+
+.starlight-auth-form {
+	display: grid;
+	gap: 8px;
+}
+
+.starlight-auth-form label {
+	font-size: 0.86rem;
+	color: rgba(230, 240, 255, 0.9);
+}
+
+.starlight-auth-form input {
+	width: 100%;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	background: rgba(4, 4, 8, 0.8);
+	color: #fff;
+	padding: 11px 12px;
+}
+
+.starlight-status {
+	min-height: 20px;
+	font-size: 0.84rem;
+	margin: 4px 0;
+	color: rgba(255, 183, 183, 0.95);
+}
+
+.starlight-status.ok {
+	color: rgba(145, 255, 190, 0.95);
+}
+
+.starlight-status.error {
+	color: rgba(255, 183, 183, 0.95);
+}
+
+.starlight-popup-copy {
+	margin: 0 0 12px;
+	color: rgba(235, 238, 245, 0.92);
+}
+
+.starlight-tos-block {
+	max-height: 280px;
+	overflow-y: auto;
+	border-radius: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	padding: 12px;
+	background: rgba(0, 0, 0, 0.35);
+	line-height: 1.58;
+	margin-bottom: 12px;
+	white-space: normal;
+}
+
+.starlight-strength-wrap {
+	width: 100%;
+	height: 10px;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.13);
+	overflow: hidden;
+	margin-top: 4px;
+}
+
+.starlight-strength-bar {
+	height: 100%;
+	width: 0;
+	transition: width 0.2s ease, background 0.2s ease;
+}
+
+.starlight-strength-text {
+	margin: 0 0 3px;
+	font-size: 0.82rem;
+}
+
+@keyframes homeRise {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@media (max-width: 640px) {
+	.starlight-home-shell {
+		padding-top: 8px;
+	}
+
+	.starlight-home-hero,
+	.starlight-home-feature {
+		padding: 16px;
+	}
+
+	.starlight-btn {
+		width: 100%;
+	}
+}

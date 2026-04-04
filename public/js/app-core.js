@@ -134,6 +134,12 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     localStorage.setItem("sidebar-pos", newPos);
   }
 
+  function randomUnit() {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return values[0] / 4294967296;
+  }
+
   window.changeSidebarPos = function changeSidebarPos(newPos) {
     saveSidebarPosition(newPos);
   };
@@ -570,21 +576,17 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     window.starlightAuth = firebaseApp.auth();
     window.starlightDb = firebaseApp.firestore();
 
-    window.starlightAuthReady = new Promise((resolve, reject) => {
-      const unsubscribe = window.starlightAuth.onAuthStateChanged(async (user) => {
-        if (user) {
-          unsubscribe();
-          resolve(user);
-          return;
-        }
-        try {
-          await window.starlightAuth.signInAnonymously();
-        } catch (error) {
-          console.error("Anonymous auth failed. Enable Anonymous sign-in in Firebase Auth.", error);
-          reject(error);
-        }
+    window.starlightAuthReady = new Promise((resolve) => {
+      const unsubscribe = window.starlightAuth.onAuthStateChanged((user) => {
+        unsubscribe();
+        resolve(user || null);
       });
     });
+
+    window.isStarlightAuthenticated = function isStarlightAuthenticated() {
+      const user = window.starlightAuth && window.starlightAuth.currentUser;
+      return Boolean(user && !user.isAnonymous);
+    };
   }
 
   saveSidebarPosition(localStorage.getItem("sidebar-pos") || "top");
@@ -923,12 +925,17 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       const count = Math.max(24, Math.floor((width * height * multiplier) / 18000));
       particles.length = 0;
       for (let i = 0; i < count; i += 1) {
+        const randX = randomUnit();
+        const randY = randomUnit();
+        const randVX = randomUnit();
+        const randVY = randomUnit();
+        const randR = randomUnit();
         particles.push({
-          x: Math.random() * width,
-          y: Math.random() * height,
-          vx: (Math.random() - 0.5) * 0.35,
-          vy: (Math.random() - 0.5) * 0.35,
-          r: 0.8 + Math.random() * 2.2
+          x: randX * width,
+          y: randY * height,
+          vx: (randVX - 0.5) * 0.35,
+          vy: (randVY - 0.5) * 0.35,
+          r: 0.8 + randR * 2.2
         });
       }
     }
