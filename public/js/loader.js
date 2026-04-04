@@ -54,6 +54,11 @@
       .join("/");
   }
 
+  function buildGameInterfaceShim(baseHref) {
+    const safeBase = JSON.stringify(baseHref || CDN_BASE);
+    return '<script>(function(){if(window.GameInterface&&typeof window.GameInterface.init==="function"){return;}var baseHref=' + safeBase + ';function absoluteUrl(file){try{return new URL(file,baseHref).toString();}catch(_e){return file;}}function loadFiles(files){var list=Array.isArray(files)?files:[files];return Promise.all(list.filter(Boolean).map(function(file){var name=String(file);if(/\\.css(\\?|#|$)/i.test(name)){return new Promise(function(resolve){var link=document.createElement("link");link.rel="stylesheet";link.href=absoluteUrl(name);link.onload=resolve;link.onerror=resolve;document.head.appendChild(link);});}return new Promise(function(resolve){var script=document.createElement("script");script.src=absoluteUrl(name);script.onload=resolve;script.onerror=resolve;document.head.appendChild(script);});}));}window.GameInterface={init:function(files){return loadFiles(files);},trackEvent:function(){return Promise.resolve();},setGameData:function(){return Promise.resolve();},showInterstitial:function(){return Promise.resolve(false);},showRewarded:function(){return Promise.resolve(false);},gameReady:function(){return Promise.resolve();},gameStart:function(){return Promise.resolve();},gameComplete:function(){return Promise.resolve();},gameOver:function(){return Promise.resolve();},gamePause:function(){return Promise.resolve();},gameResume:function(){return Promise.resolve();},sendScore:function(){return Promise.resolve();},onAudioStateChange:function(){return Promise.resolve();},onMuteStateChange:function(){return Promise.resolve();},onPauseStateChange:function(){return Promise.resolve();},isMuted:function(){return false;},isPaused:function(){return false;}};})();<\/script>';
+  }
+
   const normalizedGamePath = normalizeGamePath(gamePath);
   if (!normalizedGamePath) {
     status.textContent = "Invalid game path.";
@@ -68,32 +73,41 @@
 
   try {
     const sourceUrl = new URL(encodePath(normalizedGamePath), CDN_BASE).toString();
-    const frame = document.createElement("iframe");
-    frame.src = sourceUrl;
-    frame.setAttribute("allowfullscreen", "");
-    frame.setAttribute("referrerpolicy", "no-referrer");
-    frame.style.width = "100%";
-    frame.style.height = "100%";
-    frame.style.border = "0";
-    frame.style.display = "block";
+    const gameDirUrl = sourceUrl.slice(0, sourceUrl.lastIndexOf("/") + 1);
+    const response = await fetch(sourceUrl, { cache: "no-store" });
+    if (!response.ok) {
+      showError("Failed to load game source.");
+      return;
+    }
 
-    frame.addEventListener("load", () => {
-      const runner = document.getElementById("runner-status");
-      if (runner && runner.parentNode) {
-        runner.parentNode.replaceChild(frame, runner);
+    let html = await response.text();
+    let effectiveBase = gameDirUrl;
+    const baseMatch = html.match(/<base[^>]*href=["']([^"']+)["'][^>]*>/i);
+    if (baseMatch && baseMatch[1]) {
+      try {
+        effectiveBase = new URL(baseMatch[1], gameDirUrl).toString();
+      } catch (_error) {
+        effectiveBase = gameDirUrl;
       }
-    });
-
-    frame.addEventListener("error", () => {
-      showError("Unable to start this game right now.");
-    });
-
-    window.setTimeout(() => {
-      const runner = document.getElementById("runner-status");
-      if (runner && runner.parentNode) {
-        runner.parentNode.replaceChild(frame, runner);
+    } else {
+      const baseTag = '<base href="' + gameDirUrl + '">';
+      if (/<head[^>]*>/i.test(html)) {
+        html = html.replace(/<head([^>]*)>/i, '<head$1>' + baseTag);
+      } else {
+        html = "<head>" + baseTag + "</head>" + html;
       }
-    }, 1200);
+    }
+
+    const shimTag = buildGameInterfaceShim(effectiveBase);
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/<head([^>]*)>/i, '<head$1>' + shimTag);
+    } else {
+      html = "<head>" + shimTag + "</head>" + html;
+    }
+
+    document.open();
+    document.write(html);
+    document.close();
   } catch (_error) {
     showError("Unable to start this game right now.");
   }
