@@ -2,25 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <title>starlight</title>
     <link rel="icon" type="image/x-icon" href="logos/logo.png"> 
-    <!-- fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap" rel="stylesheet">
-    <link href="https://fonts.cdnfonts.com/css/minecraft-3" rel="stylesheet">
-    <link href="https://fonts.cdnfonts.com/css/minecrafter-alt" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Oxanium:wght@200..800&display=swap" rel="stylesheet">
     <!-- scripts -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="vendor/tailwindcss/tailwindcss.js"></script>
+  <script src="vendor/firebase/firebase-app-compat.js"></script>
+  <script src="vendor/firebase/firebase-auth-compat.js"></script>
+  <script src="vendor/firebase/firebase-firestore-compat.js"></script>
     <!-- css -->
     <link rel="stylesheet" href="css/sidebar.css">
     <link rel="stylesheet" href="css/index.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/style.css" rel="stylesheet">
+  <link rel="stylesheet" href="vendor/fontawesome/all.min.css">
+  <link rel="stylesheet" href="vendor/soundboard/style.css">
 </head>
 <body class="bg-black text-white">
     <canvas id="global-particles"></canvas>
@@ -79,102 +72,6 @@
     <script src="js/routes/apps-route.js"></script>
     <script src="js/routes/soundboard-route.js"></script>
     <script src="js/routes/notfound-route.js"></script>
-    <script>
-      (function () {
-        const ANTI_CLOSE_KEY = 'starlight-anti-close-enabled';
-        let skipOnce = false;
-
-        function antiCloseEnabled() {
-          const value = localStorage.getItem(ANTI_CLOSE_KEY);
-          if (value === null) {
-            localStorage.setItem(ANTI_CLOSE_KEY, 'on');
-            return true;
-          }
-          return value === 'on';
-        }
-
-        window.StarlightAntiClose = {
-          enable() {
-            localStorage.setItem(ANTI_CLOSE_KEY, 'on');
-          },
-          disable() {
-            localStorage.setItem(ANTI_CLOSE_KEY, 'off');
-          },
-          bypassNextClose() {
-            skipOnce = true;
-            window.setTimeout(() => {
-              skipOnce = false;
-            }, 1000);
-          }
-        };
-
-        window.addEventListener('beforeunload', (event) => {
-          if (skipOnce || !antiCloseEnabled()) {
-            return;
-          }
-          event.preventDefault();
-          event.returnValue = '';
-        });
-      })();
-
-        const appContent = document.getElementById('app-content');
-        const routes = window.StarlightRouteModules || {};
-
-        let routeToken = 0;
-        async function router() {
-            let path = window.location.pathname;
-
-            if (window.StarlightAuthUI) {
-              path = window.StarlightAuthUI.guardedPath(path);
-              window.StarlightAuthUI.syncLockedState(path);
-            }
-
-            const route = routes[path] || routes['404'];
-            if (!route || typeof route.render !== 'function') {
-              return;
-            }
-
-            const token = ++routeToken;
-            appContent.classList.add('route-exit');
-            await new Promise((resolve) => setTimeout(resolve, 170));
-            if (token !== routeToken) {
-              return;
-            }
-
-            appContent.innerHTML = route.render();
-            appContent.classList.remove('route-exit');
-            appContent.classList.add('route-enter');
-            requestAnimationFrame(() => {
-              appContent.classList.remove('route-enter');
-            });
-
-          if (typeof route.afterRender === 'function') {
-            route.afterRender(path);
-          }
-        }
-        window.router = router;
-        document.addEventListener('click', (e) => {
-            const link = e.target.closest('.nav-link');
-            if (link) {
-                e.preventDefault(); 
-                const url = link.getAttribute('href');
-                if (window.StarlightAuthUI && !window.StarlightAuthUI.isLoggedIn() && url !== '/') {
-                    window.StarlightAuthUI.showLockedMessage();
-                    window.history.replaceState({}, '', '/');
-                    router();
-                    return;
-                }
-                window.history.pushState({}, '', url);
-                router();
-            }
-        });
-        window.addEventListener('popstate', router);
-        window.addEventListener('DOMContentLoaded', () => {
-          if (window.StarlightAuthUI) {
-            window.StarlightAuthUI.init();
-          }
-          router();
-        });
-    </script>
+    <script src="js/index-init.js"></script>
   </body>
 </html> 

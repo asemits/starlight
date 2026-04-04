@@ -592,7 +592,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     const moduleScript = document.createElement("script");
     moduleScript.id = "soundboard-main-module";
     moduleScript.type = "module";
-    moduleScript.src = "https://cdn.jsdelivr.net/gh/genizy/soundboard@main/main.js?t=" + Date.now();
+    moduleScript.src = "/vendor/soundboard/main.js?t=" + Date.now();
     document.body.appendChild(moduleScript);
   };
 
