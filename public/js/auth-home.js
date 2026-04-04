@@ -145,9 +145,25 @@
     node.classList.toggle("error", !ok);
   }
 
-  function closeModal() {
+  async function closeModal() {
     const modal = document.getElementById("starlight-auth-modal");
+    const modalKind = modal ? String(modal.getAttribute("data-modal-kind") || "") : "";
+
+    if (modalKind === "verify-email") {
+      const instance = auth();
+      const user = currentUser();
+      state.verifyDeadline = 0;
+      state.resendAllowedAt = 0;
+      if (instance && user && !user.emailVerified) {
+        try {
+          await instance.signOut();
+        } catch (_error) {
+        }
+      }
+    }
+
     if (modal) {
+      modal.removeAttribute("data-modal-kind");
       modal.classList.add("hidden");
       modal.innerHTML = "";
     }
@@ -172,11 +188,12 @@
     `;
   }
 
-  function showModal(title, body) {
+  function showModal(title, body, kind) {
     const modal = document.getElementById("starlight-auth-modal");
     if (!modal) {
       return;
     }
+    modal.setAttribute("data-modal-kind", kind || "default");
     modal.innerHTML = modalShell(title, body);
     modal.classList.remove("hidden");
     modal.querySelectorAll("[data-close-modal='1']").forEach((node) => {
@@ -685,7 +702,7 @@
         <button id="verify-refresh" type="button" class="starlight-btn starlight-btn-primary">I Verified</button>
         <button id="verify-resend" type="button" class="starlight-btn starlight-btn-muted" disabled>Resend Email</button>
       </div>
-    `);
+    `, "verify-email");
 
     const countdown = document.getElementById("verify-countdown");
     const resendBtn = document.getElementById("verify-resend");
