@@ -78,6 +78,7 @@
     <div id="app-content" class="p-8 pt-24"></div>
     <script src="js/app-core.js"></script>
     <script src="js/games.js"></script>
+    <script src="js/weather.js"></script>
     <script>
         const appContent = document.getElementById('app-content');
         const pages = {
@@ -92,6 +93,9 @@
             `,
             '/social': `
               <h1 class="text-3xl font-bold">Social</h1>
+            `,
+            '/weather': `
+              <div id="weather-root"></div>
             `,
             '/settings': `
               <div class="p-8 max-w-6xl mx-auto">
@@ -437,6 +441,12 @@
                   <p class="card-desc">Play sound effects</p>
                   <div class="glow-bar"></div>
               </a>
+              <a href="/weather" class="nav-link tool-card" style="animation-delay: 0.4s;">
+                <i class="fa-solid fa-cloud-sun-rain"></i>
+                <h2>Weather</h2>
+                <p class="card-desc">Forecast and alerts</p>
+                <div class="glow-bar"></div>
+              </a>
           </div>
         `,
         '/soundboard':`
@@ -517,6 +527,10 @@
 
           if (path === '/soundboard' && window.mountSoundboardRoute) {
             window.mountSoundboardRoute();
+          }
+
+          if (path === '/weather' && window.StarlightWeather) {
+            window.StarlightWeather.mount('#weather-root');
           }
         }
         document.addEventListener('click', (e) => {
