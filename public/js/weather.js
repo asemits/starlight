@@ -47,6 +47,7 @@
       .weather-panel canvas { width: 100%; height: 210px; background: rgba(255,255,255,0.04); border-radius: 18px; }
       .wx-strip-label { margin: 0 0 6px; text-align: center; font-size: 32px; letter-spacing: 0.06em; }
       .wx-scroller { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+      .wx-scroller-center { justify-content: center; }
       .wx-scroller::-webkit-scrollbar { height: 10px; }
       .wx-scroller::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.35); border-radius: 999px; }
       .wx-card { min-width: 210px; max-width: 210px; background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 10px 12px; }
@@ -430,7 +431,7 @@
         <div class="wx-scroller" id="weather-hourly-cards">${hourlyCards.join("")}</div>
 
         <h2 class="wx-strip-label">Daily</h2>
-        <div class="wx-scroller" id="weather-daily-cards">${dailyCards.join("")}</div>
+        <div class="wx-scroller wx-scroller-center" id="weather-daily-cards">${dailyCards.join("")}</div>
       </section>
     `;
 
