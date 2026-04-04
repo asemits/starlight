@@ -283,7 +283,7 @@
       if (enforceCooldown && oldHash && oldHash !== normalizedHash && oldChangedAtMs) {
         const unlockAtMs = oldChangedAtMs + USERNAME_CHANGE_COOLDOWN_MS;
         if (Date.now() < unlockAtMs) {
-          throw new Error("You can change your username once every 7 days.");
+          throw new Error(`Wait until ${new Date(unlockAtMs).toLocaleString()} to change your username again.`);
         }
       }
       if (oldHash && oldHash !== normalizedHash) {
@@ -366,7 +366,8 @@
         const nowMs = Date.now();
 
         if (isManual && lastManualMs && nowMs - lastManualMs < MANUAL_SYNC_INTERVAL_MS) {
-          throw new Error("Manual sync is available once every 5 minutes.");
+          const nextManualMs = lastManualMs + MANUAL_SYNC_INTERVAL_MS;
+          throw new Error(`Wait until ${new Date(nextManualMs).toLocaleString()} to sync your data again.`);
         }
         if (!isManual && lastAutoMs && nowMs - lastAutoMs < AUTO_SYNC_INTERVAL_MS) {
           throw new Error("Auto sync interval has not elapsed.");
@@ -1129,11 +1130,32 @@
     }
 
     try {
+      const firestore = db();
+      if (firestore) {
+        const userDoc = await firestore.collection(USER_DOC_COLLECTION).doc(user.uid).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data() || {};
+          const currentHash = String(userData.usernameHash || "");
+          const desiredHash = await hashText(username.toLowerCase());
+          const changedAtMs = toMillis(userData.usernameChangedAt);
+          if (currentHash && currentHash !== desiredHash && changedAtMs) {
+            const nextAllowedMs = changedAtMs + USERNAME_CHANGE_COOLDOWN_MS;
+            if (Date.now() < nextAllowedMs) {
+              setStatus("settings-username-status", `Wait until ${new Date(nextAllowedMs).toLocaleString()} to change your username again.`, false);
+              return;
+            }
+          }
+        }
+      }
+
       await reserveUsername(user, username, { enforceCooldown: true });
       await user.updateProfile({ displayName: username });
       await ensureUserDoc(user, username);
       setStatus("settings-username-status", "Username updated.", true);
-      mountSettingsAuthPanel(true);
+      await mountSettingsAuthPanel(true);
+      if (typeof window.switchSettingsCategory === "function") {
+        window.switchSettingsCategory("account");
+      }
     } catch (error) {
       setStatus("settings-username-status", error && error.message ? error.message : "Could not update username.", false);
     }
@@ -1145,6 +1167,9 @@
     if (!aside || !section) {
       return;
     }
+
+    const activePanel = document.querySelector("[data-settings-panel]:not(.hidden)");
+    const activeCategory = activePanel ? String(activePanel.getAttribute("data-settings-panel") || "") : "";
 
     if (!forceRefresh && document.querySelector("[data-settings-tab='account']")) {
       return;
@@ -1284,9 +1309,16 @@
         const ok = await syncUserData("manual", false);
         if (ok) {
           setStatus("settings-sync-status", "Data synced.", true);
-          mountSettingsAuthPanel(true);
+          await mountSettingsAuthPanel(true);
+          if (typeof window.switchSettingsCategory === "function") {
+            window.switchSettingsCategory("account");
+          }
         }
       });
+    }
+
+    if (typeof window.switchSettingsCategory === "function" && (activeCategory === "account" || forceRefresh)) {
+      window.switchSettingsCategory("account");
     }
   }
 
