@@ -775,11 +775,6 @@ window.GAMES_LIST = [
         url: "webecome.html",
     }, 
     {
-        title: "UGS Library",
-        image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQFFfpMZ2POZsgEjd3l1QjvNJw410x4zK9cGw&s",
-        url: "library.html",
-    }, 
-    {
         title: "Granny",
         image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTYg41d0mA8Q__ZdcPMu2Jufov4Dybznxz6tw&s",
         url: "granny.html",
