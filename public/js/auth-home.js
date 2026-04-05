@@ -50,9 +50,6 @@
     verifyDeadline: 0,
     resendAllowedAt: 0,
     verifyTimerId: 0,
-    totpSecret: null,
-    totpSecretKey: "",
-    totpQrUrl: "",
     autoSyncTimerId: 0
   };
 
@@ -228,53 +225,6 @@
     }
 
     return "Something went wrong. Please try again.";
-  }
-
-  function friendlyMfaMessage(error) {
-    const code = authErrorCode(error);
-    if (code === "auth/invalid-verification-code") return "Invalid authenticator code.";
-    if (code === "auth/code-expired") return "Authenticator code expired. Enter the latest code.";
-    if (code === "auth/invalid-multi-factor-session") return "2FA session expired. Generate setup again.";
-    if (code === "auth/too-many-requests") return "Too many attempts. Try again later.";
-    if (code === "auth/operation-not-allowed") return "Authenticator app 2FA is not enabled for this project.";
-    if (code === "auth/requires-recent-login") return "Please log in again, then try adding 2FA.";
-    return "Could not complete authenticator setup. Please try again.";
-  }
-
-  function getTotpGenerator() {
-    if (!firebase || !firebase.auth || !firebase.auth.TotpMultiFactorGenerator) {
-      return null;
-    }
-    return firebase.auth.TotpMultiFactorGenerator;
-  }
-
-  function getTotpSecretKey(secret) {
-    if (!secret) {
-      return "";
-    }
-    if (typeof secret.secretKey === "string") {
-      return String(secret.secretKey);
-    }
-    if (typeof secret.secretKey === "function") {
-      try {
-        return String(secret.secretKey() || "");
-      } catch (_error) {
-        return "";
-      }
-    }
-    return "";
-  }
-
-  function getTotpQrUrl(secret, user) {
-    if (!secret || typeof secret.generateQrCodeUrl !== "function") {
-      return "";
-    }
-    const accountName = String((user && user.email) || "starlight-user");
-    try {
-      return String(secret.generateQrCodeUrl(accountName, "starlight") || "");
-    } catch (_error) {
-      return "";
-    }
   }
 
   function deleteAccountMessage(error) {
@@ -1772,103 +1722,6 @@
     }
   }
 
-  async function sendMfaCode() {
-    const user = currentUser();
-    if (!user) {
-      setStatus("settings-mfa-status", "You must be logged in.", false);
-      return;
-    }
-
-    try {
-      const generator = getTotpGenerator();
-      if (!generator) {
-        setStatus("settings-mfa-status", "Authenticator app 2FA is unavailable in this build.", false);
-        return;
-      }
-      setStatus("settings-mfa-status", "Generating authenticator setup...", true);
-      const session = await user.multiFactor.getSession();
-      const secret = await generator.generateSecret(session);
-      state.totpSecret = secret;
-      state.totpSecretKey = getTotpSecretKey(secret);
-      state.totpQrUrl = getTotpQrUrl(secret, user);
-
-      const secretInput = document.getElementById("mfa-totp-secret");
-      if (secretInput) {
-        secretInput.value = state.totpSecretKey;
-      }
-
-      const qrLink = document.getElementById("mfa-totp-qr-link");
-      if (qrLink) {
-        if (state.totpQrUrl) {
-          qrLink.setAttribute("href", state.totpQrUrl);
-          qrLink.classList.remove("hidden");
-        } else {
-          qrLink.classList.add("hidden");
-        }
-      }
-
-      setStatus("settings-mfa-status", "Authenticator setup ready. Add it in your app, then enter the 6-digit code.", true);
-    } catch (error) {
-      setStatus("settings-mfa-status", friendlyMfaMessage(error), false);
-    }
-  }
-
-  async function enrollMfaCode() {
-    const user = currentUser();
-    if (!user) {
-      setStatus("settings-mfa-status", "You must be logged in.", false);
-      return;
-    }
-    if (!state.totpSecret) {
-      setStatus("settings-mfa-status", "Generate authenticator setup first.", false);
-      return;
-    }
-    const code = String(document.getElementById("mfa-code").value || "").trim();
-    if (!/^\d{6}$/.test(code)) {
-      setStatus("settings-mfa-status", "Code must be 6 digits.", false);
-      return;
-    }
-
-    try {
-      const generator = getTotpGenerator();
-      if (!generator) {
-        setStatus("settings-mfa-status", "Authenticator app 2FA is unavailable in this build.", false);
-        return;
-      }
-      const assertion = generator.assertionForEnrollment(state.totpSecret, code);
-      await user.multiFactor.enroll(assertion, "auth-app");
-      state.totpSecret = null;
-      state.totpSecretKey = "";
-      state.totpQrUrl = "";
-      setStatus("settings-mfa-status", "Authenticator app 2FA enabled.", true);
-      mountSettingsAuthPanel(true);
-    } catch (error) {
-      setStatus("settings-mfa-status", friendlyMfaMessage(error), false);
-    }
-  }
-
-  async function disableMfaInSettings() {
-    const user = currentUser();
-    if (!user) {
-      setStatus("settings-mfa-status", "You must be logged in.", false);
-      return;
-    }
-
-    const factors = user.multiFactor && Array.isArray(user.multiFactor.enrolledFactors) ? user.multiFactor.enrolledFactors : [];
-    if (!factors.length) {
-      setStatus("settings-mfa-status", "No enrolled 2FA factors found.", false);
-      return;
-    }
-
-    try {
-      await user.multiFactor.unenroll(factors[0].uid);
-      setStatus("settings-mfa-status", "2FA method removed.", true);
-      mountSettingsAuthPanel(true);
-    } catch (error) {
-      setStatus("settings-mfa-status", friendlyMfaMessage(error), false);
-    }
-  }
-
   async function changeUsernameInSettings() {
     const user = currentUser();
     if (!user) {
@@ -2098,9 +1951,6 @@
     }
 
     if (forceRefresh) {
-      state.totpSecret = null;
-      state.totpSecretKey = "";
-      state.totpQrUrl = "";
       const existingTabRow = document.getElementById("settings-account-tab-row");
       const existingPanel = document.querySelector("[data-settings-panel='account']");
       if (existingTabRow) {
@@ -2141,7 +1991,6 @@
     const lastSyncMs = Math.max(lastManualSyncMs, lastAutoSyncMs);
     const lastSyncText = lastSyncMs ? new Date(lastSyncMs).toLocaleString() : "Never";
     const googleLinked = isGoogleLinked(user);
-    const hasMfa = Boolean(user && user.multiFactor && Array.isArray(user.multiFactor.enrolledFactors) && user.multiFactor.enrolledFactors.length > 0);
 
     const staleOpenAccountButton = document.getElementById("settings-open-account");
     if (staleOpenAccountButton) {
@@ -2168,18 +2017,6 @@
           ? '<button id="settings-unlink-google" type="button" class="w-full px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-brands fa-google"></i> Unlink Google Account</button>'
           : '<button id="settings-link-google" type="button" class="w-full px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-brands fa-google"></i> Link Google Account</button>'}
         <p id="settings-auth-status" class="text-sm mt-3"></p>
-      </article>
-
-      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-        <label class="block mb-2 text-sm text-gray-300">Two-Factor Authentication (Authenticator App)</label>
-        <p class="text-sm text-gray-300 mb-3">Current status: ${hasMfa ? "Enabled" : "Not configured"}</p>
-        <button id="mfa-send" type="button" class="w-full mb-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Generate Setup</button>
-        <input id="mfa-totp-secret" type="text" readonly value="${escapeHtml(state.totpSecretKey || "")}" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-2" placeholder="Authenticator secret key" />
-        <a id="mfa-totp-qr-link" href="${escapeHtml(state.totpQrUrl || "#")}" target="_blank" rel="noopener" class="text-sm text-cyan-300 hover:text-cyan-200 underline ${state.totpQrUrl ? "" : "hidden"}">Open authenticator setup link</a>
-        <input id="mfa-code" type="text" placeholder="6-digit authenticator code" class="w-full mt-2 bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-2" />
-        <button id="mfa-enroll" type="button" class="w-full px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Verify & Enable 2FA</button>
-        ${hasMfa ? '<button id="mfa-disable" type="button" class="w-full mt-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Disable 2FA</button>' : ''}
-        <p id="settings-mfa-status" class="text-sm mt-3"></p>
       </article>
 
       <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
@@ -2225,21 +2062,6 @@
     const unlinkBtn = document.getElementById("settings-unlink-google");
     if (unlinkBtn) {
       unlinkBtn.addEventListener("click", unlinkGoogleInSettings);
-    }
-
-    const sendBtn = document.getElementById("mfa-send");
-    if (sendBtn) {
-      sendBtn.addEventListener("click", sendMfaCode);
-    }
-
-    const enrollBtn = document.getElementById("mfa-enroll");
-    if (enrollBtn) {
-      enrollBtn.addEventListener("click", enrollMfaCode);
-    }
-
-    const disableBtn = document.getElementById("mfa-disable");
-    if (disableBtn) {
-      disableBtn.addEventListener("click", disableMfaInSettings);
     }
 
     const usernameBtn = document.getElementById("settings-username-save");
