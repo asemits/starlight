@@ -280,55 +280,52 @@
       return;
     }
 
-    let batch = firestore.batch();
-    let opCount = 0;
-
-    async function queueDelete(ref) {
-      batch.delete(ref);
-      opCount += 1;
-      if (opCount >= 400) {
-        await batch.commit();
-        batch = firestore.batch();
-        opCount = 0;
-      }
-    }
-
-    async function flushBatch() {
-      if (opCount > 0) {
-        await batch.commit();
-        batch = firestore.batch();
-        opCount = 0;
+    async function safeDelete(ref) {
+      try {
+        await ref.delete();
+      } catch (_error) {
       }
     }
 
     const userRef = firestore.collection(USER_DOC_COLLECTION).doc(user.uid);
-    const userSnap = await userRef.get();
-    await queueDelete(userRef);
+    let userSnap = null;
+    try {
+      userSnap = await userRef.get();
+    } catch (_error) {
+      userSnap = null;
+    }
 
-    if (userSnap.exists) {
+    await safeDelete(userRef);
+
+    if (userSnap && userSnap.exists) {
       const userData = userSnap.data() || {};
       const usernameHash = String(userData.usernameHash || "");
       if (usernameHash) {
-        await queueDelete(firestore.collection(USERNAME_COLLECTION).doc(usernameHash));
+        try {
+          const usernameRef = firestore.collection(USERNAME_COLLECTION).doc(usernameHash);
+          const usernameSnap = await usernameRef.get();
+          const usernameData = usernameSnap.exists ? (usernameSnap.data() || {}) : {};
+          if (usernameSnap.exists && String(usernameData.uid || "") === user.uid) {
+            await safeDelete(usernameRef);
+          }
+        } catch (_error) {
+        }
       }
-    }
-
-    try {
-      const playersSnap = await firestore.collectionGroup("players").where("uid", "==", user.uid).get();
-      for (const doc of playersSnap.docs) {
-        await queueDelete(doc.ref);
-      }
-    } catch (_error) {
     }
 
     const docIdField = firebase.firestore.FieldPath.documentId();
     let lastDoc = null;
     while (true) {
-      let query = firestore.collection("gameStats").orderBy(docIdField).limit(200);
-      if (lastDoc) {
-        query = query.startAfter(lastDoc);
+      let page = null;
+      try {
+        let query = firestore.collection("gameStats").orderBy(docIdField).limit(200);
+        if (lastDoc) {
+          query = query.startAfter(lastDoc);
+        }
+        page = await query.get();
+      } catch (_error) {
+        break;
       }
-      const page = await query.get();
       if (page.empty) {
         break;
       }
@@ -338,7 +335,7 @@
           const playerRef = statsDoc.ref.collection("players").doc(user.uid);
           const playerSnap = await playerRef.get();
           if (playerSnap.exists) {
-            await queueDelete(playerRef);
+            await safeDelete(playerRef);
           }
         } catch (_error) {
         }
@@ -349,8 +346,6 @@
         break;
       }
     }
-
-    await flushBatch();
   }
 
   async function canAuthenticateWithPassword(email, password) {
@@ -1670,7 +1665,10 @@
         return;
       }
       setStatus("settings-danger-status", "Deleting account data...", true);
-      await deleteUserFirestoreData(user);
+      try {
+        await deleteUserFirestoreData(user);
+      } catch (_error) {
+      }
       await user.delete();
       const instance = auth();
       if (instance) {
