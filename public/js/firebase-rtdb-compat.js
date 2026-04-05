@@ -504,6 +504,16 @@
       }) || null;
     }
 
+    _getFriendRequestUidEqualityFilter() {
+      return this._filters.find((filter) => {
+        return !filter.isDocId
+          && filter.op === "=="
+          && (filter.fieldPath === "toUid" || filter.fieldPath === "fromUid")
+          && typeof filter.value === "string"
+          && filter.value.trim().length > 0;
+      }) || null;
+    }
+
     _getScopedRefInfo() {
       if (this._source.kind !== "collection") {
         return null;
@@ -511,6 +521,17 @@
 
       let ref = this._db._rawRef(this._source.path);
       const collectionPath = splitPath(this._source.path).join("/");
+
+      if (collectionPath === "friendRequests") {
+        const requestUidFilter = this._getFriendRequestUidEqualityFilter();
+        if (requestUidFilter) {
+          const indexPath = requestUidFilter.fieldPath === "toUid"
+            ? joinPath("userFriendRequestsIncoming", requestUidFilter.value)
+            : joinPath("userFriendRequestsOutgoing", requestUidFilter.value);
+          ref = this._db._rawRef(indexPath);
+          return { ref };
+        }
+      }
 
       const participantFilter = this._getParticipantsArrayContainsFilter();
 
@@ -551,6 +572,13 @@
     async _loadDocs() {
       if (this._source.kind === "collection") {
         const collectionPath = splitPath(this._source.path).join("/");
+        if (collectionPath === "friendRequests") {
+          const requestUidFilter = this._getFriendRequestUidEqualityFilter();
+          if (requestUidFilter) {
+            const direction = requestUidFilter.fieldPath === "toUid" ? "incoming" : "outgoing";
+            return this._db._getFriendRequestsForUser(requestUidFilter.value, direction);
+          }
+        }
         if (collectionPath === "privateChats") {
           const participantFilter = this._getParticipantsArrayContainsFilter();
           if (participantFilter) {
@@ -839,6 +867,7 @@
         const payload = convertWriteValue(this._databaseNamespace, decorated);
         await ref.set(payload);
         await this._syncPrivateChatIndex(path, decorated);
+        await this._syncFriendRequestIndex(path, decorated);
         return;
       }
 
@@ -846,10 +875,12 @@
       flattenForUpdate(this._databaseNamespace, decorated, "", updates);
       if (!Object.keys(updates).length) {
         await this._syncPrivateChatIndex(path, decorated);
+        await this._syncFriendRequestIndex(path, decorated);
         return;
       }
       await ref.update(updates);
       await this._syncPrivateChatIndex(path, decorated);
+      await this._syncFriendRequestIndex(path, decorated);
     }
 
     async _updateDocument(path, data) {
@@ -858,10 +889,12 @@
       flattenForUpdate(this._databaseNamespace, decorated, "", updates);
       if (!Object.keys(updates).length) {
         await this._syncPrivateChatIndex(path, decorated);
+        await this._syncFriendRequestIndex(path, decorated);
         return;
       }
       await this._rawRef(path).update(updates);
       await this._syncPrivateChatIndex(path, decorated);
+      await this._syncFriendRequestIndex(path, decorated);
     }
 
     async _deleteDocument(path) {
@@ -894,6 +927,80 @@
       }
 
       await this._rtdb.ref().update(updates);
+    }
+
+    async _syncFriendRequestIndex(path, data) {
+      const segments = splitPath(path);
+      if (segments.length !== 2 || segments[0] !== "friendRequests") {
+        return;
+      }
+
+      let payload = isPlainObject(data) ? deepClone(data) : {};
+      let fromUid = String(payload.fromUid || "").trim();
+      let toUid = String(payload.toUid || "").trim();
+      let status = String(payload.status || "").trim() || "pending";
+
+      if (!fromUid || !toUid) {
+        const existing = await this._getDocument(path);
+        if (!existing.exists) {
+          return;
+        }
+        const existingData = existing.data() || {};
+        fromUid = fromUid || String(existingData.fromUid || "").trim();
+        toUid = toUid || String(existingData.toUid || "").trim();
+        status = status || String(existingData.status || "").trim() || "pending";
+      }
+
+      if (!fromUid || !toUid) {
+        return;
+      }
+
+      const requestId = segments[1];
+      const updates = {};
+      updates[pathToRtdb(joinPath("userFriendRequestsIncoming", toUid, requestId))] = status;
+      updates[pathToRtdb(joinPath("userFriendRequestsOutgoing", fromUid, requestId))] = status;
+
+      await this._rtdb.ref().update(updates);
+    }
+
+    async _getFriendRequestsForUser(uidValue, direction) {
+      const uid = String(uidValue || "").trim();
+      if (!uid) {
+        return [];
+      }
+
+      const indexPath = direction === "incoming"
+        ? joinPath("userFriendRequestsIncoming", uid)
+        : joinPath("userFriendRequestsOutgoing", uid);
+      const indexSnap = await this._rawRef(indexPath).once("value");
+      const indexValue = indexSnap.val();
+      if (!isObject(indexValue)) {
+        return [];
+      }
+
+      const requestIds = Object.keys(indexValue)
+        .filter((key) => indexValue[key] !== null && indexValue[key] !== undefined)
+        .map((key) => decodeDocId(key));
+
+      if (!requestIds.length) {
+        return [];
+      }
+
+      const docs = [];
+      const snapshots = await Promise.all(requestIds.map((requestId) => this._getDocument(joinPath("friendRequests", requestId))));
+      for (let i = 0; i < snapshots.length; i += 1) {
+        const snap = snapshots[i];
+        if (!snap || !snap.exists) {
+          continue;
+        }
+        docs.push({
+          id: requestIds[i],
+          path: joinPath("friendRequests", requestIds[i]),
+          data: snap.data() || {}
+        });
+      }
+
+      return docs;
     }
 
     async _getPrivateChatsForUser(uidValue) {
