@@ -1732,7 +1732,7 @@
         <p>We sent a verification email. Verify within five minutes to continue.</p>
         <p>Time left: <strong id="verify-countdown">05:00</strong></p>
         <p id="verify-status" class="starlight-status"></p>
-        <p><b>Note:</b> To Gmail users it will mark the email as spam, so check your spam folder. If you still don't see it, check "All mail", or try resending.</p>
+        <p><b>Note to Gmail users:</b> It will mark the email as spam, so check your spam folder. If you still don't see it, check "All mail", or try resending.</p>
         <button id="verify-refresh" type="button" class="starlight-btn starlight-btn-primary">I Verified</button>
         <button id="verify-resend" type="button" class="starlight-btn starlight-btn-muted" disabled>Resend Email</button>
       </div>
