@@ -23,9 +23,18 @@ service cloud.firestore {
       return v is string && v.size() > 0 && v.size() <= maxLen;
     }
 
+    function isValidFriendRequestStatus(v) {
+      return v in ['pending', 'accepted', 'declined', 'canceled'];
+    }
+
     function isChatParticipant(chatId) {
       return isSignedIn()
         && request.auth.uid in get(/databases/$(database)/documents/privateChats/$(chatId)).data.participants;
+    }
+
+    function isChatParticipantAfter(chatId) {
+      return isSignedIn()
+        && request.auth.uid in getAfter(/databases/$(database)/documents/privateChats/$(chatId)).data.participants;
     }
 
     match /gameStats/{gameId} {
@@ -149,6 +158,92 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
     }
 
+    match /users/{uid}/friends/{friendUid} {
+      allow read: if isOwner(uid);
+
+      allow create, update: if (
+          isOwner(uid)
+          || (
+            isSignedIn()
+            && request.auth.uid in [uid, friendUid]
+            && ('requestId' in request.resource.data)
+            && isNonEmptyString(request.resource.data.requestId, 256)
+            && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.status == 'accepted'
+            && (
+              (
+                getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.fromUid == uid
+                && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.toUid == friendUid
+              )
+              ||
+              (
+                getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.fromUid == friendUid
+                && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.toUid == uid
+              )
+            )
+          )
+        )
+        && hasOnlyKeys(request.resource.data, ['uid', 'username', 'usernameLower', 'requestId', 'createdAt'])
+        && request.resource.data.uid == friendUid
+        && isNonEmptyString(request.resource.data.username, 60)
+        && isNonEmptyString(request.resource.data.usernameLower, 60)
+        && (!('requestId' in request.resource.data) || isNonEmptyString(request.resource.data.requestId, 256))
+        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp);
+
+      allow delete: if isOwner(uid);
+    }
+
+    match /friendRequests/{requestId} {
+      allow read: if isSignedIn()
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && hasOnlyKeys(request.resource.data, [
+          'fromUid', 'fromUsername', 'fromUsernameLower',
+          'toUid', 'toUsername', 'toUsernameLower',
+          'status', 'pairKey', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid is string
+        && request.resource.data.toUid != request.auth.uid
+        && isNonEmptyString(request.resource.data.fromUsername, 60)
+        && isNonEmptyString(request.resource.data.fromUsernameLower, 60)
+        && isNonEmptyString(request.resource.data.toUsername, 60)
+        && isNonEmptyString(request.resource.data.toUsernameLower, 60)
+        && isNonEmptyString(request.resource.data.pairKey, 256)
+        && request.resource.data.status == 'pending'
+        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp)
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
+
+      allow update: if isSignedIn()
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid)
+        && hasOnlyKeys(request.resource.data, [
+          'fromUid', 'fromUsername', 'fromUsernameLower',
+          'toUid', 'toUsername', 'toUsernameLower',
+          'status', 'pairKey', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.fromUid == resource.data.fromUid
+        && request.resource.data.fromUsername == resource.data.fromUsername
+        && request.resource.data.fromUsernameLower == resource.data.fromUsernameLower
+        && request.resource.data.toUid == resource.data.toUid
+        && request.resource.data.toUsername == resource.data.toUsername
+        && request.resource.data.toUsernameLower == resource.data.toUsernameLower
+        && request.resource.data.pairKey == resource.data.pairKey
+        && request.resource.data.createdAt == resource.data.createdAt
+        && isValidFriendRequestStatus(request.resource.data.status)
+        && request.resource.data.updatedAt is timestamp
+        && (
+          (request.auth.uid == resource.data.fromUid
+            && resource.data.status == 'pending'
+            && request.resource.data.status == 'canceled')
+          ||
+          (request.auth.uid == resource.data.toUid
+            && resource.data.status == 'pending'
+            && request.resource.data.status in ['accepted', 'declined'])
+        );
+
+      allow delete: if false;
+    }
+
     match /usernames/{usernameHash} {
       allow read: if isSignedIn();
 
@@ -210,8 +305,8 @@ service cloud.firestore {
     match /privateChats/{chatId}/members/{uid} {
       allow read: if isChatParticipant(chatId);
 
-      allow create, update: if isChatParticipant(chatId)
-        && uid in get(/databases/$(database)/documents/privateChats/$(chatId)).data.participants
+      allow create, update: if isChatParticipantAfter(chatId)
+        && uid in getAfter(/databases/$(database)/documents/privateChats/$(chatId)).data.participants
         && hasOnlyKeys(request.resource.data, ['uid', 'username', 'wrappedKey', 'updatedAt'])
         && request.resource.data.uid == uid
         && isNonEmptyString(request.resource.data.username, 60)
@@ -224,20 +319,29 @@ service cloud.firestore {
       allow read: if isChatParticipant(chatId);
 
       allow create: if isChatParticipant(chatId)
-        && hasOnlyKeys(request.resource.data, ['senderId', 'senderUsername', 'ciphertext', 'iv', 'createdAt', 'editedAt', 'replyToMessageId'])
+        && hasOnlyKeys(request.resource.data, ['senderId', 'senderUsername', 'ciphertext', 'iv', 'createdAt', 'createdAtClient', 'editedAt', 'replyToMessageId'])
         && request.resource.data.senderId == request.auth.uid
         && isNonEmptyString(request.resource.data.senderUsername, 60)
         && isNonEmptyString(request.resource.data.ciphertext, 20000)
         && isNonEmptyString(request.resource.data.iv, 256)
+        && (!('createdAtClient' in request.resource.data) || isNonNegativeInt(request.resource.data.createdAtClient))
         && (!('editedAt' in request.resource.data) || request.resource.data.editedAt is timestamp)
         && (!('replyToMessageId' in request.resource.data) || (request.resource.data.replyToMessageId is string && request.resource.data.replyToMessageId.size() <= 200));
 
       allow update: if isChatParticipant(chatId)
         && request.auth.uid == resource.data.senderId
-        && hasOnlyKeys(request.resource.data, ['senderId', 'senderUsername', 'ciphertext', 'iv', 'createdAt', 'editedAt', 'replyToMessageId'])
+        && hasOnlyKeys(request.resource.data, ['senderId', 'senderUsername', 'ciphertext', 'iv', 'createdAt', 'createdAtClient', 'editedAt', 'replyToMessageId'])
         && request.resource.data.senderId == resource.data.senderId
         && request.resource.data.senderUsername == resource.data.senderUsername
         && request.resource.data.createdAt == resource.data.createdAt
+        && (
+          (!('createdAtClient' in resource.data) && !('createdAtClient' in request.resource.data))
+          || (
+            ('createdAtClient' in resource.data)
+            && ('createdAtClient' in request.resource.data)
+            && request.resource.data.createdAtClient == resource.data.createdAtClient
+          )
+        )
         && isNonEmptyString(request.resource.data.ciphertext, 20000)
         && isNonEmptyString(request.resource.data.iv, 256)
         && (!('editedAt' in request.resource.data) || request.resource.data.editedAt is timestamp)

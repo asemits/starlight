@@ -1,6 +1,7 @@
 (function () {
   const CHAT_COLLECTION = "privateChats";
   const PROFILE_COLLECTION = "userPublicProfiles";
+  const FRIEND_REQUESTS_COLLECTION = "friendRequests";
   const CHAIN_WINDOW_MS = 5 * 60 * 1000;
   const CHAT_PREVIEW_LIMIT = 90;
   const GC_TITLE_LIMIT = 72;
@@ -24,7 +25,13 @@
     statusText: "",
     statusType: "",
     profileCache: new Map(),
-    memberCache: new Map()
+    memberCache: new Map(),
+    friends: [],
+    incomingFriendRequests: [],
+    outgoingFriendRequests: [],
+    friendsUnsub: null,
+    incomingFriendRequestsUnsub: null,
+    outgoingFriendRequestsUnsub: null
   };
 
   function auth() {
@@ -115,6 +122,40 @@
       return text;
     }
     return `${text.slice(0, Math.max(0, maxLen - 1))}\u2026`;
+  }
+
+  function pairKeyForUids(uidA, uidB) {
+    const a = String(uidA || "").trim();
+    const b = String(uidB || "").trim();
+    return a < b ? `${a}:${b}` : `${b}:${a}`;
+  }
+
+  function getFriendsByNormalizedUsername() {
+    const map = new Map();
+    state.friends.forEach((friend) => {
+      const key = normalizeUsername(friend.username);
+      if (key) {
+        map.set(key, friend);
+      }
+    });
+    return map;
+  }
+
+  function findFriendByUsername(username) {
+    const key = normalizeUsername(username);
+    if (!key) {
+      return null;
+    }
+    return getFriendsByNormalizedUsername().get(key) || null;
+  }
+
+  function friendSuggestions(filterText, excludedUids) {
+    const filter = normalizeUsername(filterText);
+    const excluded = excludedUids || new Set();
+    return state.friends
+      .filter((friend) => !excluded.has(friend.uid))
+      .filter((friend) => !filter || normalizeUsername(friend.username).includes(filter))
+      .sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
   }
 
   function currentUser() {
@@ -454,6 +495,10 @@
     if (otherProfile.uid === user.uid) {
       throw new Error("You cannot DM yourself.");
     }
+    const isFriend = state.friends.some((friend) => friend.uid === otherProfile.uid);
+    if (!isFriend) {
+      throw new Error("You can only DM users in your friends list.");
+    }
 
     const existingSnap = await firestore
       .collection(CHAT_COLLECTION)
@@ -535,6 +580,7 @@
       throw new Error("Enter at least one username.");
     }
 
+    const friendsByName = getFriendsByNormalizedUsername();
     const byLower = new Map();
     names.forEach((name) => {
       byLower.set(normalizeUsername(name), name);
@@ -545,9 +591,13 @@
       if (!normalized) {
         continue;
       }
-      const profile = await findProfileByUsername(normalized);
+      const friend = friendsByName.get(normalized);
+      if (!friend) {
+        throw new Error(`Only friends can be added: ${normalized}`);
+      }
+      const profile = await getProfileByUid(friend.uid);
       if (!profile) {
-        throw new Error(`User not found: ${normalized}`);
+        throw new Error(`Friend profile unavailable: ${normalized}`);
       }
       if (profile.uid === user.uid) {
         continue;
@@ -626,6 +676,8 @@
     for (const doc of docs) {
       const data = doc.data() || {};
       const createdAtMs = toMillis(data.createdAt);
+      const createdAtClientMs = Number.isFinite(Number(data.createdAtClient)) ? Number(data.createdAtClient) : 0;
+      const chainAtMs = createdAtMs || createdAtClientMs;
       let payload = { text: "", replyToMessageId: "" };
       let decryptFailed = false;
       try {
@@ -642,6 +694,8 @@
         senderId: String(data.senderId || ""),
         senderUsername: String(data.senderUsername || "Unknown"),
         createdAtMs,
+        createdAtClientMs,
+        chainAtMs,
         editedAtMs: toMillis(data.editedAt),
         text,
         replyToMessageId,
@@ -649,6 +703,13 @@
         raw: data
       });
     }
+    rows.sort((a, b) => {
+      const delta = (a.chainAtMs || 0) - (b.chainAtMs || 0);
+      if (delta !== 0) {
+        return delta;
+      }
+      return String(a.id || "").localeCompare(String(b.id || ""));
+    });
     return rows;
   }
 
@@ -1091,6 +1152,7 @@
               senderUsername: currentUsername(),
               ciphertext: encrypted.ciphertext,
               iv: encrypted.iv,
+              createdAtClient: Date.now(),
               createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
@@ -1135,7 +1197,7 @@
     const html = state.messageRows
       .map((row) => {
         const sameSender = previous && previous.senderId === row.senderId;
-        const withinChain = sameSender && row.createdAtMs && previous.createdAtMs && (row.createdAtMs - previous.createdAtMs <= CHAIN_WINDOW_MS);
+        const withinChain = sameSender && row.chainAtMs && previous.chainAtMs && (row.chainAtMs - previous.chainAtMs <= CHAIN_WINDOW_MS);
         const showMeta = !withinChain;
         previous = row;
 
@@ -1149,7 +1211,7 @@
 
         return `
           <article class="starlight-chat-bubble${mineClass}" data-message-id="${escapeHtml(row.id)}">
-            ${showMeta ? `<div class="starlight-chat-bubble-meta"><strong>${escapeHtml(row.senderUsername)}</strong><span>${escapeHtml(formatTime(row.createdAtMs) + edited)}</span></div>` : ""}
+            ${showMeta ? `<div class="starlight-chat-bubble-meta"><strong>${escapeHtml(row.senderUsername)}</strong><span>${escapeHtml(formatTime(row.chainAtMs) + edited)}</span></div>` : ""}
             ${replyHtml}
             <p>${escapeHtml(row.text)}</p>
           </article>
@@ -1262,6 +1324,357 @@
     );
   }
 
+  function renderSuggestionList(container, items, onSelect) {
+    if (!container) {
+      return;
+    }
+    if (!items.length) {
+      container.innerHTML = "";
+      container.classList.add("hidden");
+      return;
+    }
+    container.classList.remove("hidden");
+    container.innerHTML = items
+      .map((item) => `<button type="button" data-friend-uid="${escapeHtml(item.uid)}">${escapeHtml(item.username)}</button>`)
+      .join("");
+    container.querySelectorAll("button[data-friend-uid]").forEach((node) => {
+      node.addEventListener("click", () => {
+        const uid = String(node.getAttribute("data-friend-uid") || "");
+        const friend = items.find((item) => item.uid === uid);
+        if (friend) {
+          onSelect(friend);
+        }
+      });
+    });
+  }
+
+  function hideSuggestionList(container) {
+    if (!container) {
+      return;
+    }
+    container.classList.add("hidden");
+  }
+
+  function renderDmSuggestions() {
+    if (!state.root) {
+      return;
+    }
+    const input = state.root.querySelector("#starlight-chat-create-dm-input");
+    const container = state.root.querySelector("#starlight-chat-create-dm-suggestions");
+    if (!input || !container) {
+      return;
+    }
+    const suggestions = friendSuggestions(input.value || "", new Set());
+    renderSuggestionList(container, suggestions, (friend) => {
+      input.value = friend.username;
+      hideSuggestionList(container);
+      input.focus();
+    });
+  }
+
+  function parseGcTokens(raw) {
+    const value = String(raw || "");
+    const tokens = value.split(",");
+    const current = String(tokens.pop() || "").trim();
+    const selected = tokens
+      .map((token) => normalizeUsername(token))
+      .filter((token) => Boolean(token));
+    return { current, selected };
+  }
+
+  function renderGcSuggestions() {
+    if (!state.root) {
+      return;
+    }
+    const input = state.root.querySelector("#starlight-chat-create-gc-input");
+    const container = state.root.querySelector("#starlight-chat-create-gc-suggestions");
+    if (!input || !container) {
+      return;
+    }
+    const parsed = parseGcTokens(input.value || "");
+    const excluded = new Set();
+    state.friends.forEach((friend) => {
+      if (parsed.selected.includes(normalizeUsername(friend.username))) {
+        excluded.add(friend.uid);
+      }
+    });
+    const suggestions = friendSuggestions(parsed.current, excluded);
+    renderSuggestionList(container, suggestions, (friend) => {
+      const baseTokens = String(input.value || "")
+        .split(",")
+        .map((token) => token.trim());
+      baseTokens.pop();
+      baseTokens.push(friend.username);
+      input.value = `${baseTokens.filter((token) => Boolean(token)).join(", ")}, `;
+      hideSuggestionList(container);
+      input.focus();
+    });
+  }
+
+  function renderFriendsModalContent() {
+    const friendsNode = document.getElementById("starlight-chat-friends-list");
+    const incomingNode = document.getElementById("starlight-chat-friends-incoming");
+    const outgoingNode = document.getElementById("starlight-chat-friends-outgoing");
+    if (friendsNode) {
+      friendsNode.innerHTML = state.friends.length
+        ? state.friends
+            .slice()
+            .sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")))
+            .map((friend) => `<li>${escapeHtml(friend.username)}</li>`)
+            .join("")
+        : '<li class="starlight-chat-friends-empty">No friends yet.</li>';
+    }
+    if (incomingNode) {
+      incomingNode.innerHTML = state.incomingFriendRequests.length
+        ? state.incomingFriendRequests
+            .map((request) => `
+              <li>
+                <span>${escapeHtml(request.fromUsername)}</span>
+                <div>
+                  <button type="button" data-friend-accept="${escapeHtml(request.id)}">Accept</button>
+                  <button type="button" data-friend-decline="${escapeHtml(request.id)}">Decline</button>
+                </div>
+              </li>
+            `)
+            .join("")
+        : '<li class="starlight-chat-friends-empty">No incoming requests.</li>';
+      incomingNode.querySelectorAll("button[data-friend-accept]").forEach((node) => {
+        node.addEventListener("click", async () => {
+          const id = String(node.getAttribute("data-friend-accept") || "");
+          await acceptFriendRequest(id);
+        });
+      });
+      incomingNode.querySelectorAll("button[data-friend-decline]").forEach((node) => {
+        node.addEventListener("click", async () => {
+          const id = String(node.getAttribute("data-friend-decline") || "");
+          await declineFriendRequest(id);
+        });
+      });
+    }
+    if (outgoingNode) {
+      outgoingNode.innerHTML = state.outgoingFriendRequests.length
+        ? state.outgoingFriendRequests
+            .map((request) => `
+              <li>
+                <span>${escapeHtml(request.toUsername)}</span>
+                <button type="button" data-friend-cancel="${escapeHtml(request.id)}">Cancel</button>
+              </li>
+            `)
+            .join("")
+        : '<li class="starlight-chat-friends-empty">No outgoing requests.</li>';
+      outgoingNode.querySelectorAll("button[data-friend-cancel]").forEach((node) => {
+        node.addEventListener("click", async () => {
+          const id = String(node.getAttribute("data-friend-cancel") || "");
+          await cancelFriendRequest(id);
+        });
+      });
+    }
+  }
+
+  async function sendFriendRequest(targetUsername) {
+    const user = state.user || currentUser();
+    const firestore = db();
+    if (!user || !firestore) {
+      throw new Error("You must be logged in.");
+    }
+
+    const clean = String(targetUsername || "").trim();
+    const profile = await findProfileByUsername(clean);
+    if (!profile || !profile.uid) {
+      throw new Error("Username not found.");
+    }
+    if (profile.uid === user.uid) {
+      throw new Error("You cannot add yourself.");
+    }
+    if (state.friends.some((friend) => friend.uid === profile.uid)) {
+      throw new Error("This user is already your friend.");
+    }
+    const pairKey = pairKeyForUids(user.uid, profile.uid);
+    const pendingExists = state.incomingFriendRequests.some((req) => req.pairKey === pairKey)
+      || state.outgoingFriendRequests.some((req) => req.pairKey === pairKey);
+    if (pendingExists) {
+      throw new Error("A friend request is already pending for this user.");
+    }
+
+    await firestore.collection(FRIEND_REQUESTS_COLLECTION).add({
+      fromUid: user.uid,
+      fromUsername: currentUsername(),
+      fromUsernameLower: normalizeUsername(currentUsername()),
+      toUid: profile.uid,
+      toUsername: profile.username,
+      toUsernameLower: normalizeUsername(profile.username),
+      status: "pending",
+      pairKey,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  async function acceptFriendRequest(requestId) {
+    const user = state.user || currentUser();
+    const firestore = db();
+    const request = state.incomingFriendRequests.find((item) => item.id === requestId);
+    if (!user || !firestore || !request) {
+      return;
+    }
+    const batch = firestore.batch();
+    const myFriendRef = firestore.collection("users").doc(user.uid).collection("friends").doc(request.fromUid);
+    const theirFriendRef = firestore.collection("users").doc(request.fromUid).collection("friends").doc(user.uid);
+    const requestRef = firestore.collection(FRIEND_REQUESTS_COLLECTION).doc(request.id);
+
+    batch.set(myFriendRef, {
+      uid: request.fromUid,
+      username: request.fromUsername,
+      usernameLower: normalizeUsername(request.fromUsername),
+      requestId: request.id,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    batch.set(theirFriendRef, {
+      uid: user.uid,
+      username: currentUsername(),
+      usernameLower: normalizeUsername(currentUsername()),
+      requestId: request.id,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    batch.update(requestRef, {
+      status: "accepted",
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await batch.commit();
+    setStatus("Friend request accepted.", "ok");
+  }
+
+  async function declineFriendRequest(requestId) {
+    const firestore = db();
+    if (!firestore || !requestId) {
+      return;
+    }
+    await firestore.collection(FRIEND_REQUESTS_COLLECTION).doc(requestId).update({
+      status: "declined",
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    setStatus("Friend request declined.", "ok");
+  }
+
+  async function cancelFriendRequest(requestId) {
+    const firestore = db();
+    if (!firestore || !requestId) {
+      return;
+    }
+    await firestore.collection(FRIEND_REQUESTS_COLLECTION).doc(requestId).update({
+      status: "canceled",
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    setStatus("Friend request canceled.", "ok");
+  }
+
+  function openFriendsModal() {
+    openModal(
+      "Friends and Requests",
+      `
+        <div class="starlight-chat-friends-modal">
+          <section>
+            <h4>Friends</h4>
+            <ul id="starlight-chat-friends-list" class="starlight-chat-friends-list"></ul>
+          </section>
+          <section>
+            <h4>Add Friend</h4>
+            <form id="starlight-chat-add-friend-form" class="starlight-chat-inline-form">
+              <input id="starlight-chat-add-friend-input" type="text" placeholder="Username" maxlength="24" autocomplete="off" />
+              <button type="submit">Send</button>
+            </form>
+          </section>
+          <section>
+            <h4>Incoming Requests</h4>
+            <ul id="starlight-chat-friends-incoming" class="starlight-chat-friends-list"></ul>
+          </section>
+          <section>
+            <h4>Outgoing Requests</h4>
+            <ul id="starlight-chat-friends-outgoing" class="starlight-chat-friends-list"></ul>
+          </section>
+        </div>
+      `
+    );
+
+    renderFriendsModalContent();
+    const form = document.getElementById("starlight-chat-add-friend-form");
+    const input = document.getElementById("starlight-chat-add-friend-input");
+    if (form && input) {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const username = String(input.value || "").trim();
+        if (!username) {
+          return;
+        }
+        input.disabled = true;
+        try {
+          await sendFriendRequest(username);
+          input.value = "";
+          setStatus("Friend request sent.", "ok");
+        } catch (error) {
+          setStatus(error && error.message ? error.message : "Could not send friend request.", "error");
+        } finally {
+          input.disabled = false;
+          renderFriendsModalContent();
+        }
+      });
+    }
+  }
+
+  function subscribeFriendsAndRequests() {
+    if (state.friendsUnsub) {
+      state.friendsUnsub();
+      state.friendsUnsub = null;
+    }
+    if (state.incomingFriendRequestsUnsub) {
+      state.incomingFriendRequestsUnsub();
+      state.incomingFriendRequestsUnsub = null;
+    }
+    if (state.outgoingFriendRequestsUnsub) {
+      state.outgoingFriendRequestsUnsub();
+      state.outgoingFriendRequestsUnsub = null;
+    }
+
+    const user = state.user || currentUser();
+    const firestore = db();
+    if (!user || !firestore) {
+      state.friends = [];
+      state.incomingFriendRequests = [];
+      state.outgoingFriendRequests = [];
+      return;
+    }
+
+    state.friendsUnsub = firestore.collection("users").doc(user.uid).collection("friends").onSnapshot((snap) => {
+      state.friends = snap.docs.map((doc) => ({
+        uid: String(doc.id),
+        ...(doc.data() || {})
+      }));
+      renderDmSuggestions();
+      renderGcSuggestions();
+      renderFriendsModalContent();
+    });
+
+    state.incomingFriendRequestsUnsub = firestore
+      .collection(FRIEND_REQUESTS_COLLECTION)
+      .where("toUid", "==", user.uid)
+      .onSnapshot((snap) => {
+        state.incomingFriendRequests = snap.docs
+          .map((doc) => ({ id: doc.id, ...(doc.data() || {}) }))
+          .filter((doc) => String(doc.status || "") === "pending");
+        renderFriendsModalContent();
+      });
+
+    state.outgoingFriendRequestsUnsub = firestore
+      .collection(FRIEND_REQUESTS_COLLECTION)
+      .where("fromUid", "==", user.uid)
+      .onSnapshot((snap) => {
+        state.outgoingFriendRequests = snap.docs
+          .map((doc) => ({ id: doc.id, ...(doc.data() || {}) }))
+          .filter((doc) => String(doc.status || "") === "pending");
+        renderFriendsModalContent();
+      });
+  }
+
   function bindControls() {
     if (!state.root) {
       return;
@@ -1269,7 +1682,18 @@
 
     const dmForm = state.root.querySelector("#starlight-chat-create-dm-form");
     const dmInput = state.root.querySelector("#starlight-chat-create-dm-input");
+    const dmSuggestions = state.root.querySelector("#starlight-chat-create-dm-suggestions");
     if (dmForm && dmInput) {
+      dmInput.addEventListener("focus", () => {
+        renderDmSuggestions();
+      });
+      dmInput.addEventListener("input", () => {
+        renderDmSuggestions();
+      });
+      dmInput.addEventListener("blur", () => {
+        window.setTimeout(() => hideSuggestionList(dmSuggestions), 120);
+      });
+
       dmForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const username = String(dmInput.value || "").trim();
@@ -1279,12 +1703,17 @@
         dmInput.disabled = true;
         setStatus("", "");
         try {
-          const profile = await findProfileByUsername(username);
+          const friend = findFriendByUsername(username);
+          if (!friend) {
+            throw new Error("You can only DM users in your friends list.");
+          }
+          const profile = await getProfileByUid(friend.uid);
           if (!profile) {
-            throw new Error("Username not found.");
+            throw new Error("Friend profile unavailable.");
           }
           const chatId = await ensureDmWithUser(profile);
           dmInput.value = "";
+          hideSuggestionList(dmSuggestions);
           setStatus("DM ready.", "ok");
           selectChat(chatId);
         } catch (error) {
@@ -1297,7 +1726,18 @@
 
     const gcForm = state.root.querySelector("#starlight-chat-create-gc-form");
     const gcInput = state.root.querySelector("#starlight-chat-create-gc-input");
+    const gcSuggestions = state.root.querySelector("#starlight-chat-create-gc-suggestions");
     if (gcForm && gcInput) {
+      gcInput.addEventListener("focus", () => {
+        renderGcSuggestions();
+      });
+      gcInput.addEventListener("input", () => {
+        renderGcSuggestions();
+      });
+      gcInput.addEventListener("blur", () => {
+        window.setTimeout(() => hideSuggestionList(gcSuggestions), 120);
+      });
+
       gcForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const text = String(gcInput.value || "").trim();
@@ -1309,6 +1749,7 @@
         try {
           const chatId = await createGroupChatFromInput(text);
           gcInput.value = "";
+          hideSuggestionList(gcSuggestions);
           setStatus("Group chat created.", "ok");
           selectChat(chatId);
         } catch (error) {
@@ -1319,6 +1760,13 @@
       });
     }
 
+    const friendsBtn = state.root.querySelector("#starlight-chat-friends-btn");
+    if (friendsBtn) {
+      friendsBtn.addEventListener("click", () => {
+        openFriendsModal();
+      });
+    }
+
     document.addEventListener("click", onGlobalClick, true);
     document.addEventListener("keydown", onGlobalKeyDown, true);
   }
@@ -1326,6 +1774,14 @@
   function onGlobalClick(event) {
     if (!state.mounted || !state.root) {
       return;
+    }
+    const dmSuggestions = state.root.querySelector("#starlight-chat-create-dm-suggestions");
+    const gcSuggestions = state.root.querySelector("#starlight-chat-create-gc-suggestions");
+    if (dmSuggestions && (!event.target || !dmSuggestions.contains(event.target))) {
+      dmSuggestions.classList.add("hidden");
+    }
+    if (gcSuggestions && (!event.target || !gcSuggestions.contains(event.target))) {
+      gcSuggestions.classList.add("hidden");
     }
     const menu = state.root.querySelector("#starlight-chat-context-menu");
     if (!menu || menu.classList.contains("hidden")) {
@@ -1362,6 +1818,7 @@
                 <input id="starlight-chat-create-dm-input" type="text" placeholder="Username" maxlength="24" autocomplete="off" />
                 <button type="submit">Open</button>
               </form>
+              <div id="starlight-chat-create-dm-suggestions" class="starlight-chat-suggestions hidden"></div>
             </div>
             <div class="starlight-chat-create-block">
               <label>New GC</label>
@@ -1369,12 +1826,14 @@
                 <input id="starlight-chat-create-gc-input" type="text" placeholder="alice, bob, charlie" maxlength="220" autocomplete="off" />
                 <button type="submit">Create</button>
               </form>
+              <div id="starlight-chat-create-gc-suggestions" class="starlight-chat-suggestions hidden"></div>
             </div>
             <p id="starlight-chat-status" class="starlight-chat-status"></p>
             <section class="starlight-chat-list-wrap">
               <h2>Direct Messages and Group Chats</h2>
               <ul id="starlight-chat-list" class="starlight-chat-list"></ul>
             </section>
+            <button type="button" id="starlight-chat-friends-btn" class="starlight-chat-friends-btn">Friends and Requests</button>
           </aside>
           <main id="starlight-chat-main" class="starlight-chat-main"></main>
         </section>
@@ -1407,6 +1866,7 @@
     } catch (_error) {
       setStatus("Profile sync is unavailable. Chat UI is loaded.", "error");
     }
+    subscribeFriendsAndRequests();
     subscribeChats();
   }
 
@@ -1448,6 +1908,18 @@
         state.messagesUnsub();
         state.messagesUnsub = null;
       }
+      if (state.friendsUnsub) {
+        state.friendsUnsub();
+        state.friendsUnsub = null;
+      }
+      if (state.incomingFriendRequestsUnsub) {
+        state.incomingFriendRequestsUnsub();
+        state.incomingFriendRequestsUnsub = null;
+      }
+      if (state.outgoingFriendRequestsUnsub) {
+        state.outgoingFriendRequestsUnsub();
+        state.outgoingFriendRequestsUnsub = null;
+      }
 
       state.chats = [];
       state.selectedChat = null;
@@ -1456,6 +1928,9 @@
       state.pendingReply = null;
       state.chatAesKeys.clear();
       state.memberCache.clear();
+      state.friends = [];
+      state.incomingFriendRequests = [];
+      state.outgoingFriendRequests = [];
       setStatus("", "");
 
       try {
@@ -1475,6 +1950,18 @@
     if (state.messagesUnsub) {
       state.messagesUnsub();
       state.messagesUnsub = null;
+    }
+    if (state.friendsUnsub) {
+      state.friendsUnsub();
+      state.friendsUnsub = null;
+    }
+    if (state.incomingFriendRequestsUnsub) {
+      state.incomingFriendRequestsUnsub();
+      state.incomingFriendRequestsUnsub = null;
+    }
+    if (state.outgoingFriendRequestsUnsub) {
+      state.outgoingFriendRequestsUnsub();
+      state.outgoingFriendRequestsUnsub = null;
     }
     if (state.authUnsub) {
       state.authUnsub();
@@ -1497,6 +1984,9 @@
     state.pendingReply = null;
     state.chatAesKeys.clear();
     state.memberCache.clear();
+    state.friends = [];
+    state.incomingFriendRequests = [];
+    state.outgoingFriendRequests = [];
     state.activeMenuMessageId = "";
     state.statusText = "";
     state.statusType = "";
