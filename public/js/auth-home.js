@@ -232,10 +232,10 @@
   function deleteAccountMessage(error) {
     const code = authErrorCode(error);
     if (code === "auth/requires-recent-login") {
-      return "Please sign in again before deleting your account.";
+      return "Please log in again, then delete your account.";
     }
     if (code === "auth/wrong-password" || code === "auth/invalid-login-credentials" || code === "auth/invalid-credential") {
-      return "Incorrect password.";
+      return "Please log in again, then delete your account.";
     }
     if (code === "auth/popup-closed-by-user") {
       return "Account deletion was canceled.";
@@ -256,18 +256,6 @@
     const providers = Array.isArray(user && user.providerData) ? user.providerData : [];
     const providerIds = providers.map((item) => item && item.providerId ? String(item.providerId) : "").filter(Boolean);
 
-    if (providerIds.includes("password")) {
-      const password = String(window.prompt("For security, enter your current password to delete your account:") || "");
-      if (!password || !user.email) {
-        const error = new Error("recent-login-required");
-        error.code = "auth/requires-recent-login";
-        throw error;
-      }
-      const credential = firebase.auth.EmailAuthProvider.credential(String(user.email), password);
-      await user.reauthenticateWithCredential(credential);
-      return;
-    }
-
     if (providerIds.includes("google.com")) {
       const provider = new firebase.auth.GoogleAuthProvider();
       try {
@@ -284,10 +272,6 @@
         throw error;
       }
     }
-
-    const fallback = new Error("recent-login-required");
-    fallback.code = "auth/requires-recent-login";
-    throw fallback;
   }
 
   async function deleteUserFirestoreData(user) {
@@ -1672,15 +1656,10 @@
     }
   }
 
-  async function deleteAccountInSettings() {
+  async function runDeleteAccountInSettings() {
     const user = currentUser();
     if (!user) {
       setStatus("settings-danger-status", "You must be logged in.", false);
-      return;
-    }
-
-    const confirmed = window.confirm("Delete your account permanently? This cannot be undone.");
-    if (!confirmed) {
       return;
     }
 
@@ -1706,11 +1685,58 @@
       if (typeof window.router === "function") {
         window.router();
       }
+      closeModal();
     } catch (error) {
       if (authErrorCode(error) === "auth/redirecting-reauth") {
         return;
       }
       setStatus("settings-danger-status", deleteAccountMessage(error), false);
+      const modalStatus = document.getElementById("delete-account-modal-status");
+      if (modalStatus) {
+        modalStatus.textContent = deleteAccountMessage(error);
+        modalStatus.classList.remove("ok");
+        modalStatus.classList.add("error");
+      }
+    }
+  }
+
+  function deleteAccountInSettings() {
+    showModal("Delete Account", `
+      <div class="starlight-auth-form">
+        <p>This will permanently delete your account and account data. This cannot be undone.</p>
+        <p id="delete-account-modal-status" class="starlight-status"></p>
+        <button id="delete-account-confirm" type="button" class="starlight-btn starlight-btn-primary">Delete Account</button>
+        <button id="delete-account-cancel" type="button" class="starlight-btn starlight-btn-muted">Cancel</button>
+      </div>
+    `);
+
+    const confirmBtn = document.getElementById("delete-account-confirm");
+    const cancelBtn = document.getElementById("delete-account-cancel");
+    const modalStatus = document.getElementById("delete-account-modal-status");
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", closeModal);
+    }
+
+    if (confirmBtn) {
+      confirmBtn.addEventListener("click", async () => {
+        if (modalStatus) {
+          modalStatus.textContent = "Deleting account...";
+          modalStatus.classList.add("ok");
+          modalStatus.classList.remove("error");
+        }
+        confirmBtn.disabled = true;
+        if (cancelBtn) {
+          cancelBtn.disabled = true;
+        }
+        await runDeleteAccountInSettings();
+        if (confirmBtn && document.body.contains(confirmBtn)) {
+          confirmBtn.disabled = false;
+        }
+        if (cancelBtn && document.body.contains(cancelBtn)) {
+          cancelBtn.disabled = false;
+        }
+      });
     }
   }
 
