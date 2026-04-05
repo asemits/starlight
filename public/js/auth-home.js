@@ -1166,9 +1166,9 @@
             await firestore.doc(docPath).set({
               clickCount: 0,
               lastPlayedAt: firebase.firestore.FieldValue.delete(),
-              activeSession: false,
+              activeSession: firebase.firestore.FieldValue.delete(),
+              activeGamePath: firebase.firestore.FieldValue.delete(),
               activeAt: firebase.firestore.FieldValue.delete(),
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
             await loadSignedInDashboard();
           } catch (_error) {
@@ -1186,9 +1186,9 @@
           const updates = recent.map((item) => firestore.doc(item.docPath).set({
             clickCount: 0,
             lastPlayedAt: firebase.firestore.FieldValue.delete(),
-            activeSession: false,
+            activeSession: firebase.firestore.FieldValue.delete(),
+            activeGamePath: firebase.firestore.FieldValue.delete(),
             activeAt: firebase.firestore.FieldValue.delete(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true }).catch(() => null));
           await Promise.all(updates);
           await loadSignedInDashboard();
@@ -1957,12 +1957,21 @@
       rating: 0,
       lastPlayedAt: firebase.firestore.FieldValue.delete(),
       lastRatedAt: firebase.firestore.FieldValue.delete(),
-      activeSession: false,
+      activeSession: firebase.firestore.FieldValue.delete(),
+      activeGamePath: firebase.firestore.FieldValue.delete(),
       activeAt: firebase.firestore.FieldValue.delete(),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).catch(() => null));
+    }, { merge: true }).then(() => true).catch(() => false));
 
-    await Promise.all(updates);
+    const results = await Promise.all(updates);
+    const successCount = results.filter(Boolean).length;
+    if (!successCount) {
+      setStatus("settings-danger-status", "Could not reset statistics.", false);
+      return;
+    }
+    if (successCount < sourceDocs.length) {
+      setStatus("settings-danger-status", `Reset ${successCount} of ${sourceDocs.length} statistics entries.`, true);
+      return;
+    }
     setStatus("settings-danger-status", "Statistics reset.", true);
   }
 
