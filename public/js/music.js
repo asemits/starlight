@@ -3,6 +3,64 @@ function getAudio() { return document.getElementById('mainAudio'); }
 let currentTrackData = null;
 let favorites = JSON.parse(localStorage.getItem('cl-favs')) || [];
 
+function getSecureRandomInt(max) {
+    if (!Number.isInteger(max) || max <= 0) return 0;
+    const cryptoObj = globalThis.crypto;
+    if (!cryptoObj?.getRandomValues) return 0;
+    const rangeLimit = Math.floor(0x100000000 / max) * max;
+    const values = new Uint32Array(1);
+    do {
+        cryptoObj.getRandomValues(values);
+    } while (values[0] >= rangeLimit);
+    return values[0] % max;
+}
+function secureShuffle(items) {
+    for (let i = items.length - 1; i > 0; i--) {
+        const j = getSecureRandomInt(i + 1);
+        [items[i], items[j]] = [items[j], items[i]];
+    }
+    return items;
+}
+function createSecureId(prefix = 'id') {
+    const cryptoObj = globalThis.crypto;
+    if (!cryptoObj?.getRandomValues) return `${prefix}-${Date.now()}`;
+    const values = new Uint32Array(2);
+    cryptoObj.getRandomValues(values);
+    return `${prefix}-${values[0].toString(36)}${values[1].toString(36)}`;
+}
+function showConfirmModal({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm }) {
+    const modal = document.getElementById('music-modal');
+    const titleEl = document.getElementById('music-modal-title');
+    const copyEl = document.getElementById('music-modal-copy');
+    const confirmBtn = document.getElementById('music-modal-confirm');
+    const cancelBtn = document.getElementById('music-modal-cancel');
+    if (!modal || !titleEl || !copyEl || !confirmBtn || !cancelBtn) {
+        if (typeof onConfirm === 'function') onConfirm();
+        return;
+    }
+    titleEl.textContent = title;
+    copyEl.textContent = message;
+    confirmBtn.textContent = confirmLabel;
+    cancelBtn.textContent = cancelLabel;
+    modal.classList.add('visible');
+    modal.setAttribute('aria-hidden', 'false');
+    const close = () => {
+        modal.classList.remove('visible');
+        modal.setAttribute('aria-hidden', 'true');
+        confirmBtn.onclick = null;
+        cancelBtn.onclick = null;
+        modal.onclick = null;
+    };
+    cancelBtn.onclick = close;
+    modal.onclick = (event) => {
+        if (event.target === modal) close();
+    };
+    confirmBtn.onclick = () => {
+        close();
+        if (typeof onConfirm === 'function') onConfirm();
+    };
+}
+
 /* ══════════════════════════════════════════════════════
    PLAYLIST  (localStorage — persists across sessions)
 ══════════════════════════════════════════════════════ */
@@ -32,17 +90,20 @@ function removeFromPlaylist(apiUrl) {
     showToast('Removed from Playlist', 'fa-trash');
 }
 function clearPlaylist() {
-    if (!confirm('Clear entire playlist?')) return;
-    savePlaylist([]);
-    showToast('Playlist cleared', 'fa-trash');
+    showConfirmModal({
+        title: 'Clear Playlist',
+        message: 'Remove every saved track from this playlist.',
+        confirmLabel: 'Clear',
+        onConfirm: () => {
+            savePlaylist([]);
+            showToast('Playlist cleared', 'fa-trash');
+        }
+    });
 }
 function shuffleAndPlayPlaylist() {
     const pl = [...getPlaylist()];
     if (!pl.length) return showToast('Playlist is empty', 'fa-circle-info');
-    for (let i = pl.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pl[i], pl[j]] = [pl[j], pl[i]];
-    }
+    secureShuffle(pl);
     setQueue(pl);
     playNextInQueue();
     openPanel('queue');
@@ -120,10 +181,7 @@ function clearQueue() {
 function shuffleQueue() {
     const q = getQueue();
     if (q.length < 2) return;
-    for (let i = q.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [q[i], q[j]] = [q[j], q[i]];
-    }
+    secureShuffle(q);
     setQueue(q);
     showToast('Queue shuffled', 'fa-shuffle');
 }
@@ -357,7 +415,7 @@ async function togglePiP() {
         if (document.pictureInPictureElement) {
             await document.exitPictureInPicture();
         } else {
-            if (!currentTrackData) return alert("Play music first!");
+            if (!currentTrackData) return showToast('Play a track first', 'fa-circle-info');
             pipVideo.srcObject = document.getElementById('pipCanvas').captureStream();
             drawPiPFrame();
             await pipVideo.play();
@@ -503,7 +561,7 @@ function updateFavUI() {
 function createCard(track) {
     const card = document.createElement('div');
     card.className = 'track-card';
-    const imgId = 'img-' + Math.random().toString(36).substr(2,9);
+    const imgId = createSecureId('img');
 
     // Left-click = play, right-click = context actions
     card.onclick = () => playTrack(track.apiUrl, track.title, track.artist, track.img);

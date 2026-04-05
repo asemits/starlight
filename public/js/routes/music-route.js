@@ -4,27 +4,31 @@
     render: function renderMusicRoute() {
       return `
         <style>
-@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200;0,300;0,400;0,600;0,700;1,300&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,600;0,700;0,800;0,900;1,300&display=swap');
 
 :root {
   --accent: #ffffff;
+  --accent-soft: #d5d7dc;
   --accent-dim: rgba(255,255,255,0.18);
   --accent-glow: rgba(255,255,255,0.12);
   --bg: #000000;
   --surface: #0a0a0a;
   --surface2: #0f0f0f;
   --surface3: #161616;
+  --surface4: #1d1d1f;
   --border: rgba(255,255,255,0.07);
   --border-h: rgba(255,255,255,0.22);
   --ink: rgba(255,255,255,0.88);
   --ink-dim: rgba(255,255,255,0.35);
   --ink-faint: rgba(255,255,255,0.12);
   --spring: cubic-bezier(0.16,1,0.3,1);
-  --ff-display: 'Cormorant Garamond', serif;
+  --ff-display: 'Nunito', Montserrat, 'DM Sans', sans-serif;
   --ff-body: 'Nunito', Montserrat, 'DM Sans', sans-serif;
   --ff-mono: 'Nunito', 'Fira Code', monospace;
-  --grad-text: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 50%, #fff 100%);
-  --grad-shimmer: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.55) 40%, rgba(255,255,255,0.85) 70%, #fff 100%);
+  --grad-text: linear-gradient(180deg, #ffffff 0%, #eceef2 46%, #aeb3bc 100%);
+  --grad-shimmer: linear-gradient(90deg, #ffffff 0%, #f0f2f5 28%, #b1b6bf 68%, #ffffff 100%);
+  --mint: #f6f7f9;
+  --panel-shadow: 0 20px 70px rgba(0,0,0,0.55);
 }
 
 /* ── Keyframes ────────────────────────────────────── */
@@ -101,7 +105,7 @@ body::after {
 
 /* ── Gradient text utility ────────────────────────── */
 .grad-text {
-  background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.6) 45%, rgba(255,255,255,0.9) 70%, #fff 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #eceef2 46%, #aeb3bc 100%);
   background-size: 300% 300%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -134,8 +138,8 @@ header.scrolled {
 .header-brand {
   font-family: var(--ff-display);
   font-size: 22px;
-  font-weight: 300;
-  letter-spacing: 0.2em;
+  font-weight: 900;
+  letter-spacing: 0.38em;
   text-transform: uppercase;
   background: var(--grad-shimmer);
   background-size: 300% 300%;
@@ -158,38 +162,39 @@ header.scrolled {
 }
 
 .search-box {
-  background: rgba(255,255,255,0.04);
-  border: 0.5px solid var(--border);
-  padding: 10px 20px 10px 40px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 12px 22px 12px 40px;
   border-radius: 999px;
   color: var(--ink);
   outline: none;
-  width: 240px;
+  width: 260px;
   font-family: var(--ff-body);
-  font-size: 12px;
-  font-weight: 300;
-  letter-spacing: 0.06em;
-  backdrop-filter: blur(12px);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  backdrop-filter: blur(18px);
   transition: all 0.4s var(--spring);
 }
 .search-box::placeholder { color: var(--ink-faint); }
 .search-box:focus {
-  border-color: rgba(255,255,255,0.28);
-  background: rgba(255,255,255,0.06);
-  width: 320px;
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.04), 0 8px 32px rgba(0,0,0,0.5);
+  border-color: rgba(255,255,255,0.22);
+  background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+  width: 340px;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.04), 0 16px 36px rgba(0,0,0,0.45);
 }
 .search-wrap:focus-within i { color: var(--ink-dim); }
 
 /* ── Hero ─────────────────────────────────────────── */
 .hero {
   position: relative;
-  height: 62vh;
-  min-height: 420px;
+  height: 68vh;
+  min-height: 500px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 0 5% 60px calc(80px + 5%);
+  padding: 0 5% 76px calc(80px + 5%);
   overflow: hidden;
 }
 
@@ -206,8 +211,8 @@ header.scrolled {
 .hero-gradient {
   position:absolute; inset:0;
   background:
-    linear-gradient(to top, var(--bg) 0%, rgba(0,0,0,0.65) 50%, transparent 100%),
-    linear-gradient(to right, var(--bg) 0%, transparent 60%);
+    linear-gradient(to top, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.76) 44%, rgba(0,0,0,0.2) 100%),
+    linear-gradient(to right, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.55) 44%, transparent 70%);
   z-index:1;
 }
 
@@ -223,8 +228,8 @@ header.scrolled {
 .hero-label {
   font-family: var(--ff-body);
   font-size: 9px;
-  font-weight: 300;
-  letter-spacing: 0.35em;
+  font-weight: 800;
+  letter-spacing: 0.42em;
   color: var(--ink-dim);
   text-transform: uppercase;
   margin-bottom: 18px;
@@ -246,12 +251,14 @@ header.scrolled {
 
 .hero h1 {
   font-family: var(--ff-display);
-  font-size: clamp(52px, 8vw, 110px);
-  font-weight: 300;
-  line-height: 0.92;
-  letter-spacing: -0.01em;
-  margin-bottom: 18px;
+  font-size: clamp(56px, 8.6vw, 124px);
+  font-weight: 900;
+  line-height: 0.84;
+  letter-spacing: 0.14em;
+  margin-bottom: 22px;
   overflow: hidden;
+  text-transform: uppercase;
+  text-wrap: balance;
 }
 
 .hero h1 .line { display:block; overflow:hidden; }
@@ -263,21 +270,28 @@ header.scrolled {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  text-shadow: 0 0 32px rgba(255,255,255,0.08);
   animation: slideUp 0.9s cubic-bezier(0.22,1,0.36,1) forwards, textGrad 8s ease 2s infinite;
 }
 .hero h1 .line:nth-child(1) span { animation-delay: 0.7s, 2s; }
 .hero h1 .line:nth-child(2) span {
   animation-delay: 0.9s, 2s;
-  background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, #fff 50%, rgba(255,255,255,0.5) 100%);
-  background-size: 300% 300%;
+  background: linear-gradient(135deg, rgba(7, 1, 1, 0.5) 0%, #fff 50%, rgba(255, 255, 255, 0.5) 100%);
+  -webkit-background-clip: text;
+    background-clip: text;
+    
+    /* 3. Make the actual text transparent so the background shines through */
+    -webkit-text-fill-color: transparent;
+    color: transparent;
 }
 
 .hero-sub {
   font-family: var(--ff-body);
   font-size: 11px;
-  font-weight: 200;
-  color: var(--ink-faint);
-  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: rgba(255,255,255,0.62);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -387,8 +401,9 @@ header.scrolled {
 .row-title {
   font-family: var(--ff-display);
   font-size: 28px;
-  font-weight: 300;
-  letter-spacing: 0.04em;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
   background: var(--grad-shimmer);
   background-size: 300% 300%;
   -webkit-background-clip: text;
@@ -449,12 +464,12 @@ header.scrolled {
 .track-card {
   flex: 0 0 200px;
   aspect-ratio: 1/1;
-  background: var(--surface2);
-  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(28,28,30,0.98), rgba(8,8,9,0.98));
+  border-radius: 20px;
   overflow: hidden;
   position: relative;
   cursor: pointer;
-  border: 0.5px solid var(--border);
+  border: 1px solid rgba(255,255,255,0.08);
   transition: transform 0.5s var(--spring), border-color 0.3s ease, box-shadow 0.5s ease;
   opacity: 0;
   animation: cardReveal 0.5s ease both;
@@ -477,8 +492,8 @@ header.scrolled {
 
 .track-card:hover {
   transform: translateY(-10px) scale(1.03);
-  border-color: rgba(255,255,255,0.2);
-  box-shadow: 0 40px 80px rgba(0,0,0,0.8), 0 0 0 0.5px rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.18);
+  box-shadow: 0 34px 70px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.08);
 }
 .track-card:hover::before { opacity:1; }
 
@@ -535,9 +550,9 @@ header.scrolled {
   z-index:4;
 }
 .track-title {
-  font-size:13px; font-weight:400;
+  font-size:13px; font-weight:800;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  margin-bottom:4px; letter-spacing:0.02em;
+  margin-bottom:4px; letter-spacing:0.12em; text-transform:uppercase;
   background: var(--grad-text);
   background-size: 200% 200%;
   -webkit-background-clip: text;
@@ -546,27 +561,29 @@ header.scrolled {
   animation: textGrad 8s ease infinite;
 }
 .track-artist {
-  font-size:10px; font-weight:200;
-  letter-spacing:0.1em;
-  color: var(--ink-faint);
+  font-size:10px; font-weight:700;
+  letter-spacing:0.18em;
+  color: rgba(255,255,255,0.44);
+  text-transform:uppercase;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 
 /* ── Player bar ───────────────────────────────────── */
 .player-bar {
   position:fixed; bottom:0; left:0; right:0;
-  height:90px;
-  background: rgba(0,0,0,0.92);
+  height:102px;
+  background: linear-gradient(180deg, rgba(8,8,9,0.94), rgba(0,0,0,0.97));
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border-top: 0.5px solid var(--border);
+  border-top: 1px solid rgba(255,255,255,0.08);
   padding: 0 3%;
   display:grid;
   grid-template-columns: 1fr auto 1fr;
-  align-items:center; gap:20px;
+  align-items:center; gap:24px;
   z-index:1000;
   animation: playerIn 0.6s ease 1s both;
   overflow:hidden;
+  box-shadow: 0 -12px 48px rgba(0,0,0,0.45);
 }
 .player-bar::before {
   content:'';
@@ -606,9 +623,11 @@ header.scrolled {
 
 .now-playing-text { min-width:0; }
 #now-playing-title {
-  font-weight:400; font-size:13px;
+  font-weight:900; font-size:13px;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   margin-bottom:2px;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
   background: var(--grad-text);
   background-size: 200% 200%;
   -webkit-background-clip: text;
@@ -617,16 +636,18 @@ header.scrolled {
   animation: textGrad 8s ease infinite;
 }
 #now-playing-artist {
-  font-size:10px; font-weight:200;
-  letter-spacing:0.08em;
-  color: var(--ink-faint);
+  font-size:10px; font-weight:700;
+  letter-spacing:0.16em;
+  color: rgba(255,255,255,0.4);
+  text-transform:uppercase;
 }
 #status-msg {
-  font-size:9px; font-weight:200;
-  letter-spacing:0.12em;
+  font-size:9px; font-weight:700;
+  letter-spacing:0.18em;
   color: var(--ink-dim);
   display:flex; align-items:center; gap:6px;
   margin-top:4px;
+  text-transform:uppercase;
 }
 #status-msg::before {
   content:''; width:4px; height:4px;
@@ -652,15 +673,16 @@ header.scrolled {
 .controls { display:flex; align-items:center; gap:8px; }
 
 .control-btn {
-  background:none; border:none;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.08);
   color: var(--ink-faint);
   font-size:19px; cursor:pointer;
   width:36px; height:36px;
-  border-radius:50%;
+  border-radius:999px;
   display:flex; align-items:center; justify-content:center;
   transition: all 0.25s ease;
 }
-.control-btn:hover { color:#fff; background:rgba(255,255,255,0.06); transform:scale(1.1); }
+.control-btn:hover { color:#fff; background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.18); transform:translateY(-1px) scale(1.03); }
 
 .play-btn {
   width:44px; height:44px;
@@ -706,13 +728,13 @@ header.scrolled {
   display:flex; align-items:center; justify-content:flex-end; gap:16px;
 }
 .tunnel-badge {
-  font-size:9px; font-weight:200;
-  letter-spacing:0.18em;
+  font-size:9px; font-weight:800;
+  letter-spacing:0.24em;
   color: var(--ink-faint);
-  background: rgba(255,255,255,0.03);
-  border: 0.5px solid var(--border);
-  padding: 4px 12px;
-  border-radius:4px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 6px 14px;
+  border-radius:999px;
   text-transform:uppercase;
 }
 
@@ -795,8 +817,9 @@ header.scrolled {
 }
 .panel-header-title {
   font-family: var(--ff-display);
-  font-size:22px; font-weight:300;
-  letter-spacing:0.04em; flex:1;
+  font-size:22px; font-weight:900;
+  letter-spacing:0.22em; flex:1;
+  text-transform:uppercase;
   background: var(--grad-shimmer);
   background-size:300% 300%;
   -webkit-background-clip:text; background-clip:text; color:transparent;
@@ -862,9 +885,10 @@ header.scrolled {
 
 .track-row-info { flex:1; min-width:0; }
 .track-row-title {
-  font-size:12px; font-weight:400;
+  font-size:12px; font-weight:800;
   color:var(--ink);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px;
+  letter-spacing:0.11em; text-transform:uppercase;
 }
 .track-row.playing .track-row-title {
   background: var(--grad-text); background-size:200% 200%;
@@ -872,8 +896,9 @@ header.scrolled {
   animation: textGrad 8s ease infinite;
 }
 .track-row-artist {
-  font-size:10px; font-weight:200;
-  letter-spacing:0.06em; color:var(--ink-faint);
+  font-size:10px; font-weight:700;
+  letter-spacing:0.14em; color:rgba(255,255,255,0.42);
+  text-transform:uppercase;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 
@@ -917,8 +942,9 @@ header.scrolled {
   flex:1; padding:10px;
   border-radius:999px;
   font-family:var(--ff-body); font-size:9px;
-  font-weight:300; letter-spacing:0.15em;
-  cursor:pointer; border:0.5px solid var(--border);
+  font-weight:800; letter-spacing:0.18em;
+  cursor:pointer; border:1px solid rgba(255,255,255,0.08);
+  text-transform:uppercase;
   transition:all 0.2s;
   display:flex; align-items:center; justify-content:center; gap:6px;
 }
@@ -933,10 +959,11 @@ header.scrolled {
 .player-panel-btn {
   display:flex; align-items:center; gap:6px;
   padding:7px 14px; border-radius:999px;
-  background:none; border:0.5px solid var(--border);
+  background:linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)); border:1px solid rgba(255,255,255,0.08);
   color:var(--ink-faint);
   font-family:var(--ff-body); font-size:9px;
-  font-weight:300; letter-spacing:0.15em; cursor:pointer;
+  font-weight:800; letter-spacing:0.18em; cursor:pointer;
+  text-transform:uppercase;
   transition:all 0.25s ease; position:relative;
 }
 .player-panel-btn:hover { color:#fff; border-color:var(--border-h); background:rgba(255,255,255,0.04); }
@@ -971,6 +998,191 @@ header.scrolled {
 }
 .toast i { color:rgba(255,255,255,0.6); font-size:12px; }
 .toast.removing { animation:toastOut 0.3s ease forwards; }
+.music-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(20px);
+  z-index: 1200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.music-modal.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.music-modal-card {
+  width: min(100%, 420px);
+  background: linear-gradient(180deg, rgba(20,20,22,0.98), rgba(7,7,8,0.98));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 22px;
+  box-shadow: var(--panel-shadow);
+  padding: 26px 24px 22px;
+  transform: translateY(16px) scale(0.98);
+  transition: transform 0.25s var(--spring);
+}
+.music-modal.visible .music-modal-card {
+  transform: translateY(0) scale(1);
+}
+.music-modal-title {
+  font-family: var(--ff-display);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  background: var(--grad-shimmer);
+  background-size: 280% 280%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.music-modal-copy {
+  margin-top: 14px;
+  color: rgba(255,255,255,0.62);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.8;
+  text-transform: uppercase;
+}
+.music-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+.music-modal-btn {
+  flex: 1;
+  min-height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  color: rgba(255,255,255,0.74);
+  font-family: var(--ff-body);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.music-modal-btn:hover {
+  color: #fff;
+  border-color: rgba(255,255,255,0.18);
+}
+.music-modal-btn.primary {
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(217,220,226,0.9));
+  color: #060606;
+}
+.music-modal-btn.primary:hover {
+  box-shadow: 0 14px 32px rgba(255,255,255,0.16);
+}
+@media (max-width: 1100px) {
+  header {
+    padding-right: 24px;
+  }
+  .hero {
+    min-height: 460px;
+  }
+  .hero-disc {
+    right: 3%;
+    transform: translateY(-50%) scale(0.82);
+    transform-origin: center;
+  }
+  .player-bar {
+    height: auto;
+    padding: 16px calc(20px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .player-center {
+    width: 100%;
+  }
+  .player-right {
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .side-panel {
+    width: min(100%, 420px);
+    max-height: calc(100vh - 124px);
+  }
+}
+@media (max-width: 760px) {
+  header {
+    left: 0;
+    padding: 16px 16px 16px 82px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .header-brand {
+    font-size: 16px;
+    letter-spacing: 0.28em;
+  }
+  .search-box,
+  .search-box:focus {
+    width: min(100vw - 110px, 100%);
+  }
+  .hero {
+    height: auto;
+    min-height: 0;
+    padding: 150px 16px 34px 92px;
+  }
+  .hero-disc {
+    display: none;
+  }
+  .hero h1 {
+    font-size: clamp(38px, 11vw, 66px);
+    letter-spacing: 0.12em;
+  }
+  .hero-sub {
+    letter-spacing: 0.16em;
+    line-height: 1.8;
+    flex-wrap: wrap;
+  }
+  .row {
+    padding-left: 92px;
+    margin-top: 34px;
+  }
+  .row-header {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .row-title {
+    font-size: 21px;
+    letter-spacing: 0.16em;
+  }
+  .track-container {
+    padding-right: 16px;
+  }
+  .track-card,
+  .skeleton {
+    flex-basis: 168px;
+  }
+  .scroll-arrow {
+    display: none;
+  }
+  .side-panel {
+    left: 12px;
+    right: 12px;
+    bottom: 120px;
+    width: auto;
+    border-radius: 20px;
+    border-right: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .player-panel-btns {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .player-panel-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
 .skip-btn { font-size:18px !important; }
         </style>
         <canvas id="pipCanvas" width="500" height="500" style="display:none;"></canvas>
@@ -979,7 +1191,7 @@ header.scrolled {
 
 <!-- HEADER -->
 <header id="site-header">
-    <div class="header-brand"><i class="fa-solid fa-music"></i> CODELISTENER</div>
+    <div class="header-brand"><i class="fa-solid fa-music"></i> STARLIGHT</div>
     <div class="search-wrap">
         <i class="fa-solid fa-magnifying-glass"></i>
         <input type="text" id="musicInput" class="search-box" placeholder="Search tracks, artists…"
@@ -1142,6 +1354,16 @@ header.scrolled {
 
 <!-- TOAST CONTAINER -->
 <div class="toast-container" id="toast-container"></div>
+<div class="music-modal" id="music-modal" aria-hidden="true">
+    <div class="music-modal-card" role="dialog" aria-modal="true" aria-labelledby="music-modal-title">
+        <div class="music-modal-title" id="music-modal-title">Confirm Action</div>
+        <div class="music-modal-copy" id="music-modal-copy"></div>
+        <div class="music-modal-actions">
+            <button class="music-modal-btn" id="music-modal-cancel" type="button">Cancel</button>
+            <button class="music-modal-btn primary" id="music-modal-confirm" type="button">Confirm</button>
+        </div>
+    </div>
+</div>
 
 <!-- PLAYER BAR -->
 <div class="player-bar">
