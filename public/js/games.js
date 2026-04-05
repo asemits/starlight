@@ -1551,6 +1551,21 @@
 				grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 				gap: 12px;
 			}
+			.games-hero-skeleton {
+				height: 230px;
+				border: 1px solid var(--border);
+				border-radius: 16px;
+				background: rgba(255,255,255,0.05);
+				position: relative;
+				overflow: hidden;
+				margin-bottom: 16px;
+			}
+			.games-popular-skeleton-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+				gap: 12px;
+				margin-bottom: 18px;
+			}
 			.games-skeleton-card {
 				height: 220px;
 				border: 1px solid var(--border);
@@ -1559,7 +1574,8 @@
 				position: relative;
 				overflow: hidden;
 			}
-			.games-skeleton-card::after {
+			.games-skeleton-card::after,
+			.games-hero-skeleton::after {
 				content: "";
 				position: absolute;
 				inset: 0;
@@ -1641,18 +1657,29 @@
 	function loadingMarkup() {
 		return `
 			${baseMarkup()}
-			<div class="games-section" style="margin-top:12px;">
-				<div class="games-headline">
-					<div>
-						<p class="games-kicker">Loading</p>
-						<h2 class="games-title">Fetching games...</h2>
-					</div>
-				</div>
-				<div class="games-skeleton-grid">
-					${Array.from({ length: 12 }).map(() => '<div class="games-skeleton-card"></div>').join("")}
-				</div>
+			<div class="games-hero-skeleton"></div>
+			<div class="games-popular-skeleton-grid">
+				${Array.from({ length: 6 }).map(() => '<div class="games-skeleton-card"></div>').join("")}
+			</div>
+			<div class="games-skeleton-grid">
+				${Array.from({ length: 12 }).map(() => '<div class="games-skeleton-card"></div>').join("")}
 			</div>
 		`;
+	}
+
+	function applyLoadingSkeleton(root) {
+		const heroNode = root.querySelector("#games-hero");
+		if (heroNode) {
+			heroNode.innerHTML = '<div class="games-hero-skeleton"></div>';
+		}
+		const popularNode = root.querySelector("#games-popular");
+		if (popularNode) {
+			popularNode.innerHTML = `<div class="games-popular-skeleton-grid">${Array.from({ length: 6 }).map(() => '<div class="games-skeleton-card"></div>').join("")}</div>`;
+		}
+		const cardsNode = root.querySelector("#games-grid");
+		if (cardsNode) {
+			cardsNode.innerHTML = `<div class="games-skeleton-grid">${Array.from({ length: 12 }).map(() => '<div class="games-skeleton-card"></div>').join("")}</div>`;
+		}
 	}
 
 	function bindEvents(root) {
@@ -1790,6 +1817,8 @@
 
 		if (!root.querySelector(".games-page")) {
 			root.innerHTML = loadingMarkup();
+		} else {
+			applyLoadingSkeleton(root);
 		}
 
 		const authReady = await ensureAuthReady();

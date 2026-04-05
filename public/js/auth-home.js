@@ -6,6 +6,8 @@
   const DASHBOARD_SHOW_RECENT_KEY = "dashboard-show-recent";
   const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
   const DASHBOARD_SHOW_STATS_KEY = "dashboard-show-stats";
+  const DASHBOARD_RECENT_COUNT_KEY = "dashboard-last-recent-count";
+  const DASHBOARD_FAVORITES_COUNT_KEY = "dashboard-last-favorites-count";
   const TOS_REQUIRED_MS = 30 * 1000;
   const USER_DOC_COLLECTION = "users";
   const USERNAME_COLLECTION = "usernames";
@@ -149,6 +151,14 @@
     } catch (_error) {
       return "";
     }
+  }
+
+  function dashboardSkeletonCount(storageKey, fallbackCount) {
+    const parsed = Number.parseInt(localStorage.getItem(storageKey) || "", 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.max(1, Math.min(8, parsed));
+    }
+    return fallbackCount;
   }
 
   async function hashText(value) {
@@ -1142,16 +1152,18 @@
     }
 
     if (showRecent && recentNode) {
+      const recentSkeletonCount = dashboardSkeletonCount(DASHBOARD_RECENT_COUNT_KEY, 3);
       recentNode.innerHTML = `
         <div class="starlight-dashboard-skeleton-grid">
-          ${Array.from({ length: 4 }).map(() => '<article class="starlight-dashboard-item starlight-dashboard-item-skeleton"><div class="starlight-dashboard-thumb"><div class="starlight-skeleton-block"></div></div></article>').join("")}
+          ${Array.from({ length: recentSkeletonCount }).map(() => '<article class="starlight-dashboard-item starlight-dashboard-item-skeleton"><div class="starlight-dashboard-thumb"><div class="starlight-skeleton-block"></div></div></article>').join("")}
         </div>
       `;
     }
     if (showFavorites && favoritesNode) {
+      const favoritesSkeletonCount = dashboardSkeletonCount(DASHBOARD_FAVORITES_COUNT_KEY, 4);
       favoritesNode.innerHTML = `
         <div class="starlight-dashboard-skeleton-grid">
-          ${Array.from({ length: 5 }).map(() => '<article class="starlight-dashboard-item starlight-dashboard-item-skeleton"><div class="starlight-dashboard-thumb"><div class="starlight-skeleton-block"></div></div></article>').join("")}
+          ${Array.from({ length: favoritesSkeletonCount }).map(() => '<article class="starlight-dashboard-item starlight-dashboard-item-skeleton"><div class="starlight-dashboard-thumb"><div class="starlight-skeleton-block"></div></div></article>').join("")}
         </div>
       `;
     }
@@ -1215,6 +1227,9 @@
         .filter((item) => item.isFavorite)
         .sort((a, b) => b.lastPlayedAtMs - a.lastPlayedAtMs)
         .slice(0, 8);
+
+      localStorage.setItem(DASHBOARD_RECENT_COUNT_KEY, String(recent.length));
+      localStorage.setItem(DASHBOARD_FAVORITES_COUNT_KEY, String(favorites.length));
 
       const totalPlays = list.reduce((sum, item) => sum + Math.max(0, item.clickCount), 0);
       const gamesPlayed = list.filter((item) => item.clickCount > 0).length;
@@ -1281,6 +1296,8 @@
               if (card) {
                 card.remove();
               }
+              const remainingFavorites = favoritesNode.querySelectorAll(".starlight-dashboard-item").length;
+              localStorage.setItem(DASHBOARD_FAVORITES_COUNT_KEY, String(remainingFavorites));
               if (!favoritesNode.querySelector(".starlight-dashboard-item")) {
                 favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">No favorites yet. Star games in Games.</p>';
               }
@@ -1313,6 +1330,8 @@
               }
               const clearRecentBtn = document.getElementById("dashboard-clear-recent");
               const hasCards = Boolean(recentNode.querySelector(".starlight-dashboard-item"));
+              const remainingRecent = recentNode.querySelectorAll(".starlight-dashboard-item").length;
+              localStorage.setItem(DASHBOARD_RECENT_COUNT_KEY, String(remainingRecent));
               if (clearRecentBtn) {
                 clearRecentBtn.disabled = !hasCards;
               }
@@ -1341,6 +1360,7 @@
           }, { merge: true }).catch(() => null));
           await Promise.all(updates);
           recentNode.innerHTML = '<p class="starlight-dashboard-empty">No recent games yet.</p>';
+          localStorage.setItem(DASHBOARD_RECENT_COUNT_KEY, "0");
           clearRecentBtn.disabled = true;
         });
       }

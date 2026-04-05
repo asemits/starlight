@@ -781,14 +781,14 @@
   content: "";
   position: absolute;
   inset: 0;
-  transform: translateX(-100%);
+  transform: translateX(-120%);
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
   animation: starlightShimmer 1.2s ease-in-out infinite;
 }
 
 @keyframes starlightShimmer {
   to {
-    transform: translateX(100%);
+    transform: translateX(120%);
   }
 }
 
