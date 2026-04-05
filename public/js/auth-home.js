@@ -52,6 +52,7 @@
     verifyTimerId: 0,
     verificationId: "",
     recaptcha: null,
+    recaptchaWidgetId: null,
     autoSyncTimerId: 0
   };
 
@@ -227,6 +228,40 @@
     }
 
     return "Something went wrong. Please try again.";
+  }
+
+  function friendlyMfaMessage(error) {
+    const code = authErrorCode(error);
+    if (code === "auth/invalid-phone-number") return "Invalid phone number. Use format like +15551234567.";
+    if (code === "auth/missing-phone-number") return "Enter a phone number first.";
+    if (code === "auth/captcha-check-failed") return "Verification failed. Try sending the code again.";
+    if (code === "auth/quota-exceeded") return "SMS quota exceeded. Try again later.";
+    if (code === "auth/too-many-requests") return "Too many attempts. Try again later.";
+    if (code === "auth/operation-not-allowed") return "Phone auth is not enabled for this project.";
+    if (code === "auth/requires-recent-login") return "Please log in again, then try adding 2FA.";
+    return "Could not send code. Please try again.";
+  }
+
+  async function ensureMfaRecaptchaVerifier() {
+    const instance = auth();
+    const container = document.getElementById("mfa-recaptcha");
+    if (!instance || !container) {
+      throw new Error("mfa-recaptcha-unavailable");
+    }
+
+    if (state.recaptcha) {
+      try {
+        state.recaptcha.clear();
+      } catch (_error) {
+      }
+      state.recaptcha = null;
+      state.recaptchaWidgetId = null;
+    }
+
+    container.innerHTML = "";
+    state.recaptcha = new firebase.auth.RecaptchaVerifier("mfa-recaptcha", { size: "invisible" }, instance);
+    state.recaptchaWidgetId = await state.recaptcha.render();
+    return state.recaptcha;
   }
 
   function deleteAccountMessage(error) {
@@ -1737,17 +1772,15 @@
     }
 
     try {
-      if (state.recaptcha) {
-        state.recaptcha.clear();
-      }
-      state.recaptcha = new firebase.auth.RecaptchaVerifier("mfa-recaptcha", { size: "invisible" });
+      setStatus("settings-mfa-status", "Sending code...", true);
+      const verifier = await ensureMfaRecaptchaVerifier();
       const session = await user.multiFactor.getSession();
       const phoneInfoOptions = { phoneNumber: phone, session };
       const phoneAuthProvider = new firebase.auth.PhoneAuthProvider();
-      state.verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, state.recaptcha);
+      state.verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, verifier);
       setStatus("settings-mfa-status", "Code sent. Enter it below to finish enrollment.", true);
     } catch (error) {
-      setStatus("settings-mfa-status", error && error.message ? error.message : "Could not send code.", false);
+      setStatus("settings-mfa-status", friendlyMfaMessage(error), false);
     }
   }
 
@@ -2030,6 +2063,14 @@
     }
 
     if (forceRefresh) {
+      if (state.recaptcha) {
+        try {
+          state.recaptcha.clear();
+        } catch (_error) {
+        }
+        state.recaptcha = null;
+        state.recaptchaWidgetId = null;
+      }
       const existingTabRow = document.getElementById("settings-account-tab-row");
       const existingPanel = document.querySelector("[data-settings-panel='account']");
       if (existingTabRow) {
