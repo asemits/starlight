@@ -507,7 +507,7 @@
         <section class="starlight-home-shell starlight-dashboard-shell">
           <header class="starlight-home-hero">
             <p class="starlight-home-kicker">Account</p>
-            <h1>Confirm Email</h1>
+            <h1>confirm email</h1>
             <p class="starlight-home-tagline">secure your account access</p>
           </header>
 
