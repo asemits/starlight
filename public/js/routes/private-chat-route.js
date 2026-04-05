@@ -2,13 +2,11 @@
   const modules = window.StarlightRouteModules = window.StarlightRouteModules || {};
   modules["/private-chat"] = {
     render: function renderPrivateChatRoute() {
-      // Inline styles to override main container padding and height constraints to make it full screen
       return `
         <style>
-          /* Override layout for full screen chat */
           #main-content {
             padding: 0 !important;
-            height: calc(100vh - /* navbar h */ 0px) !important;
+            height: calc(100vh - 0px) !important;
             overflow: hidden;
           }
           .chat-container {
@@ -19,7 +17,7 @@
             top: 0;
             left: 0;
             z-index: 100;
-            background-color: #36393f; /* Discord grey */
+            background-color: #36393f;
             color: #dcddde;
           }
           .chat-sidebar {
@@ -94,7 +92,6 @@
           <div class="chat-sidebar">
             <div style="padding: 15px; border-bottom: 1px solid #202225; font-weight: bold">Direct Messages</div>
             <div class="chat-list" id="chat-list-container">
-              <!-- Dynamically populated -->
               <div class="chat-item">Mock User 1</div>
               <div class="chat-item">Mock Group (User 2, User 3...)</div>
             </div>
@@ -105,7 +102,6 @@
               <a href="#/social" class="close-btn">&times;</a>
             </div>
             <div class="chat-messages" id="chat-messages-container">
-              <!-- Messages -->
             </div>
             <div class="chat-input-area">
               <input type="text" class="chat-input" placeholder="Message..." id="chat-input-field" disabled/>
@@ -115,7 +111,6 @@
       `;
     },
     afterRender: function afterRenderPrivateChatRoute() {
-      // Minimal setup to simulate a chat load
       const chatRoot = document.getElementById("private-chat-root");
       if (window.StarlightPrivateChat && chatRoot) {
         window.StarlightPrivateChat.mount("#private-chat-root");
