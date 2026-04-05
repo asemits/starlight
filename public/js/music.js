@@ -86,7 +86,7 @@ function showDownloadFormatModal(track) {
                 </button>
             `).join('')}
         </div>
-        <div class="download-format-note">Format conversion runs in your browser when needed.</div>
+        <div class="download-format-note">Includes title/artist metadata and cover art when supported.</div>
     `;
 
     confirmBtn.style.display = 'none';
@@ -403,6 +403,41 @@ function sanitizeTrackFileNamePart(value) {
         .trim();
 }
 
+function sanitizeTrackMetadataPart(value, fallback = '') {
+    const cleaned = String(value ?? '')
+        .replace(/[\u0000\r\n]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return cleaned || fallback;
+}
+
+function getTrackMetadata(track) {
+    const artist = sanitizeTrackMetadataPart(track?.artist, 'Unknown Artist');
+    return {
+        title: sanitizeTrackMetadataPart(track?.title, 'Unknown Title'),
+        artist,
+        album: sanitizeTrackMetadataPart(track?.album, `Starlight - ${artist}`),
+        albumArtist: artist,
+        year: String(new Date().getFullYear())
+    };
+}
+
+function getTrackMetadataArgs(track) {
+    const metadata = getTrackMetadata(track);
+    return [
+        '-metadata', `title=${metadata.title}`,
+        '-metadata', `artist=${metadata.artist}`,
+        '-metadata', `album=${metadata.album}`,
+        '-metadata', `album_artist=${metadata.albumArtist}`,
+        '-metadata', `date=${metadata.year}`
+    ];
+}
+
+function canEmbedCoverForFormat(format) {
+    const selectedFormat = normalizeDownloadFormat(format);
+    return selectedFormat === 'mp3' || selectedFormat === 'm4a' || selectedFormat === 'flac';
+}
+
 function normalizeDownloadFormat(format) {
     const value = String(format || '').toLowerCase();
     return DOWNLOAD_FORMATS.includes(value) ? value : 'mp3';
@@ -424,18 +459,51 @@ function getDownloadFileName(track, format = 'mp3') {
     return `${base.slice(0, 120)}.${selectedFormat}`;
 }
 
-function getFfmpegArgsForFormat(format, inputName, outputName) {
+function getFfmpegArgsForFormat(format, inputName, outputName, track, coverName = null) {
     const selectedFormat = normalizeDownloadFormat(format);
+    const useCover = Boolean(coverName) && canEmbedCoverForFormat(selectedFormat);
+    const args = ['-i', inputName];
+
+    if (useCover) {
+        args.push('-i', coverName);
+    }
+
+    args.push('-map', '0:a:0');
+    if (useCover) {
+        args.push('-map', '1:v:0');
+    }
+
     if (selectedFormat === 'wav') {
-        return ['-i', inputName, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', outputName];
+        args.push('-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2');
+        args.push(...getTrackMetadataArgs(track), outputName);
+        return args;
     }
+
     if (selectedFormat === 'm4a') {
-        return ['-i', inputName, '-vn', '-c:a', 'aac', '-b:a', '192k', outputName];
+        args.push('-c:a', 'aac', '-b:a', '192k');
+        if (useCover) {
+            args.push('-c:v', 'mjpeg', '-disposition:v:0', 'attached_pic');
+        }
+        args.push(...getTrackMetadataArgs(track), outputName);
+        return args;
     }
+
     if (selectedFormat === 'flac') {
-        return ['-i', inputName, '-vn', '-c:a', 'flac', outputName];
+        args.push('-c:a', 'flac');
+        if (useCover) {
+            args.push('-c:v', 'mjpeg', '-disposition:v:0', 'attached_pic');
+        }
+        args.push(...getTrackMetadataArgs(track), outputName);
+        return args;
     }
-    return ['-i', inputName, '-vn', '-c:a', 'libmp3lame', '-q:a', '2', outputName];
+
+    args.push('-c:a', 'libmp3lame', '-q:a', '2', '-id3v2_version', '3', '-write_id3v1', '1');
+    if (useCover) {
+        args.push('-c:v', 'mjpeg', '-disposition:v:0', 'attached_pic');
+        args.push('-metadata:s:v', 'title=Album cover', '-metadata:s:v', 'comment=Cover (front)');
+    }
+    args.push(...getTrackMetadataArgs(track), outputName);
+    return args;
 }
 
 async function ensureFfmpegLoaded() {
@@ -466,23 +534,46 @@ async function ensureFfmpegLoaded() {
     return ffmpegLoadPromise;
 }
 
-async function convertAudioBlobToFormat(sourceBlob, format) {
+async function convertAudioBlobToFormat(sourceBlob, track, format, coverBlob = null) {
     const ffmpeg = await ensureFfmpegLoaded();
     const selectedFormat = normalizeDownloadFormat(format);
     const fileId = createSecureId('dl');
     const inputName = `${fileId}.mp3`;
     const outputName = `${fileId}.${selectedFormat}`;
+    const coverExt = coverBlob?.type === 'image/png' ? 'png' : 'jpg';
+    const coverName = coverBlob ? `${fileId}-cover.${coverExt}` : null;
     const inputData = new Uint8Array(await sourceBlob.arrayBuffer());
 
     await ffmpeg.writeFile(inputName, inputData);
+    if (coverBlob && coverName) {
+        const coverData = new Uint8Array(await coverBlob.arrayBuffer());
+        await ffmpeg.writeFile(coverName, coverData);
+    }
+
+    let coverEmbedded = Boolean(coverName);
     try {
-        await ffmpeg.exec(getFfmpegArgsForFormat(selectedFormat, inputName, outputName));
+        try {
+            await ffmpeg.exec(getFfmpegArgsForFormat(selectedFormat, inputName, outputName, track, coverName));
+        } catch (error) {
+            if (!coverName) {
+                throw error;
+            }
+            coverEmbedded = false;
+            try { await ffmpeg.deleteFile(outputName); } catch {}
+            await ffmpeg.exec(getFfmpegArgsForFormat(selectedFormat, inputName, outputName, track, null));
+        }
         const outputData = await ffmpeg.readFile(outputName);
         const bytes = outputData instanceof Uint8Array ? outputData : new TextEncoder().encode(String(outputData || ''));
-        return new Blob([bytes], { type: getDownloadMimeType(selectedFormat) });
+        return {
+            blob: new Blob([bytes], { type: getDownloadMimeType(selectedFormat) }),
+            coverEmbedded
+        };
     } finally {
         try { await ffmpeg.deleteFile(inputName); } catch {}
         try { await ffmpeg.deleteFile(outputName); } catch {}
+        if (coverName) {
+            try { await ffmpeg.deleteFile(coverName); } catch {}
+        }
     }
 }
 
@@ -512,24 +603,34 @@ async function downloadTrack(track, format = null) {
     const selectedFormat = normalizeDownloadFormat(format);
     showToast(`Preparing ${selectedFormat.toUpperCase()}...`, 'fa-gear');
 
-    const sourceBlob = await getTunneledDataBlob(track.apiUrl, 'stream');
+    const [sourceBlob, coverBlob] = await Promise.all([
+        getTunneledDataBlob(track.apiUrl, 'stream'),
+        track.img ? getTunneledDataBlob(track.img, 'image') : Promise.resolve(null)
+    ]);
+
     if (!sourceBlob) {
         showToast('Download failed', 'fa-triangle-exclamation');
         return;
     }
 
-    let outputBlob = sourceBlob;
-    if (selectedFormat !== 'mp3') {
-        try {
-            showToast(`Converting to ${selectedFormat.toUpperCase()}...`, 'fa-gear');
-            outputBlob = await convertAudioBlobToFormat(sourceBlob, selectedFormat);
-        } catch (error) {
-            showToast(`Could not convert to ${selectedFormat.toUpperCase()}`, 'fa-triangle-exclamation');
-            return;
-        }
+    const formattedCoverBlob = canEmbedCoverForFormat(selectedFormat) ? coverBlob : null;
+
+    let conversionResult = null;
+    try {
+        showToast(`Converting to ${selectedFormat.toUpperCase()}...`, 'fa-gear');
+        conversionResult = await convertAudioBlobToFormat(sourceBlob, track, selectedFormat, formattedCoverBlob);
+    } catch (error) {
+        showToast(`Could not export ${selectedFormat.toUpperCase()}`, 'fa-triangle-exclamation');
+        return;
     }
 
-    startBlobDownload(outputBlob, getDownloadFileName(track, selectedFormat));
+    if (coverBlob && !formattedCoverBlob) {
+        showToast('Cover art is not supported in WAV exports', 'fa-circle-info');
+    } else if (formattedCoverBlob && conversionResult && !conversionResult.coverEmbedded) {
+        showToast('Downloaded with metadata; cover art embed failed', 'fa-circle-info');
+    }
+
+    startBlobDownload(conversionResult.blob, getDownloadFileName(track, selectedFormat));
     showToast('Download started', 'fa-download');
 }
 
