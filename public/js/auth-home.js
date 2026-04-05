@@ -1142,13 +1142,23 @@
     }
 
     if (showRecent && recentNode) {
-      recentNode.innerHTML = '<p class="starlight-dashboard-empty">Loading...</p>';
+      recentNode.innerHTML = `
+        <div class="starlight-dashboard-skeleton-grid">
+          ${Array.from({ length: 4 }).map(() => '<article class="starlight-dashboard-item starlight-dashboard-item-skeleton"><div class="starlight-dashboard-thumb"><div class="starlight-skeleton-block"></div></div></article>').join("")}
+        </div>
+      `;
     }
     if (showFavorites && favoritesNode) {
-      favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">Loading...</p>';
+      favoritesNode.innerHTML = `
+        <div class="starlight-dashboard-skeleton-grid">
+          ${Array.from({ length: 5 }).map(() => '<article class="starlight-dashboard-item starlight-dashboard-item-skeleton"><div class="starlight-dashboard-thumb"><div class="starlight-skeleton-block"></div></div></article>').join("")}
+        </div>
+      `;
     }
     if (showStats && statsNode) {
-      statsNode.innerHTML = '';
+      statsNode.innerHTML = `
+        ${Array.from({ length: 4 }).map(() => '<article class="starlight-stat-card starlight-stat-card-skeleton"><div class="starlight-skeleton-line"></div><div class="starlight-skeleton-line starlight-skeleton-line-wide"></div></article>').join("")}
+      `;
     }
 
     try {
@@ -1257,45 +1267,62 @@
 
       if (showFavorites && favoritesNode) {
         favoritesNode.querySelectorAll("[data-remove-favorite='1']").forEach((button) => {
-        button.addEventListener("click", async (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const path = button.getAttribute("data-game-path") || "";
-          const sourceBase = button.getAttribute("data-source-base") || "";
-          if (!path || !window.StarlightGames || typeof window.StarlightGames.setFavoriteByPath !== "function") {
-            return;
-          }
-          try {
-            await window.StarlightGames.setFavoriteByPath(path, sourceBase, false);
-            await loadSignedInDashboard();
-          } catch (_error) {
-          }
+          button.addEventListener("click", async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const path = button.getAttribute("data-game-path") || "";
+            const sourceBase = button.getAttribute("data-source-base") || "";
+            if (!path || !window.StarlightGames || typeof window.StarlightGames.setFavoriteByPath !== "function") {
+              return;
+            }
+            try {
+              await window.StarlightGames.setFavoriteByPath(path, sourceBase, false);
+              const card = button.closest(".starlight-dashboard-item");
+              if (card) {
+                card.remove();
+              }
+              if (!favoritesNode.querySelector(".starlight-dashboard-item")) {
+                favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">No favorites yet. Star games in Games.</p>';
+              }
+            } catch (_error) {
+            }
+          });
         });
-      });
       }
 
       if (showRecent && recentNode) {
         recentNode.querySelectorAll("[data-remove-recent='1']").forEach((button) => {
-        button.addEventListener("click", async (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const docPath = String(button.getAttribute("data-doc-path") || "").trim();
-          if (!docPath) {
-            return;
-          }
-          try {
-            await firestore.doc(docPath).set({
-              clickCount: 0,
-              lastPlayedAt: firebase.firestore.FieldValue.delete(),
-              activeSession: firebase.firestore.FieldValue.delete(),
-              activeGamePath: firebase.firestore.FieldValue.delete(),
-              activeAt: firebase.firestore.FieldValue.delete(),
-            }, { merge: true });
-            await loadSignedInDashboard();
-          } catch (_error) {
-          }
+          button.addEventListener("click", async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const docPath = String(button.getAttribute("data-doc-path") || "").trim();
+            if (!docPath) {
+              return;
+            }
+            try {
+              await firestore.doc(docPath).set({
+                clickCount: 0,
+                lastPlayedAt: firebase.firestore.FieldValue.delete(),
+                activeSession: firebase.firestore.FieldValue.delete(),
+                activeGamePath: firebase.firestore.FieldValue.delete(),
+                activeAt: firebase.firestore.FieldValue.delete(),
+              }, { merge: true });
+              const card = button.closest(".starlight-dashboard-item");
+              if (card) {
+                card.remove();
+              }
+              const clearRecentBtn = document.getElementById("dashboard-clear-recent");
+              const hasCards = Boolean(recentNode.querySelector(".starlight-dashboard-item"));
+              if (clearRecentBtn) {
+                clearRecentBtn.disabled = !hasCards;
+              }
+              if (!hasCards) {
+                recentNode.innerHTML = '<p class="starlight-dashboard-empty">No recent games yet.</p>';
+              }
+            } catch (_error) {
+            }
+          });
         });
-      });
       }
 
       const clearRecentBtn = document.getElementById("dashboard-clear-recent");
@@ -1313,7 +1340,8 @@
             activeAt: firebase.firestore.FieldValue.delete(),
           }, { merge: true }).catch(() => null));
           await Promise.all(updates);
-          await loadSignedInDashboard();
+          recentNode.innerHTML = '<p class="starlight-dashboard-empty">No recent games yet.</p>';
+          clearRecentBtn.disabled = true;
         });
       }
     } catch (_error) {

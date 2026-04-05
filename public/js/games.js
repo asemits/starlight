@@ -1546,6 +1546,32 @@
 				background: #fff;
 				color: #000;
 			}
+			.games-skeleton-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+				gap: 12px;
+			}
+			.games-skeleton-card {
+				height: 220px;
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				background: rgba(255,255,255,0.05);
+				position: relative;
+				overflow: hidden;
+			}
+			.games-skeleton-card::after {
+				content: "";
+				position: absolute;
+				inset: 0;
+				transform: translateX(-100%);
+				background: linear-gradient(90deg, transparent, rgba(255,255,255,0.16), transparent);
+				animation: gamesShimmer 1.1s ease-in-out infinite;
+			}
+			@keyframes gamesShimmer {
+				to {
+					transform: translateX(100%);
+				}
+			}
 			.game-overlay {
 				position: fixed;
 				inset: 0;
@@ -1609,6 +1635,23 @@
 					<div id="games-pagination" class="games-page-nav"></div>
 				</section>
 			</section>
+		`;
+	}
+
+	function loadingMarkup() {
+		return `
+			${baseMarkup()}
+			<div class="games-section" style="margin-top:12px;">
+				<div class="games-headline">
+					<div>
+						<p class="games-kicker">Loading</p>
+						<h2 class="games-title">Fetching games...</h2>
+					</div>
+				</div>
+				<div class="games-skeleton-grid">
+					${Array.from({ length: 12 }).map(() => '<div class="games-skeleton-card"></div>').join("")}
+				</div>
+			</div>
 		`;
 	}
 
@@ -1745,10 +1788,13 @@
 			return;
 		}
 
+		if (!root.querySelector(".games-page")) {
+			root.innerHTML = loadingMarkup();
+		}
+
 		const authReady = await ensureAuthReady();
 
 		if (!state.ready) {
-			root.innerHTML = '<div class="text-2xl">Loading games...</div>';
 			try {
 				await loadGames();
 			} catch (_error) {

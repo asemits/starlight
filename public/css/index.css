@@ -735,6 +735,63 @@
   font-weight: 200;
 }
 
+.starlight-dashboard-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 260px));
+  gap: 12px;
+}
+
+.starlight-dashboard-item-skeleton,
+.starlight-stat-card-skeleton {
+  pointer-events: none;
+}
+
+.starlight-dashboard-item-skeleton .starlight-dashboard-thumb,
+.starlight-stat-card-skeleton {
+  background: rgba(255,255,255,0.04);
+}
+
+.starlight-skeleton-block,
+.starlight-skeleton-line {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+}
+
+.starlight-skeleton-block {
+  width: 100%;
+  height: 100%;
+}
+
+.starlight-skeleton-line {
+  width: 52%;
+  height: 10px;
+  margin-bottom: 12px;
+}
+
+.starlight-skeleton-line-wide {
+  width: 72%;
+  height: 24px;
+  margin-bottom: 0;
+}
+
+.starlight-skeleton-block::after,
+.starlight-skeleton-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  animation: starlightShimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes starlightShimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
 /* ── Status / Misc ────────────────────────────────── */
 .starlight-status {
   min-height: 18px;
