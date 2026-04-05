@@ -1073,29 +1073,29 @@
       root.innerHTML = `
         <section class="starlight-home-shell starlight-dashboard-shell">
           <header class="starlight-home-hero">
-            <p class="starlight-home-kicker">Dashboard</p>
-            <h1>${escapeHtml(config.siteName)}</h1>
-            <p class="starlight-home-tagline">welcome back</p>
+            <p class="starlight-home-kicker">Your Dashboard</p>
+            <h1>Welcome back to ${escapeHtml(config.siteName)}</h1>
+            <p class="starlight-home-tagline">Pick up where you left off or discover something new</p>
           </header>
 
           ${showRecent ? `<section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
-              <h2>Recently Played</h2>
-              <button id="dashboard-clear-recent" type="button" class="starlight-btn starlight-btn-muted">Clear Recent</button>
+              <h2>📺 Recently Played</h2>
+              <button id="dashboard-clear-recent" type="button" class="starlight-btn starlight-btn-muted">Clear</button>
             </div>
             <div id="dashboard-recent" class="starlight-dashboard-grid"></div>
           </section>` : ""}
 
           ${showFavorites ? `<section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
-              <h2>Favorites</h2>
+              <h2>❤️ Your Favorites</h2>
             </div>
             <div id="dashboard-favorites" class="starlight-dashboard-grid"></div>
           </section>` : ""}
 
           ${showStats ? `<section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
-              <h2>Stats</h2>
+              <h2>📊 Your Stats</h2>
             </div>
             <div id="dashboard-stats" class="starlight-dashboard-stats"></div>
           </section>` : ""}
@@ -1106,18 +1106,18 @@
       root.innerHTML = `
       <section class="starlight-home-shell">
         <header class="starlight-home-hero">
-          <p class="starlight-home-kicker">Welcome</p>
-          <h1>${escapeHtml(config.siteName)}</h1>
+          <p class="starlight-home-kicker">Welcome to ${escapeHtml(config.siteName)}</p>
+          <h1>Your Gateway to Gaming</h1>
           <p class="starlight-home-tagline">${escapeHtml(config.heroTagline)}</p>
           <p class="starlight-home-subtext">${escapeHtml(config.heroSubtext)}</p>
+          <div style="margin-top: 24px; display: flex; gap: 12px;">
+            <button id="starlight-login" type="button" class="starlight-btn starlight-btn-primary">Log In to Your Account</button>
+            <button id="starlight-signup" type="button" class="starlight-btn starlight-btn-highlight">Create Account</button>
+          </div>
         </header>
         <section class="starlight-home-grid">
           ${featureCards}
         </section>
-        <div class="starlight-home-auth-actions">
-            <button id="starlight-login" type="button" class="starlight-btn starlight-btn-muted">Log In</button>
-            <button id="starlight-signup" type="button" class="starlight-btn starlight-btn-highlight">Sign Up</button>
-        </div>
       </section>
     `;
     }
