@@ -975,6 +975,7 @@
           <section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
               <h2>Recently Played</h2>
+              <button id="dashboard-clear-recent" type="button" class="starlight-btn starlight-btn-muted">Clear Recent</button>
             </div>
             <div id="dashboard-recent" class="starlight-dashboard-grid"></div>
           </section>
@@ -1108,6 +1109,9 @@
         const removeFavorite = favoriteMode
           ? `<button type="button" class="starlight-dashboard-remove-favorite" data-remove-favorite="1" data-game-path="${escapeHtml(item.gamePath)}" data-source-base="${escapeHtml(item.sourceBase)}" aria-label="Remove from favorites"><i class="fa-solid fa-trash"></i></button>`
           : "";
+        const removeRecent = !favoriteMode
+          ? `<button type="button" class="starlight-dashboard-remove-favorite" data-remove-recent="1" data-doc-path="${escapeHtml(item.docPath)}" aria-label="Remove from recently played"><i class="fa-solid fa-trash"></i></button>`
+          : "";
         return `
           <a href="/games" class="nav-link starlight-dashboard-item" data-game-path="${escapeHtml(item.gamePath)}" data-source-base="${escapeHtml(item.sourceBase)}">
             <div class="starlight-dashboard-thumb">
@@ -1117,6 +1121,7 @@
                 <p>Plays: ${item.clickCount}</p>
               </div>
               ${removeFavorite}
+              ${removeRecent}
             </div>
           </a>
         `;
@@ -1148,6 +1153,47 @@
           }
         });
       });
+
+      recentNode.querySelectorAll("[data-remove-recent='1']").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const docPath = String(button.getAttribute("data-doc-path") || "").trim();
+          if (!docPath) {
+            return;
+          }
+          try {
+            await firestore.doc(docPath).set({
+              clickCount: 0,
+              lastPlayedAt: firebase.firestore.FieldValue.delete(),
+              activeSession: false,
+              activeAt: firebase.firestore.FieldValue.delete(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            await loadSignedInDashboard();
+          } catch (_error) {
+          }
+        });
+      });
+
+      const clearRecentBtn = document.getElementById("dashboard-clear-recent");
+      if (clearRecentBtn) {
+        clearRecentBtn.disabled = !recent.length;
+        clearRecentBtn.addEventListener("click", async () => {
+          if (!recent.length) {
+            return;
+          }
+          const updates = recent.map((item) => firestore.doc(item.docPath).set({
+            clickCount: 0,
+            lastPlayedAt: firebase.firestore.FieldValue.delete(),
+            activeSession: false,
+            activeAt: firebase.firestore.FieldValue.delete(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true }).catch(() => null));
+          await Promise.all(updates);
+          await loadSignedInDashboard();
+        });
+      }
     } catch (_error) {
       recentNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load recent games.</p>';
       favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load favorites.</p>';
@@ -1866,6 +1912,60 @@
     }
   }
 
+  async function resetStatisticsInSettings() {
+    const user = currentUser();
+    const firestore = db();
+    if (!user || !firestore) {
+      setStatus("settings-danger-status", "You must be logged in.", false);
+      return;
+    }
+
+    setStatus("settings-danger-status", "Resetting statistics...", true);
+
+    let sourceDocs = [];
+    try {
+      const snap = await firestore.collectionGroup("players").where("uid", "==", user.uid).get();
+      sourceDocs = snap.docs;
+    } catch (_queryError) {
+      sourceDocs = [];
+    }
+
+    if (!sourceDocs.length) {
+      try {
+        const statsSnap = await firestore.collection("gameStats").orderBy("updatedAt", "desc").limit(400).get();
+        const playerDocs = await Promise.all(statsSnap.docs.map(async (statsDoc) => {
+          try {
+            const playerDoc = await statsDoc.ref.collection("players").doc(user.uid).get();
+            return playerDoc.exists ? playerDoc : null;
+          } catch (_playerError) {
+            return null;
+          }
+        }));
+        sourceDocs = playerDocs.filter(Boolean);
+      } catch (_fallbackError) {
+        sourceDocs = [];
+      }
+    }
+
+    if (!sourceDocs.length) {
+      setStatus("settings-danger-status", "No statistics found to reset.", true);
+      return;
+    }
+
+    const updates = sourceDocs.map((doc) => doc.ref.set({
+      clickCount: 0,
+      rating: 0,
+      lastPlayedAt: firebase.firestore.FieldValue.delete(),
+      lastRatedAt: firebase.firestore.FieldValue.delete(),
+      activeSession: false,
+      activeAt: firebase.firestore.FieldValue.delete(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(() => null));
+
+    await Promise.all(updates);
+    setStatus("settings-danger-status", "Statistics reset.", true);
+  }
+
   function deleteAccountInSettings() {
     showModal("Delete Account", `
       <div class="starlight-auth-form">
@@ -2029,6 +2129,7 @@
         <p class="text-sm text-red-100/90 mb-3">These actions affect your account and cannot be reversed.</p>
         <div class="flex flex-wrap gap-2">
           <button id="settings-danger-logout" type="button" class="px-4 py-3 rounded-xl border border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30 transition">Log Out</button>
+          <button id="settings-danger-reset-stats" type="button" class="px-4 py-3 rounded-xl border border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30 transition">Reset Statistics</button>
           <button id="settings-danger-delete" type="button" class="px-4 py-3 rounded-xl border border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30 transition">Delete Account</button>
         </div>
         <p id="settings-danger-status" class="text-sm mt-3"></p>
@@ -2083,6 +2184,11 @@
     const logoutDangerBtn = document.getElementById("settings-danger-logout");
     if (logoutDangerBtn) {
       logoutDangerBtn.addEventListener("click", logoutInSettings);
+    }
+
+    const resetStatsBtn = document.getElementById("settings-danger-reset-stats");
+    if (resetStatsBtn) {
+      resetStatsBtn.addEventListener("click", resetStatisticsInSettings);
     }
 
     const deleteDangerBtn = document.getElementById("settings-danger-delete");
