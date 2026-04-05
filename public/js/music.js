@@ -86,7 +86,7 @@ function showDownloadFormatModal(track) {
                 </button>
             `).join('')}
         </div>
-        <div class="download-format-note">Includes title/artist metadata and cover art when supported.</div>
+        <div class="download-format-note">Format conversion runs in your browser when needed.</div>
     `;
 
     confirmBtn.style.display = 'none';
@@ -118,9 +118,6 @@ function showDownloadFormatModal(track) {
     });
 }
 
-/* ══════════════════════════════════════════════════════
-   PLAYLIST  (localStorage — persists across sessions)
-══════════════════════════════════════════════════════ */
 const PLAYLIST_KEY = 'cl-playlist';
 
 function getPlaylist() {
@@ -206,9 +203,6 @@ function renderPlaylist() {
     });
 }
 
-/* ══════════════════════════════════════════════════════
-   QUEUE  (sessionStorage — clears when tab closes)
-══════════════════════════════════════════════════════ */
 const QUEUE_KEY = 'cl-queue';
 
 function getQueue() {
@@ -264,7 +258,6 @@ function renderQueue() {
     }
     body.innerHTML = '';
 
-    // "Up Next" label
     const lbl = document.createElement('div');
     lbl.className = 'queue-section-label';
     lbl.textContent = `UP NEXT · ${q.length} TRACK${q.length !== 1 ? 'S' : ''}`;
@@ -274,7 +267,6 @@ function renderQueue() {
         const row = buildTrackRow(t, i, 'queue');
         row.addEventListener('click', (e) => {
             if (e.target.closest('.row-icon-btn')) return;
-            // Move clicked to front and play
             const qq = getQueue();
             const [item] = qq.splice(i, 1);
             qq.unshift(item);
@@ -285,14 +277,12 @@ function renderQueue() {
     });
 }
 
-/* ── Shared row builder ──────────────────────────── */
 function buildTrackRow(track, idx, source) {
     const row = document.createElement('div');
     row.className = 'track-row';
     row.style.animationDelay = `${idx * 0.04}s`;
     if (currentTrackData && currentTrackData.apiUrl === track.apiUrl) row.classList.add('playing');
 
-    // Mini EQ for playing indicator
     const eqHtml = `<div class="track-row-eq">
         <div class="eq-bar" style="animation-duration:0.6s"></div>
         <div class="eq-bar" style="animation-duration:0.9s;animation-delay:0.15s"></div>
@@ -301,7 +291,6 @@ function buildTrackRow(track, idx, source) {
 
     const trackPayload = JSON.stringify(track).replace(/"/g,'&quot;');
 
-    // Actions differ per source
     const actionsHtml = source === 'playlist'
         ? `<div class="track-row-actions">
                 <button class="row-icon-btn" onclick="downloadTrack(${trackPayload})" title="Download as..."><i class="fa-solid fa-download"></i></button>
@@ -324,7 +313,6 @@ function buildTrackRow(track, idx, source) {
         </div>
         ${actionsHtml}`;
 
-    // Lazy load thumbnail
     if (track.img) {
         getTunneledBlob(track.img, 'image').then(url => {
             if (!url) return;
@@ -335,9 +323,6 @@ function buildTrackRow(track, idx, source) {
     return row;
 }
 
-/* ══════════════════════════════════════════════════════
-   PANEL UI
-══════════════════════════════════════════════════════ */
 let currentPanel = null;
 
 function openPanel(tab) {
@@ -381,9 +366,6 @@ function updateBadges() {
     qBadge.textContent  = qLen;  qBadge.style.display  = qLen  ? 'flex' : 'none';
 }
 
-/* ══════════════════════════════════════════════════════
-   TOAST
-══════════════════════════════════════════════════════ */
 function showToast(msg, icon = 'fa-circle-check') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
@@ -401,41 +383,6 @@ function sanitizeTrackFileNamePart(value) {
         .replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
-}
-
-function sanitizeTrackMetadataPart(value, fallback = '') {
-    const cleaned = String(value ?? '')
-        .replace(/[\u0000\r\n]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    return cleaned || fallback;
-}
-
-function getTrackMetadata(track) {
-    const artist = sanitizeTrackMetadataPart(track?.artist, 'Unknown Artist');
-    return {
-        title: sanitizeTrackMetadataPart(track?.title, 'Unknown Title'),
-        artist,
-        album: sanitizeTrackMetadataPart(track?.album, `Starlight - ${artist}`),
-        albumArtist: artist,
-        year: String(new Date().getFullYear())
-    };
-}
-
-function getTrackMetadataArgs(track) {
-    const metadata = getTrackMetadata(track);
-    return [
-        '-metadata', `title=${metadata.title}`,
-        '-metadata', `artist=${metadata.artist}`,
-        '-metadata', `album=${metadata.album}`,
-        '-metadata', `album_artist=${metadata.albumArtist}`,
-        '-metadata', `date=${metadata.year}`
-    ];
-}
-
-function canEmbedCoverForFormat(format) {
-    const selectedFormat = normalizeDownloadFormat(format);
-    return selectedFormat === 'mp3' || selectedFormat === 'm4a' || selectedFormat === 'flac';
 }
 
 function normalizeDownloadFormat(format) {
@@ -459,51 +406,18 @@ function getDownloadFileName(track, format = 'mp3') {
     return `${base.slice(0, 120)}.${selectedFormat}`;
 }
 
-function getFfmpegArgsForFormat(format, inputName, outputName, track, coverName = null) {
+function getFfmpegArgsForFormat(format, inputName, outputName) {
     const selectedFormat = normalizeDownloadFormat(format);
-    const useCover = Boolean(coverName) && canEmbedCoverForFormat(selectedFormat);
-    const args = ['-i', inputName];
-
-    if (useCover) {
-        args.push('-i', coverName);
-    }
-
-    args.push('-map', '0:a:0');
-    if (useCover) {
-        args.push('-map', '1:v:0');
-    }
-
     if (selectedFormat === 'wav') {
-        args.push('-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2');
-        args.push(...getTrackMetadataArgs(track), outputName);
-        return args;
+        return ['-i', inputName, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', outputName];
     }
-
     if (selectedFormat === 'm4a') {
-        args.push('-c:a', 'aac', '-b:a', '192k');
-        if (useCover) {
-            args.push('-c:v', 'mjpeg', '-disposition:v:0', 'attached_pic');
-        }
-        args.push(...getTrackMetadataArgs(track), outputName);
-        return args;
+        return ['-i', inputName, '-vn', '-c:a', 'aac', '-b:a', '192k', outputName];
     }
-
     if (selectedFormat === 'flac') {
-        args.push('-c:a', 'flac');
-        if (useCover) {
-            args.push('-c:v', 'mjpeg', '-disposition:v:0', 'attached_pic');
-        }
-        args.push(...getTrackMetadataArgs(track), outputName);
-        return args;
+        return ['-i', inputName, '-vn', '-c:a', 'flac', outputName];
     }
-
-    args.push('-c:a', 'libmp3lame', '-q:a', '2', '-id3v2_version', '3', '-write_id3v1', '1');
-    if (useCover) {
-        args.push('-c:v', 'mjpeg', '-disposition:v:0', 'attached_pic');
-        args.push('-metadata:s:v', 'title=Album cover', '-metadata:s:v', 'comment=Cover (front)');
-    }
-    args.push(...getTrackMetadataArgs(track), outputName);
-    return args;
+    return ['-i', inputName, '-vn', '-c:a', 'libmp3lame', '-q:a', '2', outputName];
 }
 
 async function ensureFfmpegLoaded() {
@@ -534,46 +448,23 @@ async function ensureFfmpegLoaded() {
     return ffmpegLoadPromise;
 }
 
-async function convertAudioBlobToFormat(sourceBlob, track, format, coverBlob = null) {
+async function convertAudioBlobToFormat(sourceBlob, format) {
     const ffmpeg = await ensureFfmpegLoaded();
     const selectedFormat = normalizeDownloadFormat(format);
     const fileId = createSecureId('dl');
     const inputName = `${fileId}.mp3`;
     const outputName = `${fileId}.${selectedFormat}`;
-    const coverExt = coverBlob?.type === 'image/png' ? 'png' : 'jpg';
-    const coverName = coverBlob ? `${fileId}-cover.${coverExt}` : null;
     const inputData = new Uint8Array(await sourceBlob.arrayBuffer());
 
     await ffmpeg.writeFile(inputName, inputData);
-    if (coverBlob && coverName) {
-        const coverData = new Uint8Array(await coverBlob.arrayBuffer());
-        await ffmpeg.writeFile(coverName, coverData);
-    }
-
-    let coverEmbedded = Boolean(coverName);
     try {
-        try {
-            await ffmpeg.exec(getFfmpegArgsForFormat(selectedFormat, inputName, outputName, track, coverName));
-        } catch (error) {
-            if (!coverName) {
-                throw error;
-            }
-            coverEmbedded = false;
-            try { await ffmpeg.deleteFile(outputName); } catch {}
-            await ffmpeg.exec(getFfmpegArgsForFormat(selectedFormat, inputName, outputName, track, null));
-        }
+        await ffmpeg.exec(getFfmpegArgsForFormat(selectedFormat, inputName, outputName));
         const outputData = await ffmpeg.readFile(outputName);
         const bytes = outputData instanceof Uint8Array ? outputData : new TextEncoder().encode(String(outputData || ''));
-        return {
-            blob: new Blob([bytes], { type: getDownloadMimeType(selectedFormat) }),
-            coverEmbedded
-        };
+        return new Blob([bytes], { type: getDownloadMimeType(selectedFormat) });
     } finally {
         try { await ffmpeg.deleteFile(inputName); } catch {}
         try { await ffmpeg.deleteFile(outputName); } catch {}
-        if (coverName) {
-            try { await ffmpeg.deleteFile(coverName); } catch {}
-        }
     }
 }
 
@@ -603,34 +494,24 @@ async function downloadTrack(track, format = null) {
     const selectedFormat = normalizeDownloadFormat(format);
     showToast(`Preparing ${selectedFormat.toUpperCase()}...`, 'fa-gear');
 
-    const [sourceBlob, coverBlob] = await Promise.all([
-        getTunneledDataBlob(track.apiUrl, 'stream'),
-        track.img ? getTunneledDataBlob(track.img, 'image') : Promise.resolve(null)
-    ]);
-
+    const sourceBlob = await getTunneledDataBlob(track.apiUrl, 'stream');
     if (!sourceBlob) {
         showToast('Download failed', 'fa-triangle-exclamation');
         return;
     }
 
-    const formattedCoverBlob = canEmbedCoverForFormat(selectedFormat) ? coverBlob : null;
-
-    let conversionResult = null;
-    try {
-        showToast(`Converting to ${selectedFormat.toUpperCase()}...`, 'fa-gear');
-        conversionResult = await convertAudioBlobToFormat(sourceBlob, track, selectedFormat, formattedCoverBlob);
-    } catch (error) {
-        showToast(`Could not export ${selectedFormat.toUpperCase()}`, 'fa-triangle-exclamation');
-        return;
+    let outputBlob = sourceBlob;
+    if (selectedFormat !== 'mp3') {
+        try {
+            showToast(`Converting to ${selectedFormat.toUpperCase()}...`, 'fa-gear');
+            outputBlob = await convertAudioBlobToFormat(sourceBlob, selectedFormat);
+        } catch (error) {
+            showToast(`Could not convert to ${selectedFormat.toUpperCase()}`, 'fa-triangle-exclamation');
+            return;
+        }
     }
 
-    if (coverBlob && !formattedCoverBlob) {
-        showToast('Cover art is not supported in WAV exports', 'fa-circle-info');
-    } else if (formattedCoverBlob && conversionResult && !conversionResult.coverEmbedded) {
-        showToast('Downloaded with metadata; cover art embed failed', 'fa-circle-info');
-    }
-
-    startBlobDownload(conversionResult.blob, getDownloadFileName(track, selectedFormat));
+    startBlobDownload(outputBlob, getDownloadFileName(track, selectedFormat));
     showToast('Download started', 'fa-download');
 }
 
@@ -642,9 +523,6 @@ function downloadCurrentTrack(format = null) {
     downloadTrack(currentTrackData, format);
 }
 
-/* ══════════════════════════════════════════════════════
-   SCROLL / ARROWS
-══════════════════════════════════════════════════════ */
 function scrollRow(id, dir) {
     document.getElementById(id).scrollBy({ left: dir * 700, behavior:'smooth' });
 }
@@ -669,19 +547,14 @@ function attachScrollListener(id) {
     setTimeout(() => updateArrows(id), 500);
 }
 
-/* Header scroll */
 window.addEventListener('scroll', () => {
     document.getElementById('site-header').classList.toggle('scrolled', window.scrollY > 60);
 });
 
-/* Keyboard shortcut: Escape closes panel */
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closePanel();
 });
 
-/* ══════════════════════════════════════════════════════
-   TUNNEL ENGINE
-══════════════════════════════════════════════════════ */
 async function getTunneledDataBlob(url, type) {
     try {
         const res = await fetch(`${PROXY_URL}?type=${type}&url=${encodeURIComponent(url)}`);
@@ -701,9 +574,6 @@ async function getTunneledBlob(url, type) {
     return blob ? URL.createObjectURL(blob) : null;
 }
 
-/* ══════════════════════════════════════════════════════
-   PIP ENGINE
-══════════════════════════════════════════════════════ */
 function drawPiPFrame() {
     const canvas = document.getElementById('pipCanvas');
     const audio = getAudio();
@@ -737,9 +607,6 @@ async function togglePiP() {
     } catch(e) { console.error("PiP:", e); }
 }
 
-/* ══════════════════════════════════════════════════════
-   MEDIA SESSION
-══════════════════════════════════════════════════════ */
 function updateMediaSession() {
     if ('mediaSession' in navigator && currentTrackData) {
         navigator.mediaSession.metadata = new MediaMetadata({
@@ -753,9 +620,6 @@ function updateMediaSession() {
     }
 }
 
-/* ══════════════════════════════════════════════════════
-   PLAYER CORE
-══════════════════════════════════════════════════════ */
 async function playTrack(apiUrl, title, artist, img) {
     currentTrackData = { apiUrl, title, artist, img };
     document.getElementById('now-playing-title').textContent = title;
@@ -782,7 +646,6 @@ async function playTrack(apiUrl, title, artist, img) {
         document.getElementById('status-msg').textContent = "Live";
     }
 
-    // Re-render panels to highlight current
     renderPlaylist();
     renderQueue();
 }
@@ -792,7 +655,7 @@ const audio = getAudio(); if (!audio.src) return;
 audio.paused ? audio.play() : audio.pause();
 }
 
-let loopMode = 0; // 0 = off, 1 = loop one, 2 = loop all
+let loopMode = 0;
 
 function toggleLoop() {
   loopMode = (loopMode + 1) % 3;
@@ -800,22 +663,22 @@ function toggleLoop() {
   const icon = btn.querySelector('i');
 
   if (loopMode === 0) {
-    // Off
+
     btn.style.color = '';
     btn.style.background = '';
     icon.className = 'fa-solid fa-repeat';
     btn.title = 'Loop: Off';
     showToast('Loop off', 'fa-repeat');
   } else if (loopMode === 1) {
-    // Loop one
+
     btn.style.color = 'var(--mint)';
     btn.style.background = 'rgba(38,255,154,0.08)';
     icon.className = 'fa-solid fa-repeat';
-    // Add "1" badge
+
     btn.title = 'Loop: One';
     showToast('Loop one', 'fa-repeat');
   } else {
-    // Loop all
+
     btn.style.color = 'var(--mint)';
     btn.style.background = 'rgba(38,255,154,0.08)';
     icon.className = 'fa-solid fa-repeat';
@@ -823,7 +686,6 @@ function toggleLoop() {
     showToast('Loop all', 'fa-repeat');
   }
 
-  // Show/hide the "1" indicator
   let badge = btn.querySelector('.loop-badge');
   if (loopMode === 1) {
     if (!badge) {
@@ -845,11 +707,7 @@ function toggleLoop() {
     badge?.remove();
   }
 }
-/* Auto-advance to next in queue when track ends */
 
-/* ══════════════════════════════════════════════════════
-   FAVORITES
-══════════════════════════════════════════════════════ */
 function toggleFavorite() {
     if (!currentTrackData) return;
     const i = favorites.findIndex(f => f.apiUrl === currentTrackData.apiUrl);
@@ -868,15 +726,11 @@ function updateFavUI() {
     } else { document.getElementById('fav-row').style.display = 'none'; }
 }
 
-/* ══════════════════════════════════════════════════════
-   TRACK CARD (main grid)
-══════════════════════════════════════════════════════ */
 function createCard(track) {
     const card = document.createElement('div');
     card.className = 'track-card';
     const imgId = createSecureId('img');
 
-    // Left-click = play, right-click = context actions
     card.onclick = () => playTrack(track.apiUrl, track.title, track.artist, track.img);
     card.addEventListener('contextmenu', e => {
         e.preventDefault();
@@ -905,7 +759,6 @@ function createCard(track) {
     return card;
 }
 
-/* ── Context menu ────────────────────────────────── */
 let activeContext = null;
 function showCardContext(e, track) {
     removeContext();
@@ -951,9 +804,6 @@ function removeContext() {
     if (activeContext) { activeContext.remove(); activeContext = null; }
 }
 
-/* ══════════════════════════════════════════════════════
-   FETCH
-══════════════════════════════════════════════════════ */
 async function fetchMusic(mode) {
     const query = document.getElementById('musicInput').value || 'phonk';
     const sRow = document.getElementById('search-row');
@@ -990,9 +840,6 @@ function manualSeek(val) {
     if (audio && audio.duration) audio.currentTime = (val/100) * audio.duration;
 }
 
-/* ══════════════════════════════════════════════════════
-   AUDIO EVENTS
-══════════════════════════════════════════════════════ */
 document.addEventListener('audioReady', function() {
   const audio = getAudio();
   audio.onplay = () => {
