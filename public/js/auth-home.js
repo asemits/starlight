@@ -1153,19 +1153,11 @@
 
     if (showRecent && recentNode) {
       const recentSkeletonCount = dashboardSkeletonCount(DASHBOARD_RECENT_COUNT_KEY, 3);
-      recentNode.innerHTML = `
-        <div class="starlight-dashboard-skeleton-grid">
-          ${Array.from({ length: recentSkeletonCount }).map(() => '<article class="starlight-dashboard-item starlight-dashboard-item-skeleton"><div class="starlight-dashboard-thumb"><div class="starlight-skeleton-block"></div></div></article>').join("")}
-        </div>
-      `;
+      recentNode.innerHTML = Array.from({ length: recentSkeletonCount }).map(() => '<article class="starlight-dashboard-item starlight-dashboard-item-skeleton"><div class="starlight-dashboard-thumb"><div class="starlight-skeleton-block"></div></div></article>').join("");
     }
     if (showFavorites && favoritesNode) {
       const favoritesSkeletonCount = dashboardSkeletonCount(DASHBOARD_FAVORITES_COUNT_KEY, 4);
-      favoritesNode.innerHTML = `
-        <div class="starlight-dashboard-skeleton-grid">
-          ${Array.from({ length: favoritesSkeletonCount }).map(() => '<article class="starlight-dashboard-item starlight-dashboard-item-skeleton"><div class="starlight-dashboard-thumb"><div class="starlight-skeleton-block"></div></div></article>').join("")}
-        </div>
-      `;
+      favoritesNode.innerHTML = Array.from({ length: favoritesSkeletonCount }).map(() => '<article class="starlight-dashboard-item starlight-dashboard-item-skeleton"><div class="starlight-dashboard-thumb"><div class="starlight-skeleton-block"></div></div></article>').join("");
     }
     if (showStats && statsNode) {
       statsNode.innerHTML = `

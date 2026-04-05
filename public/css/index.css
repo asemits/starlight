@@ -735,12 +735,6 @@
   font-weight: 200;
 }
 
-.starlight-dashboard-skeleton-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 260px));
-  gap: 12px;
-}
-
 .starlight-dashboard-item-skeleton,
 .starlight-stat-card-skeleton {
   pointer-events: none;
