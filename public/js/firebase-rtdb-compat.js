@@ -494,9 +494,54 @@
       return this._clone({ cursor });
     }
 
+    _getScopedRefInfo() {
+      if (this._source.kind !== "collection") {
+        return null;
+      }
+
+      let ref = this._db._rawRef(this._source.path);
+
+      const participantFilter = this._filters.find((filter) => {
+        return !filter.isDocId
+          && filter.op === "array-contains"
+          && filter.fieldPath === "participants"
+          && typeof filter.value === "string"
+          && filter.value.trim().length > 0;
+      });
+
+      if (participantFilter) {
+        ref = ref.orderByChild(`participantsMap/${participantFilter.value}`).equalTo(true);
+      } else {
+        const equalityFilter = this._filters.find((filter) => {
+          return !filter.isDocId
+            && filter.op === "=="
+            && typeof filter.fieldPath === "string"
+            && filter.fieldPath.length > 0;
+        });
+
+        if (equalityFilter) {
+          ref = ref.orderByChild(equalityFilter.fieldPath).equalTo(equalityFilter.value);
+        } else if (this._order && !this._order.isDocId && typeof this._order.fieldPath === "string" && this._order.fieldPath.length > 0) {
+          ref = ref.orderByChild(this._order.fieldPath);
+        } else if (this._order && this._order.isDocId) {
+          ref = ref.orderByKey();
+        }
+      }
+
+      if (this._limit && this._limit > 0 && !this._cursor) {
+        if (this._order && this._order.direction === "desc") {
+          ref = ref.limitToLast(this._limit);
+        } else {
+          ref = ref.limitToFirst(this._limit);
+        }
+      }
+
+      return { ref };
+    }
+
     async _loadDocs() {
       if (this._source.kind === "collection") {
-        return this._db._getCollectionDocs(this._source.path);
+        return this._db._getCollectionDocs(this._source.path, this._getScopedRefInfo());
       }
       if (this._source.kind === "collectionGroup") {
         return this._db._getCollectionGroupDocs(this._source.collectionId);
@@ -610,10 +655,16 @@
 
     onSnapshot() {
       const callbacks = parseSnapshotCallbacks(arguments);
-      const listenPath = this._source.kind === "collectionGroup"
-        ? (this._source.collectionId === "players" ? "gameStats" : "")
-        : this._source.path;
-      const listenRef = this._db._rawRef(listenPath);
+      let listenRef = null;
+      if (this._source.kind === "collection") {
+        const scoped = this._getScopedRefInfo();
+        listenRef = scoped && scoped.ref ? scoped.ref : this._db._rawRef(this._source.path);
+      } else {
+        const listenPath = this._source.kind === "collectionGroup"
+          ? (this._source.collectionId === "players" ? "gameStats" : "")
+          : this._source.path;
+        listenRef = this._db._rawRef(listenPath);
+      }
       const handleChange = () => {
         this.get()
           .then((snapshot) => {
@@ -796,8 +847,8 @@
       await this._rawRef(path).remove();
     }
 
-    async _getCollectionDocs(collectionPath) {
-      const ref = this._rawRef(collectionPath);
+    async _getCollectionDocs(collectionPath, scopedRefInfo) {
+      const ref = scopedRefInfo && scopedRefInfo.ref ? scopedRefInfo.ref : this._rawRef(collectionPath);
       const snap = await ref.once("value");
       const value = snap.val();
       if (!isObject(value)) {
@@ -805,20 +856,38 @@
       }
 
       const docs = [];
-      const keys = Object.keys(value);
-      for (let i = 0; i < keys.length; i += 1) {
-        const key = keys[i];
+      snap.forEach((childSnap) => {
+        const key = childSnap.key;
         const docId = decodeDocId(key);
         const docPath = joinPath(collectionPath, docId);
-        const docValue = value[key];
+        const docValue = childSnap.val();
         if (docValue === null || docValue === undefined) {
-          continue;
+          return false;
         }
         docs.push({
           id: docId,
           path: docPath,
           data: deepClone(docValue)
         });
+        return false;
+      });
+
+      if (!docs.length) {
+        const keys = Object.keys(value);
+        for (let i = 0; i < keys.length; i += 1) {
+          const key = keys[i];
+          const docId = decodeDocId(key);
+          const docPath = joinPath(collectionPath, docId);
+          const docValue = value[key];
+          if (docValue === null || docValue === undefined) {
+            continue;
+          }
+          docs.push({
+            id: docId,
+            path: docPath,
+            data: deepClone(docValue)
+          });
+        }
       }
 
       return docs;
