@@ -875,9 +875,16 @@
 
   function guardedPath(path) {
     const normalized = String(path || "/");
+    const action = getActionParams();
+    if (action) {
+      if (window.location.pathname !== "/") {
+        window.history.replaceState({}, "", `/${window.location.search || ""}`);
+      }
+      return "/";
+    }
     if (!isLoggedIn() && normalized !== "/") {
       if (window.location.pathname !== "/") {
-        window.history.replaceState({}, "", "/");
+        window.history.replaceState({}, "", `/${window.location.search || ""}`);
       }
       return "/";
     }
