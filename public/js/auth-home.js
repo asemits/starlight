@@ -1296,17 +1296,92 @@
   function openSignupTosModal() {
     state.signupStartedAt = Date.now();
     showModal("Terms of Service", `
-      <div class="starlight-tos-block">${escapeHtml(config.tosText).replaceAll("\n", "<br>")}</div>
-      <p id="signup-status" class="starlight-status"></p>
-      <button type="button" id="signup-tos-continue" class="starlight-btn starlight-btn-primary">I Agree</button>
+      <div id="signup-tos-scroll" class="starlight-tos-block">${escapeHtml(config.tosText).replaceAll("\n", "<br>")}</div>
+      <p id="signup-status" class="starlight-status">Scroll to the bottom and wait 30 seconds to continue.</p>
+      <button type="button" id="signup-tos-continue" class="starlight-btn starlight-btn-primary" disabled>I Agree</button>
       <button type="button" id="signup-tos-decline" class="starlight-btn starlight-btn-muted">I Decline</button>
     `);
 
+    const tosScroll = document.getElementById("signup-tos-scroll");
     const continueBtn = document.getElementById("signup-tos-continue");
+    const statusNode = document.getElementById("signup-status");
+
+    let reachedBottom = false;
+
+    function hasWaitedLongEnough() {
+      return Date.now() - state.signupStartedAt >= TOS_REQUIRED_MS;
+    }
+
+    function checkReachedBottom() {
+      if (!tosScroll) {
+        return false;
+      }
+      const threshold = 2;
+      const atBottom = tosScroll.scrollTop + tosScroll.clientHeight >= tosScroll.scrollHeight - threshold;
+      if (atBottom) {
+        reachedBottom = true;
+      }
+      return reachedBottom;
+    }
+
+    function refreshContinueState() {
+      const waitedLongEnough = hasWaitedLongEnough();
+      const scrolledToBottom = checkReachedBottom();
+      const canContinue = waitedLongEnough && scrolledToBottom;
+
+      if (continueBtn) {
+        continueBtn.disabled = !canContinue;
+      }
+
+      if (!statusNode) {
+        return;
+      }
+
+      if (canContinue) {
+        statusNode.textContent = "You can continue.";
+        statusNode.classList.remove("error");
+        statusNode.classList.add("ok");
+        return;
+      }
+
+      const remainingMs = Math.max(0, TOS_REQUIRED_MS - (Date.now() - state.signupStartedAt));
+      const needsTime = !waitedLongEnough;
+      const needsScroll = !scrolledToBottom;
+
+      if (needsTime && needsScroll) {
+        statusNode.textContent = `Scroll to the bottom and wait ${toTimeText(remainingMs)}.`;
+      } else if (needsTime) {
+        statusNode.textContent = `Wait ${toTimeText(remainingMs)} to continue.`;
+      } else {
+        statusNode.textContent = "Scroll to the bottom to continue.";
+      }
+      statusNode.classList.remove("ok");
+      statusNode.classList.add("error");
+    }
+
+    if (tosScroll) {
+      tosScroll.addEventListener("scroll", refreshContinueState);
+    }
+
+    const tosGateTimer = window.setInterval(() => {
+      if (!document.getElementById("signup-tos-continue")) {
+        window.clearInterval(tosGateTimer);
+        return;
+      }
+      refreshContinueState();
+      if (hasWaitedLongEnough() && reachedBottom) {
+        window.clearInterval(tosGateTimer);
+      }
+    }, 250);
+
+    refreshContinueState();
+
     if (continueBtn) {
       continueBtn.addEventListener("click", () => {
-        if (Date.now() - state.signupStartedAt < TOS_REQUIRED_MS) {
-          showMessagePopup("Read it, you lazy bum.", "Slow Down");
+        const waitedLongEnough = hasWaitedLongEnough();
+        const scrolledToBottom = checkReachedBottom();
+        if (!waitedLongEnough || !scrolledToBottom) {
+          refreshContinueState();
           return;
         }
         openSignupFormModal();
