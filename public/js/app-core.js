@@ -2,6 +2,7 @@
   const firebaseConfig = {
     apiKey: "AIzaSyAaOp3LYoMGbByON7W7pGQYV_oXJlmU_Hw",
     authDomain: "starlight-28e40.firebaseapp.com",
+    databaseURL: "https://starlight-28e40-default-rtdb.firebaseio.com",
     projectId: "starlight-28e40",
     storageBucket: "starlight-28e40.firebasestorage.app",
     messagingSenderId: "206859310211",
@@ -643,7 +644,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   if (window.firebase) {
     const firebaseApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
     window.starlightAuth = firebaseApp.auth();
-    window.starlightDb = firebaseApp.firestore();
+    window.starlightRtdb = firebaseApp.database();
+    window.starlightDb = window.createStarlightRtdbCompatDb
+      ? window.createStarlightRtdbCompatDb(window.starlightRtdb)
+      : null;
 
     window.starlightAuthReady = new Promise((resolve) => {
       const unsubscribe = window.starlightAuth.onAuthStateChanged((user) => {
