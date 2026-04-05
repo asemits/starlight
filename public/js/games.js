@@ -7,6 +7,7 @@
 	const POPULAR_LIMIT = 10;
 	const POPULAR_REFRESH_MS = 15000;
 	const GAME_LIST_CACHE_KEY = "starlight-games-list-v8";
+	const PENDING_GAME_LAUNCH_KEY = "starlight-pending-game-launch";
 
 	const state = {
 		mountSelector: "#games-root",
@@ -193,6 +194,25 @@
 		const input = String(sourceBase || "").trim();
 		const found = CDN_BASES.find((base) => base === input || base.replace(/\/$/, "") === input.replace(/\/$/, ""));
 		return found || PRIMARY_CDN_BASE;
+	}
+
+	function consumePendingLaunch() {
+		try {
+			const raw = sessionStorage.getItem(PENDING_GAME_LAUNCH_KEY);
+			if (!raw) {
+				return null;
+			}
+			sessionStorage.removeItem(PENDING_GAME_LAUNCH_KEY);
+			const parsed = JSON.parse(raw);
+			const path = normalizePath(parsed && parsed.path ? parsed.path : "");
+			if (!path) {
+				return null;
+			}
+			const sourceBase = normalizeSourceBase(parsed && parsed.sourceBase ? parsed.sourceBase : PRIMARY_CDN_BASE);
+			return { path, sourceBase };
+		} catch (_error) {
+			return null;
+		}
 	}
 
 	function normalizeImageUrl(image, sourceBase) {
@@ -1719,6 +1739,17 @@
 		renderHero(root);
 		renderPopular(root);
 		renderCards(root, false);
+
+		const pendingLaunch = consumePendingLaunch();
+		if (pendingLaunch) {
+			const game = findGame(pendingLaunch.path, pendingLaunch.sourceBase);
+			if (game) {
+				try {
+					await openGame(game);
+				} catch (_error) {
+				}
+			}
+		}
 	}
 
 	function mount(selector) {

@@ -1,5 +1,6 @@
 (function () {
   const ANTI_CLOSE_KEY = "starlight-anti-close-enabled";
+  const PENDING_GAME_LAUNCH_KEY = "starlight-pending-game-launch";
   let skipOnce = false;
 
   function antiCloseEnabled() {
@@ -89,6 +90,19 @@
     if (link) {
       e.preventDefault();
       const url = link.getAttribute("href");
+      if (url === "/games") {
+        const gamePath = String(link.getAttribute("data-game-path") || "").trim();
+        const sourceBase = String(link.getAttribute("data-source-base") || "").trim();
+        if (gamePath) {
+          try {
+            sessionStorage.setItem(PENDING_GAME_LAUNCH_KEY, JSON.stringify({
+              path: gamePath,
+              sourceBase
+            }));
+          } catch (_error) {
+          }
+        }
+      }
       if (url !== "/games" && window.StarlightGames && typeof window.StarlightGames.hideOverlayInstant === "function") {
         try {
           window.StarlightGames.hideOverlayInstant();
