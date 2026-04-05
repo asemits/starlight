@@ -240,6 +240,12 @@
     if (code === "auth/popup-closed-by-user") {
       return "Account deletion was canceled.";
     }
+    if (code === "auth/popup-blocked") {
+      return "Popup was blocked. Allow popups or use password reauthentication.";
+    }
+    if (code === "auth/redirecting-reauth") {
+      return "Continuing Google reauthentication...";
+    }
     if (code === "auth/too-many-requests") {
       return "Too many attempts. Try again later.";
     }
@@ -249,12 +255,6 @@
   async function ensureRecentLoginForDeletion(user) {
     const providers = Array.isArray(user && user.providerData) ? user.providerData : [];
     const providerIds = providers.map((item) => item && item.providerId ? String(item.providerId) : "").filter(Boolean);
-
-    if (providerIds.includes("google.com")) {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      await user.reauthenticateWithPopup(provider);
-      return;
-    }
 
     if (providerIds.includes("password")) {
       const password = String(window.prompt("For security, enter your current password to delete your account:") || "");
@@ -266,6 +266,23 @@
       const credential = firebase.auth.EmailAuthProvider.credential(String(user.email), password);
       await user.reauthenticateWithCredential(credential);
       return;
+    }
+
+    if (providerIds.includes("google.com")) {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      try {
+        await user.reauthenticateWithPopup(provider);
+        return;
+      } catch (error) {
+        const code = authErrorCode(error);
+        if (code === "auth/popup-blocked") {
+          await user.reauthenticateWithRedirect(provider);
+          const redirecting = new Error("redirecting-reauth");
+          redirecting.code = "auth/redirecting-reauth";
+          throw redirecting;
+        }
+        throw error;
+      }
     }
 
     const fallback = new Error("recent-login-required");
@@ -1670,6 +1687,9 @@
     try {
       setStatus("settings-danger-status", "Confirming your identity...", true);
       await ensureRecentLoginForDeletion(user);
+      if (!currentUser()) {
+        return;
+      }
       setStatus("settings-danger-status", "Deleting account data...", true);
       await deleteUserFirestoreData(user);
       await user.delete();
@@ -1687,6 +1707,9 @@
         window.router();
       }
     } catch (error) {
+      if (authErrorCode(error) === "auth/redirecting-reauth") {
+        return;
+      }
       setStatus("settings-danger-status", deleteAccountMessage(error), false);
     }
   }
