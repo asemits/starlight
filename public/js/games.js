@@ -432,6 +432,16 @@
 			|| null;
 	}
 
+	function findGameByPath(path) {
+		const normalized = normalizePath(path).toLowerCase();
+		if (!normalized) {
+			return null;
+		}
+		return state.games.find((game) => normalizePath(game.path).toLowerCase() === normalized)
+			|| state.popularGames.find((game) => normalizePath(game.path).toLowerCase() === normalized)
+			|| null;
+	}
+
 	async function loadGames() {
 		if (state.ready) {
 			return;
@@ -1742,7 +1752,8 @@
 
 		const pendingLaunch = consumePendingLaunch();
 		if (pendingLaunch) {
-			const game = findGame(pendingLaunch.path, pendingLaunch.sourceBase);
+			const game = findGame(pendingLaunch.path, pendingLaunch.sourceBase)
+				|| findGameByPath(pendingLaunch.path);
 			if (game) {
 				try {
 					await openGame(game);
