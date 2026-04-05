@@ -9,7 +9,7 @@
             <p>Open encrypted direct messages and group chats.</p>
           </header>
           <div class="starlight-social-grid">
-            <a href="/private-chat" class="nav-link starlight-social-card">
+            <a href="/chat" class="nav-link starlight-social-card">
               <div class="starlight-social-card-icon">
                 <i class="fa-solid fa-user-lock"></i>
               </div>

@@ -54,11 +54,11 @@
       window.StarlightAuthUI.syncLockedState(path);
     }
 
-    if (path !== "/private-chat" && window.StarlightPrivateChat && typeof window.StarlightPrivateChat.unmount === "function") {
+    if (path !== "/private-chat" && path !== "/chat" && window.StarlightPrivateChat && typeof window.StarlightPrivateChat.unmount === "function") {
       window.StarlightPrivateChat.unmount();
     }
 
-    appContent.classList.toggle("starlight-chat-screen", path === "/private-chat");
+    appContent.classList.toggle("starlight-chat-screen", path === "/private-chat" || path === "/chat");
 
     const route = routes[path] || routes["404"];
     if (!route || typeof route.render !== "function") {
