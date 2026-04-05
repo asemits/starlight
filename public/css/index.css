@@ -23,7 +23,7 @@
   position: relative;
   z-index: 1;
   opacity: 1;
-  transform: translateX(0);
+  transform: none;
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
