@@ -1068,18 +1068,9 @@
 	}
 
 	async function openGame(game) {
-		try {
-			await trackPlay(game);
-		} catch (_error) {
-		}
-		try {
-			await ensureStats([game.path]);
-		} catch (_error) {
-		}
-		try {
-			await loadPopularGames(true);
-		} catch (_error) {
-		}
+		trackPlay(game).catch(() => {});
+		ensureStats([game.path]).catch(() => {});
+		loadPopularGames(true).catch(() => {});
 
 		if (state.overlayCleanup) {
 			try {
