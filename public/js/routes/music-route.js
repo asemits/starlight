@@ -1184,8 +1184,11 @@ header.scrolled {
   }
 }
 .skip-btn { font-size:18px !important; }
+.scorller {
+  overflow-y:scroll
+}
         </style>
-        
+        <div class="scorller">
         <canvas id="pipCanvas" width="500" height="500" style="display:none;"></canvas>
 <video id="pipVideo" muted autoplay playsinline style="display:none;"></video>
 <div class="scanline"></div>
@@ -1349,6 +1352,7 @@ header.scrolled {
             <button class="music-modal-btn primary" id="music-modal-confirm" type="button">Confirm</button>
         </div>
     </div>
+</div>
 </div>
 <br>
 <br>

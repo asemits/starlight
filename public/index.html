@@ -24,8 +24,14 @@
     <link rel="stylesheet" href="css/index.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/style.css" rel="stylesheet">
-</head>
+  <style>
+    * {
+    cursor: none !important;
+}
+  </style>
+  </head>
 <body class="bg-black text-white">
+  <div class="custom-cursor"></div>
     <canvas id="global-particles"></canvas>
     <nav class="sidebar" id="sidebar">
       <img src="logos/logo.png" class="sidebar-logo">
@@ -69,6 +75,7 @@
         </ul>
     </nav>
     <div id="app-content" class="p-8 pt-24"></div>
+    <script src="js/cursor.js"></script>
     <script src="js/app-core.js"></script>
     <script src="js/games.js"></script>
     <script src="js/weather.js"></script>
