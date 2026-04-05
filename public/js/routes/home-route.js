@@ -2,11 +2,7 @@
   const modules = window.StarlightRouteModules = window.StarlightRouteModules || {};
   modules["/"] = {
     render: function renderHomeRoute() {
-      return `
-        <div class="starlight-home-shell">
-          <div id="home-root"></div>
-        </div>
-      `;
+      return '<div id="home-root"></div>';
     },
     afterRender: function afterRenderHomeRoute() {
       if (window.StarlightAuthUI) {

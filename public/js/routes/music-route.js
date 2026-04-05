@@ -1240,7 +1240,10 @@ header.scrolled {
         <canvas id="pipCanvas" width="500" height="500" style="display:none;"></canvas>
 <video id="pipVideo" muted autoplay playsinline style="display:none;"></video>
 <div class="scanline"></div>
+
+<!-- HEADER -->
 <header id="site-header">
+    <div class="header-brand"><i class="fa-solid fa-music"></i>STARLIGHT</div>
     <div class="search-wrap">
         <i class="fa-solid fa-magnifying-glass"></i>
         <input type="text" id="musicInput" class="search-box" placeholder="Search tracks, artists…"
@@ -1248,6 +1251,7 @@ header.scrolled {
     </div>
 </header>
 
+<!-- HERO -->
 <section class="hero">
     <div class="hero-bg" id="hero-bg"></div>
     <div class="hero-gradient"></div>
@@ -1260,6 +1264,7 @@ header.scrolled {
             <span class="line"><span>PLAYER</span></span>
         </h1>
 
+        <!-- EQ bars decoration -->
         <div class="eq-bars" id="hero-eq">
             <div class="eq-bar" style="height:16px"></div>
             <div class="eq-bar" style="height:10px"></div>
