@@ -42,10 +42,6 @@
   async function router() {
     let path = window.location.pathname;
 
-    if (path !== "/private-chat" && window.StarlightPrivateChat && typeof window.StarlightPrivateChat.unmount === "function") {
-      window.StarlightPrivateChat.unmount();
-    }
-
     if (path !== "/games" && window.StarlightGames && typeof window.StarlightGames.hideOverlayInstant === "function") {
       try {
         window.StarlightGames.hideOverlayInstant();
@@ -57,6 +53,12 @@
       path = window.StarlightAuthUI.guardedPath(path);
       window.StarlightAuthUI.syncLockedState(path);
     }
+
+    if (path !== "/private-chat" && window.StarlightPrivateChat && typeof window.StarlightPrivateChat.unmount === "function") {
+      window.StarlightPrivateChat.unmount();
+    }
+
+    appContent.classList.toggle("starlight-chat-screen", path === "/private-chat");
 
     const route = routes[path] || routes["404"];
     if (!route || typeof route.render !== "function") {

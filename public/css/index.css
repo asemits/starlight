@@ -39,6 +39,17 @@
   filter: blur(2px);
 }
 
+#app-content.starlight-chat-screen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  padding: 0 !important;
+  margin: 0;
+  z-index: 3;
+}
+
 /* ── Info Widget ──────────────────────────────────── */
 #starlight-info-widget {
   position: fixed;
@@ -1266,6 +1277,280 @@
   gap: 8px;
 }
 
+.starlight-private-chat-page-fullscreen {
+  width: 100%;
+  height: 100%;
+}
+
+.starlight-private-chat-shell-fullscreen {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  grid-template-columns: 320px minmax(0, 1fr);
+}
+
+.starlight-private-chat-shell-fullscreen .starlight-chat-sidebar {
+  border-right: 0.5px solid var(--border);
+  min-height: 0;
+  height: 100%;
+}
+
+.starlight-private-chat-shell-fullscreen .starlight-chat-main {
+  border-right: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.starlight-private-chat-shell-fullscreen .starlight-chat-list-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.starlight-private-chat-shell-fullscreen .starlight-chat-list {
+  overflow-y: auto;
+}
+
+.starlight-chat-compose-wrap {
+  border-top: 0.5px solid var(--border);
+}
+
+.starlight-chat-compose-wrap .starlight-chat-compose {
+  border-top: 0;
+}
+
+.starlight-chat-reply-chip {
+  margin: 8px 10px 0;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.starlight-chat-reply-chip.hidden {
+  display: none;
+}
+
+.starlight-chat-reply-chip-main p {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-family: 'Geist', 'Oxanium', sans-serif;
+  font-weight: 300;
+}
+
+.starlight-chat-reply-chip-main span {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  color: var(--ink-dim);
+  font-family: 'Geist', 'Montserrat', sans-serif;
+  font-weight: 200;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.starlight-chat-reply-chip button {
+  border-radius: 10px;
+  border: 0.5px solid var(--border);
+  background: var(--glass);
+  width: 30px;
+  height: 30px;
+  color: var(--ink);
+}
+
+.starlight-chat-inline-reply {
+  border-left: 2px solid rgba(255,255,255,0.2);
+  padding-left: 8px;
+  margin-bottom: 7px;
+  display: grid;
+  gap: 3px;
+}
+
+.starlight-chat-inline-reply strong {
+  font-size: 0.67rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  font-family: 'Geist', 'Oxanium', sans-serif;
+  font-weight: 300;
+}
+
+.starlight-chat-inline-reply span {
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
+  font-family: 'Geist', 'Montserrat', sans-serif;
+  font-weight: 200;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.starlight-chat-context-menu {
+  position: fixed;
+  z-index: 4000;
+  min-width: 170px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 0.5px solid var(--border);
+  background: rgba(15,15,15,0.9);
+  box-shadow: var(--shadow-deep);
+  display: grid;
+  gap: 4px;
+}
+
+.starlight-chat-context-menu.hidden {
+  display: none;
+}
+
+.starlight-chat-context-menu button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  letter-spacing: 0.04em;
+  font-size: 0.77rem;
+  font-family: 'Geist', 'Montserrat', sans-serif;
+  font-weight: 300;
+}
+
+.starlight-chat-context-menu button:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+#starlight-chat-modal.hidden {
+  display: none;
+}
+
+.starlight-chat-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 4500;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.starlight-chat-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0,0,0,0.74);
+  backdrop-filter: blur(4px);
+}
+
+.starlight-chat-modal-card {
+  position: relative;
+  width: min(92vw, 560px);
+  border: 0.5px solid var(--border);
+  border-radius: 18px;
+  background: rgba(10,10,10,0.92);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: var(--shadow-deep);
+}
+
+.starlight-chat-modal-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.starlight-chat-modal-card h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: 'Geist', 'Oxanium', sans-serif;
+  font-weight: 300;
+}
+
+.starlight-chat-modal-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 0.5px solid var(--border);
+  background: var(--glass);
+  color: var(--ink);
+}
+
+.starlight-chat-modal-body {
+  padding: 14px 16px 16px;
+}
+
+.starlight-chat-modal-copy {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  font-family: 'Geist', 'Montserrat', sans-serif;
+  font-weight: 200;
+}
+
+.starlight-chat-modal-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.starlight-chat-modal-btn {
+  border-radius: 10px;
+  border: 0.5px solid var(--border);
+  background: var(--glass-mid);
+  color: var(--ink);
+  padding: 9px 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 10px;
+  font-family: 'Geist', 'Oxanium', sans-serif;
+  font-weight: 300;
+}
+
+.starlight-chat-modal-btn.danger {
+  background: rgba(255,80,80,0.14);
+  border-color: rgba(255,80,80,0.38);
+}
+
+.starlight-chat-edit-form {
+  display: grid;
+  gap: 10px;
+}
+
+.starlight-chat-edit-form textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  border-radius: 12px;
+  border: 0.5px solid var(--border);
+  background: rgba(0,0,0,0.35);
+  color: var(--ink);
+  padding: 10px 12px;
+  font-size: 0.86rem;
+  letter-spacing: 0.03em;
+  font-family: 'Geist', 'Montserrat', sans-serif;
+  font-weight: 200;
+  outline: none;
+}
+
 /* ── Auth locked ──────────────────────────────────── */
 body.auth-locked .sidebar .nav-link.auth-disabled {
   opacity: 0.3;
@@ -1301,6 +1586,16 @@ body.auth-locked .sidebar .nav-link.auth-disabled {
   .starlight-chat-list-wrap {
     height: 250px;
     flex: 0 0 auto;
+  }
+
+  .starlight-private-chat-shell-fullscreen {
+    grid-template-columns: 1fr;
+    grid-template-rows: 44vh minmax(0, 1fr);
+  }
+
+  .starlight-private-chat-shell-fullscreen .starlight-chat-sidebar {
+    border-right: 0;
+    border-bottom: 0.5px solid var(--border);
   }
 }
 

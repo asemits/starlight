@@ -224,13 +224,33 @@ service cloud.firestore {
       allow read: if isChatParticipant(chatId);
 
       allow create: if isChatParticipant(chatId)
-        && hasOnlyKeys(request.resource.data, ['senderId', 'senderUsername', 'ciphertext', 'iv', 'createdAt'])
+        && hasOnlyKeys(request.resource.data, ['senderId', 'senderUsername', 'ciphertext', 'iv', 'createdAt', 'editedAt', 'replyToMessageId'])
         && request.resource.data.senderId == request.auth.uid
         && isNonEmptyString(request.resource.data.senderUsername, 60)
         && isNonEmptyString(request.resource.data.ciphertext, 20000)
-        && isNonEmptyString(request.resource.data.iv, 256);
+        && isNonEmptyString(request.resource.data.iv, 256)
+        && (!('editedAt' in request.resource.data) || request.resource.data.editedAt is timestamp)
+        && (!('replyToMessageId' in request.resource.data) || (request.resource.data.replyToMessageId is string && request.resource.data.replyToMessageId.size() <= 200));
 
-      allow update, delete: if false;
+      allow update: if isChatParticipant(chatId)
+        && request.auth.uid == resource.data.senderId
+        && hasOnlyKeys(request.resource.data, ['senderId', 'senderUsername', 'ciphertext', 'iv', 'createdAt', 'editedAt', 'replyToMessageId'])
+        && request.resource.data.senderId == resource.data.senderId
+        && request.resource.data.senderUsername == resource.data.senderUsername
+        && request.resource.data.createdAt == resource.data.createdAt
+        && isNonEmptyString(request.resource.data.ciphertext, 20000)
+        && isNonEmptyString(request.resource.data.iv, 256)
+        && (!('editedAt' in request.resource.data) || request.resource.data.editedAt is timestamp)
+        && (
+          (!('replyToMessageId' in resource.data) && !('replyToMessageId' in request.resource.data))
+          || (
+            ('replyToMessageId' in resource.data)
+            && ('replyToMessageId' in request.resource.data)
+            && request.resource.data.replyToMessageId == resource.data.replyToMessageId
+          )
+        );
+
+      allow delete: if isChatParticipant(chatId) && request.auth.uid == resource.data.senderId;
     }
 
     match /{document=**} {
