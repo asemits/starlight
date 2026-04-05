@@ -1074,13 +1074,13 @@
         <section class="starlight-home-shell starlight-dashboard-shell">
           <header class="starlight-home-hero">
             <p class="starlight-home-kicker">Your Dashboard</p>
-            <h1>Welcome back to ${escapeHtml(config.siteName)}</h1>
-            <p class="starlight-home-tagline">Pick up where you left off or discover something new</p>
+            <h1>${escapeHtml(config.siteName)}</h1>
+            <p class="starlight-home-tagline">pick up where you left off</p>
           </header>
 
           ${showRecent ? `<section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
-              <h2>📺 Recently Played</h2>
+              <h2>Recently Played</h2>
               <button id="dashboard-clear-recent" type="button" class="starlight-btn starlight-btn-muted">Clear</button>
             </div>
             <div id="dashboard-recent" class="starlight-dashboard-grid"></div>
@@ -1088,14 +1088,14 @@
 
           ${showFavorites ? `<section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
-              <h2>❤️ Your Favorites</h2>
+              <h2>Your Favorites</h2>
             </div>
             <div id="dashboard-favorites" class="starlight-dashboard-grid"></div>
           </section>` : ""}
 
           ${showStats ? `<section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
-              <h2>📊 Your Stats</h2>
+              <h2>Your Stats</h2>
             </div>
             <div id="dashboard-stats" class="starlight-dashboard-stats"></div>
           </section>` : ""}
