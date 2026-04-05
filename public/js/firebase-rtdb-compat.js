@@ -494,23 +494,32 @@
       return this._clone({ cursor });
     }
 
+    _getParticipantsArrayContainsFilter() {
+      return this._filters.find((filter) => {
+        return !filter.isDocId
+          && filter.op === "array-contains"
+          && filter.fieldPath === "participants"
+          && typeof filter.value === "string"
+          && filter.value.trim().length > 0;
+      }) || null;
+    }
+
     _getScopedRefInfo() {
       if (this._source.kind !== "collection") {
         return null;
       }
 
       let ref = this._db._rawRef(this._source.path);
+      const collectionPath = splitPath(this._source.path).join("/");
 
-      const participantFilter = this._filters.find((filter) => {
-        return !filter.isDocId
-          && filter.op === "array-contains"
-          && filter.fieldPath === "participants"
-          && typeof filter.value === "string"
-          && filter.value.trim().length > 0;
-      });
+      const participantFilter = this._getParticipantsArrayContainsFilter();
 
       if (participantFilter) {
-        ref = ref.orderByChild(`participantsMap/${participantFilter.value}`).equalTo(true);
+        if (collectionPath === "privateChats") {
+          ref = this._db._rawRef(joinPath("userChats", participantFilter.value));
+        } else {
+          ref = ref.orderByChild(`participantsMap/${participantFilter.value}`).equalTo(true);
+        }
       } else {
         const equalityFilter = this._filters.find((filter) => {
           return !filter.isDocId
@@ -541,6 +550,13 @@
 
     async _loadDocs() {
       if (this._source.kind === "collection") {
+        const collectionPath = splitPath(this._source.path).join("/");
+        if (collectionPath === "privateChats") {
+          const participantFilter = this._getParticipantsArrayContainsFilter();
+          if (participantFilter) {
+            return this._db._getPrivateChatsForUser(participantFilter.value);
+          }
+        }
         return this._db._getCollectionDocs(this._source.path, this._getScopedRefInfo());
       }
       if (this._source.kind === "collectionGroup") {
@@ -822,15 +838,18 @@
       if (!merge) {
         const payload = convertWriteValue(this._databaseNamespace, decorated);
         await ref.set(payload);
+        await this._syncPrivateChatIndex(path, decorated);
         return;
       }
 
       const updates = {};
       flattenForUpdate(this._databaseNamespace, decorated, "", updates);
       if (!Object.keys(updates).length) {
+        await this._syncPrivateChatIndex(path, decorated);
         return;
       }
       await ref.update(updates);
+      await this._syncPrivateChatIndex(path, decorated);
     }
 
     async _updateDocument(path, data) {
@@ -838,13 +857,80 @@
       const updates = {};
       flattenForUpdate(this._databaseNamespace, decorated, "", updates);
       if (!Object.keys(updates).length) {
+        await this._syncPrivateChatIndex(path, decorated);
         return;
       }
       await this._rawRef(path).update(updates);
+      await this._syncPrivateChatIndex(path, decorated);
     }
 
     async _deleteDocument(path) {
       await this._rawRef(path).remove();
+    }
+
+    async _syncPrivateChatIndex(path, data) {
+      const segments = splitPath(path);
+      if (segments.length !== 2 || segments[0] !== "privateChats") {
+        return;
+      }
+
+      if (!isPlainObject(data) || !Array.isArray(data.participants)) {
+        return;
+      }
+
+      const chatId = segments[1];
+      const updates = {};
+      data.participants.forEach((uidValue) => {
+        const uid = String(uidValue || "").trim();
+        if (!uid) {
+          return;
+        }
+        const rtdbPath = pathToRtdb(joinPath("userChats", uid, chatId));
+        updates[rtdbPath] = true;
+      });
+
+      if (!Object.keys(updates).length) {
+        return;
+      }
+
+      await this._rtdb.ref().update(updates);
+    }
+
+    async _getPrivateChatsForUser(uidValue) {
+      const uid = String(uidValue || "").trim();
+      if (!uid) {
+        return [];
+      }
+
+      const indexSnap = await this._rawRef(joinPath("userChats", uid)).once("value");
+      const indexValue = indexSnap.val();
+      if (!isObject(indexValue)) {
+        return [];
+      }
+
+      const chatIds = Object.keys(indexValue)
+        .filter((key) => Boolean(indexValue[key]))
+        .map((key) => decodeDocId(key));
+
+      if (!chatIds.length) {
+        return [];
+      }
+
+      const docs = [];
+      const snapshots = await Promise.all(chatIds.map((chatId) => this._getDocument(joinPath("privateChats", chatId))));
+      for (let i = 0; i < snapshots.length; i += 1) {
+        const snap = snapshots[i];
+        if (!snap || !snap.exists) {
+          continue;
+        }
+        docs.push({
+          id: chatIds[i],
+          path: joinPath("privateChats", chatIds[i]),
+          data: snap.data() || {}
+        });
+      }
+
+      return docs;
     }
 
     async _getCollectionDocs(collectionPath, scopedRefInfo) {
