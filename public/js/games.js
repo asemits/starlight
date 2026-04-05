@@ -1168,7 +1168,17 @@
 		state.overlayCleanup = cleanup;
 	}
 
+	function hideOverlayInstant() {
+		document.querySelectorAll(".game-overlay").forEach((node) => {
+			try {
+				node.remove();
+			} catch (_error) {
+			}
+		});
+	}
+
 	async function closeOverlay() {
+		hideOverlayInstant();
 		if (!state.overlayCleanup) {
 			return;
 		}
@@ -1714,6 +1724,7 @@
 	window.StarlightGames = {
 		mount,
 		render,
+		hideOverlayInstant,
 		closeOverlay,
 		setFavoriteByPath: async function setFavoriteByPath(path, sourceBase, favoriteOn) {
 			const game = findGame(path, sourceBase || PRIMARY_CDN_BASE);

@@ -82,6 +82,12 @@
     if (link) {
       e.preventDefault();
       const url = link.getAttribute("href");
+      if (url !== "/games" && window.StarlightGames && typeof window.StarlightGames.hideOverlayInstant === "function") {
+        try {
+          window.StarlightGames.hideOverlayInstant();
+        } catch (_error) {
+        }
+      }
       if (window.StarlightAuthUI && !window.StarlightAuthUI.isLoggedIn() && url !== "/") {
         window.StarlightAuthUI.showLockedMessage();
         window.history.replaceState({}, "", "/");
@@ -92,7 +98,15 @@
       router();
     }
   });
-  window.addEventListener("popstate", router);
+  window.addEventListener("popstate", () => {
+    if (window.location.pathname !== "/games" && window.StarlightGames && typeof window.StarlightGames.hideOverlayInstant === "function") {
+      try {
+        window.StarlightGames.hideOverlayInstant();
+      } catch (_error) {
+      }
+    }
+    router();
+  });
   window.addEventListener("DOMContentLoaded", () => {
     if (window.StarlightAuthUI) {
       window.StarlightAuthUI.init();
