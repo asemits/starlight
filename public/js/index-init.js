@@ -42,6 +42,10 @@
   async function router() {
     let path = window.location.pathname;
 
+    if (path !== "/private-chat" && window.StarlightPrivateChat && typeof window.StarlightPrivateChat.unmount === "function") {
+      window.StarlightPrivateChat.unmount();
+    }
+
     if (path !== "/games" && window.StarlightGames && typeof window.StarlightGames.hideOverlayInstant === "function") {
       try {
         window.StarlightGames.hideOverlayInstant();
