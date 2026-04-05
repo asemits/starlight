@@ -164,6 +164,71 @@
     node.classList.toggle("error", !ok);
   }
 
+  function authErrorCode(error) {
+    if (!error || !error.code) {
+      return "";
+    }
+    return String(error.code).trim().toLowerCase();
+  }
+
+  function friendlyAuthMessage(error, context) {
+    const code = authErrorCode(error);
+
+    if (context === "login") {
+      if (code === "auth/invalid-email") return "Invalid email.";
+      if (code === "auth/user-not-found") return "Account does not exist.";
+      if (code === "auth/wrong-password" || code === "auth/invalid-login-credentials" || code === "auth/invalid-credential") return "Incorrect email or password.";
+      if (code === "auth/user-disabled") return "This account is disabled.";
+      if (code === "auth/too-many-requests") return "Too many attempts. Try again later.";
+      return "Could not log in. Please try again.";
+    }
+
+    if (context === "signup") {
+      if (code === "auth/invalid-email") return "Invalid email.";
+      if (code === "auth/email-already-in-use") return "Email already exists.";
+      if (code === "auth/weak-password" || code === "auth/password-does-not-meet-requirements") return "Password does not meet requirements.";
+      if (code === "auth/operation-not-allowed") return "Account creation is currently unavailable.";
+      return "Could not create account. Please try again.";
+    }
+
+    if (context === "forgot-password") {
+      if (code === "auth/invalid-email") return "Invalid email.";
+      if (code === "auth/user-not-found") return "Account does not exist.";
+      if (code === "auth/too-many-requests") return "Too many requests. Try again later.";
+      return "Could not send reset email. Please try again.";
+    }
+
+    if (context === "verify-email") {
+      if (code === "auth/invalid-action-code" || code === "auth/expired-action-code") return "This verification link is invalid or expired.";
+      return "Could not verify email. Please try again.";
+    }
+
+    if (context === "reset-link") {
+      if (code === "auth/invalid-action-code" || code === "auth/expired-action-code") return "This reset link is invalid or expired.";
+      if (code === "auth/user-not-found") return "Account does not exist.";
+      return "Could not validate reset link.";
+    }
+
+    if (context === "reset-password") {
+      if (code === "auth/invalid-action-code" || code === "auth/expired-action-code") return "This reset link is invalid or expired.";
+      if (code === "auth/weak-password" || code === "auth/password-does-not-meet-requirements") return "Password does not meet requirements.";
+      return "Could not reset password. Please try again.";
+    }
+
+    if (context === "password-reuse-check") {
+      if (code === "auth/too-many-requests") return "Too many attempts. Try again later.";
+      return "Could not verify your previous password. Try again.";
+    }
+
+    if (context === "google") {
+      if (code === "auth/popup-closed-by-user") return "Sign-in was canceled.";
+      if (code === "auth/popup-blocked") return "Popup was blocked by your browser.";
+      return "Google sign-in failed. Please try again.";
+    }
+
+    return "Something went wrong. Please try again.";
+  }
+
   async function closeModal() {
     const modal = document.getElementById("starlight-auth-modal");
     const modalKind = modal ? String(modal.getAttribute("data-modal-kind") || "") : "";
@@ -325,7 +390,7 @@
             setStatus("verify-action-status", "Email confirmed. You can now log in.", true);
             clearActionParams();
           } catch (error) {
-            setStatus("verify-action-status", error && error.message ? error.message : "Could not confirm email.", false);
+            setStatus("verify-action-status", friendlyAuthMessage(error, "verify-email"), false);
           }
         });
       }
@@ -336,7 +401,7 @@
       <section class="starlight-home-shell starlight-dashboard-shell">
         <header class="starlight-home-hero">
           <p class="starlight-home-kicker">Account</p>
-          <h1>Reset Password</h1>
+          <h1>reset password</h1>
           <p class="starlight-home-tagline">set a new secure password</p>
         </header>
 
@@ -409,7 +474,7 @@
         emailText.textContent = `Email: ${String(email || "")}`;
       }
     }).catch((error) => {
-      setStatus("reset-action-status", error && error.message ? error.message : "This reset link is invalid or expired.", false);
+      setStatus("reset-action-status", friendlyAuthMessage(error, "reset-link"), false);
     });
 
     if (form) {
@@ -441,8 +506,8 @@
             return;
           } catch (previousPasswordError) {
             const code = previousPasswordError && previousPasswordError.code ? String(previousPasswordError.code) : "";
-            if (code && code !== "auth/wrong-password" && code !== "auth/user-not-found" && code !== "auth/invalid-login-credentials") {
-              setStatus("reset-action-status", previousPasswordError.message || "Could not verify your previous password.", false);
+            if (code && code !== "auth/wrong-password" && code !== "auth/user-not-found" && code !== "auth/invalid-login-credentials" && code !== "auth/invalid-credential") {
+              setStatus("reset-action-status", friendlyAuthMessage(previousPasswordError, "password-reuse-check"), false);
               return;
             }
           }
@@ -451,7 +516,7 @@
           setStatus("reset-action-status", "Password updated. You can now log in.", true);
           clearActionParams();
         } catch (error) {
-          setStatus("reset-action-status", error && error.message ? error.message : "Could not reset password.", false);
+          setStatus("reset-action-status", friendlyAuthMessage(error, "reset-password"), false);
         }
       });
     }
@@ -931,7 +996,7 @@
           }
           closeModal();
         } catch (error) {
-          setStatus("login-status", error && error.message ? error.message : "Login failed.", false);
+          setStatus("login-status", friendlyAuthMessage(error, "login"), false);
         }
       });
     }
@@ -952,7 +1017,7 @@
           }
           closeModal();
         } catch (error) {
-          setStatus("login-status", error && error.message ? error.message : "Google login failed.", false);
+          setStatus("login-status", friendlyAuthMessage(error, "google"), false);
         }
       });
     }
@@ -974,7 +1039,7 @@
           await instance.sendPasswordResetEmail(email, getActionCodeSettings());
           setStatus("login-status", "Password reset email sent.", true);
         } catch (error) {
-          setStatus("login-status", error && error.message ? error.message : "Could not send password reset email.", false);
+          setStatus("login-status", friendlyAuthMessage(error, "forgot-password"), false);
         }
       });
     }
@@ -1084,7 +1149,7 @@
           state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
           openVerifyEmailModal();
         } catch (error) {
-          setStatus("signup-form-status", error && error.message ? error.message : "Sign up failed.", false);
+          setStatus("signup-form-status", friendlyAuthMessage(error, "signup"), false);
         }
       });
     }
@@ -1105,7 +1170,7 @@
           }
           closeModal();
         } catch (error) {
-          setStatus("signup-form-status", error && error.message ? error.message : "Google sign up failed.", false);
+          setStatus("signup-form-status", friendlyAuthMessage(error, "google"), false);
         }
       });
     }
@@ -1165,7 +1230,7 @@
           setStatus("verify-status", "Verification email resent.", true);
           refreshTimer();
         } catch (error) {
-          setStatus("verify-status", error && error.message ? error.message : "Could not resend email.", false);
+          setStatus("verify-status", friendlyAuthMessage(error, "verify-email"), false);
         }
       });
     }
@@ -1190,7 +1255,7 @@
           }
           openUsernameModal();
         } catch (error) {
-          setStatus("verify-status", error && error.message ? error.message : "Could not refresh user.", false);
+          setStatus("verify-status", friendlyAuthMessage(error, "verify-email"), false);
         }
       });
     }
