@@ -99,7 +99,7 @@
           <div class="chat-main">
             <div class="chat-header">
               <span id="chat-header-name">Select a chat</span>
-              <a href="#/social" class="close-btn">&times;</a>
+              <a href="/social" class="close-btn nav-link">&times;</a>
             </div>
             <div class="chat-messages" id="chat-messages-container">
             </div>
