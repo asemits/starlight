@@ -68,7 +68,7 @@ body {
   font-family: var(--ff-body);
   font-weight: 300;
   overflow-x: hidden;
-  padding-bottom: 160px;
+  padding-bottom: 0 !important;
   opacity: 0;
   animation: bodyIn 0.6s ease 0.1s forwards;
 }
@@ -571,7 +571,7 @@ header.scrolled {
 /* ── Player bar ───────────────────────────────────── */
 .player-bar {
   position:fixed; bottom:0; left:0; right:0;
-  height:102px;
+  height:90px;
   background: linear-gradient(180deg, rgba(8,8,9,0.94), rgba(0,0,0,0.97));
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
@@ -1185,13 +1185,14 @@ header.scrolled {
 }
 .skip-btn { font-size:18px !important; }
         </style>
+        
         <canvas id="pipCanvas" width="500" height="500" style="display:none;"></canvas>
 <video id="pipVideo" muted autoplay playsinline style="display:none;"></video>
 <div class="scanline"></div>
 
 <!-- HEADER -->
 <header id="site-header">
-    <div class="header-brand"><i class="fa-solid fa-music"></i> STARLIGHT</div>
+    <div class="header-brand"><i class="fa-solid fa-music"></i>STARLIGHT</div>
     <div class="search-wrap">
         <i class="fa-solid fa-magnifying-glass"></i>
         <input type="text" id="musicInput" class="search-box" placeholder="Search tracks, artists…"
@@ -1205,27 +1206,12 @@ header.scrolled {
     <div class="hero-gradient"></div>
     <div class="hero-glow"></div>
 
-    <!-- Decorative spinning disc -->
-    <div class="hero-disc">
-        <div class="disc-ring"></div>
-        <div class="disc-ring"></div>
-        <div class="disc-outer">
-            <div class="disc-inner">
-                <div class="disc-core"></div>
-            </div>
-        </div>
-    </div>
-
     <div class="hero-content">
         <div class="hero-label">
-            <span class="live-dot"></span>
-            ENCRYPTED TUNNEL ACTIVE
-        </div>
         <h1>
             <span class="line"><span>MUSIC</span></span>
             <span class="line"><span>PLAYER</span></span>
         </h1>
-        <p class="hero-sub">Private streaming · Background playback · No limits</p>
 
         <!-- EQ bars decoration -->
         <div class="eq-bars" id="hero-eq">
@@ -1261,7 +1247,7 @@ header.scrolled {
 <!-- TRENDING ROW -->
 <div class="row">
     <div class="row-header">
-        <span class="row-label">Live Charts</span>
+        <span class="row-label">></span>
         <span class="row-title">Global Trending</span>
         <span class="row-count" id="trending-count"></span>
     </div>
@@ -1364,7 +1350,10 @@ header.scrolled {
         </div>
     </div>
 </div>
-
+<br>
+<br>
+<br>
+<br>
 <!-- PLAYER BAR -->
 <div class="player-bar">
     <!-- Now Playing -->
@@ -1425,7 +1414,7 @@ header.scrolled {
                 <span class="btn-badge" id="q-count-badge" style="display:none">0</span>
             </button>
         </div>
-        <div class="tunnel-badge">TUNNEL v2.5</div>
+        <div class="tunnel-badge">{}</div>
     </div>
 </div>
 

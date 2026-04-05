@@ -50,6 +50,10 @@
   z-index: 3;
 }
 
+#app-content:has(.hero) {
+    padding: 0 !important;
+    margin: 0 !important;
+}
 /* ── Info Widget ──────────────────────────────────── */
 #starlight-info-widget {
   position: fixed;
