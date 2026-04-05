@@ -90,6 +90,7 @@
     if (link) {
       e.preventDefault();
       const url = link.getAttribute("href");
+      let nextUrl = url;
       if (url === "/games") {
         const gamePath = String(link.getAttribute("data-game-path") || "").trim();
         const sourceBase = String(link.getAttribute("data-source-base") || "").trim();
@@ -101,6 +102,7 @@
             }));
           } catch (_error) {
           }
+          nextUrl = `/games?play=${encodeURIComponent(gamePath)}${sourceBase ? `&base=${encodeURIComponent(sourceBase)}` : ""}`;
         }
       }
       if (url !== "/games" && window.StarlightGames && typeof window.StarlightGames.hideOverlayInstant === "function") {
@@ -115,7 +117,7 @@
         router();
         return;
       }
-      window.history.pushState({}, "", url);
+      window.history.pushState({}, "", nextUrl);
       router();
     }
   });

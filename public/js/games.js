@@ -8,6 +8,7 @@
 	const POPULAR_REFRESH_MS = 15000;
 	const GAME_LIST_CACHE_KEY = "starlight-games-list-v8";
 	const PENDING_GAME_LAUNCH_KEY = "starlight-pending-game-launch";
+	const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
 
 	const state = {
 		mountSelector: "#games-root",
@@ -198,6 +199,23 @@
 
 	function consumePendingLaunch() {
 		try {
+			const params = new URLSearchParams(window.location.search || "");
+			const rawPath = String(params.get("play") || "").trim();
+			const rawBase = String(params.get("base") || "").trim();
+			const path = normalizePath(rawPath);
+			if (path) {
+				const sourceBase = normalizeSourceBase(rawBase || PRIMARY_CDN_BASE);
+				params.delete("play");
+				params.delete("base");
+				const nextQuery = params.toString();
+				const nextUrl = nextQuery ? `/games?${nextQuery}` : "/games";
+				window.history.replaceState({}, "", nextUrl);
+				return { path, sourceBase };
+			}
+		} catch (_error) {
+		}
+
+		try {
 			const raw = sessionStorage.getItem(PENDING_GAME_LAUNCH_KEY);
 			if (!raw) {
 				return null;
@@ -213,6 +231,10 @@
 		} catch (_error) {
 			return null;
 		}
+	}
+
+	function favoritesEnabled() {
+		return localStorage.getItem(DASHBOARD_SHOW_FAVORITES_KEY) !== "off";
 	}
 
 	function normalizeImageUrl(image, sourceBase) {
@@ -558,6 +580,10 @@
 	}
 
 	async function setFavorite(game, favoriteOn) {
+		if (favoriteOn && !favoritesEnabled()) {
+			throw new Error("favorites-disabled");
+		}
+
 		const prev = statsForPath(game.path);
 		mergeStatCache(game.path, { isFavorite: Boolean(favoriteOn) });
 
@@ -838,6 +864,8 @@
 
 	function gameCardMarkup(game) {
 		const stats = statsForPath(game.path);
+		const canFavorite = favoritesEnabled();
+		const favoriteActionAllowed = canFavorite || stats.isFavorite;
 		const fallbacks = thumbFallback(game.path, game.sourceBase);
 		const initialSrc = game.image || fallbacks.split("|")[0] || "/logos/logo.png";
 		return `
@@ -853,7 +881,7 @@
 						${statIcon("fa-user-group", stats.currentPlayers, "Currently Playing")}
 					</div>
 					<div class="game-card-actions">
-						<button type="button" class="rate-btn ${stats.isFavorite ? "active" : ""}" data-action="favorite" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}"><i class="fa-solid fa-star"></i><span>${stats.isFavorite ? "Saved" : "Save"}</span></button>
+						<button type="button" class="rate-btn ${stats.isFavorite ? "active" : ""}" data-action="favorite" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}" ${favoriteActionAllowed ? "" : "disabled"} title="${favoriteActionAllowed ? "" : "Enable Dashboard Favorites in Layout settings to save games."}"><i class="fa-solid fa-star"></i><span>${stats.isFavorite ? "Saved" : "Save"}</span></button>
 						<button type="button" class="rate-btn ${stats.myRating === 1 ? "active" : ""}" data-action="rate" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}" data-rate="1"><i class="fa-solid fa-thumbs-up"></i><span>${stats.thumbsUp}</span></button>
 						<button type="button" class="rate-btn ${stats.myRating === -1 ? "active" : ""}" data-action="rate" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}" data-rate="-1"><i class="fa-solid fa-thumbs-down"></i><span>${stats.thumbsDown}</span></button>
 					</div>
@@ -1014,6 +1042,8 @@
 
 	function renderOverlayStats(overlay, path) {
 		const stats = statsForPath(path);
+		const canFavorite = favoritesEnabled();
+		const favoriteActionAllowed = canFavorite || stats.isFavorite;
 		const statsNode = overlay.querySelector("#game-stats");
 		if (statsNode) {
 			statsNode.innerHTML = `${statIcon("fa-play", stats.plays, "Plays")}${statIcon("fa-eye", stats.uniqueClicks, "Unique Clicks")}${statIcon("fa-user-group", stats.currentPlayers, "Currently Playing")}`;
@@ -1023,6 +1053,7 @@
 		const down = overlay.querySelector("#overlay-down");
 		const favorite = overlay.querySelector("#overlay-favorite");
 		if (favorite) {
+			favorite.disabled = !favoriteActionAllowed;
 			favorite.classList.toggle("active", Boolean(stats.isFavorite));
 			favorite.innerHTML = `<i class="fa-solid fa-star"></i><span>${stats.isFavorite ? "Saved" : "Save"}</span>`;
 		}
@@ -1779,8 +1810,16 @@
 		render,
 		hideOverlayInstant,
 		closeOverlay,
+		launchGameByPath: async function launchGameByPath(path, sourceBase) {
+			const game = findGame(path, sourceBase || PRIMARY_CDN_BASE) || findGameByPath(path);
+			if (!game) {
+				return false;
+			}
+			await openGame(game);
+			return true;
+		},
 		setFavoriteByPath: async function setFavoriteByPath(path, sourceBase, favoriteOn) {
-			const game = findGame(path, sourceBase || PRIMARY_CDN_BASE);
+			const game = findGame(path, sourceBase || PRIMARY_CDN_BASE) || findGameByPath(path);
 			if (!game) {
 				return;
 			}

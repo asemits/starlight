@@ -71,9 +71,7 @@
                     <option value="metric" ${window.getMeasurementSystem() === 'metric' ? 'selected' : ''}>Metric (C, km/h)</option>
                   </select>
                 </article>
-              </div>
 
-              <div data-settings-panel="games" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
                   <button type="button" onclick="resetSettingsCard('games-pagination')" title="Reset Games Pagination" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
                   <label class="block mb-2 text-sm text-gray-300">Games Pagination</label>
@@ -81,6 +79,40 @@
                     <option value="numbered" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? '' : 'selected'}>Numbered</option>
                     <option value="alphabetical" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? 'selected' : ''}>Alphabetical</option>
                   </select>
+                </article>
+
+                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
+                  <button type="button" onclick="resetSettingsCard('layout-dashboard-recent')" title="Reset Recently Played Section" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+                  <label class="block mb-2 text-sm text-gray-300">Dashboard Recently Played</label>
+                  <select onchange="changeDashboardSectionVisibility('recent', this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                    <option value="on" ${window.getDashboardSectionVisibility('recent') === 'on' ? 'selected' : ''}>On</option>
+                    <option value="off" ${window.getDashboardSectionVisibility('recent') === 'off' ? 'selected' : ''}>Off</option>
+                  </select>
+                </article>
+
+                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
+                  <button type="button" onclick="resetSettingsCard('layout-dashboard-favorites')" title="Reset Favorites Section" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+                  <label class="block mb-2 text-sm text-gray-300">Dashboard Favorites</label>
+                  <select onchange="changeDashboardSectionVisibility('favorites', this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                    <option value="on" ${window.getDashboardSectionVisibility('favorites') === 'on' ? 'selected' : ''}>On</option>
+                    <option value="off" ${window.getDashboardSectionVisibility('favorites') === 'off' ? 'selected' : ''}>Off</option>
+                  </select>
+                </article>
+
+                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
+                  <button type="button" onclick="resetSettingsCard('layout-dashboard-stats')" title="Reset Stats Section" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+                  <label class="block mb-2 text-sm text-gray-300">Dashboard Stats</label>
+                  <select onchange="changeDashboardSectionVisibility('stats', this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+                    <option value="on" ${window.getDashboardSectionVisibility('stats') === 'on' ? 'selected' : ''}>On</option>
+                    <option value="off" ${window.getDashboardSectionVisibility('stats') === 'off' ? 'selected' : ''}>Off</option>
+                  </select>
+                </article>
+              </div>
+
+              <div data-settings-panel="games" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
+                  <label class="block mb-2 text-sm text-gray-300">Games settings moved to other categories</label>
+                  <p class="text-sm text-gray-300">Games Pagination is now under Layout. Particles settings are in the Particles category.</p>
                 </article>
               </div>
 

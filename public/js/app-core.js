@@ -24,6 +24,9 @@
   const WIDGET_SHOW_WEATHER_KEY = "info-widget-show-weather";
   const WIDGET_SHOW_DATETIME_KEY = "info-widget-show-datetime";
   const WIDGET_SHOW_BATTERY_KEY = "info-widget-show-battery";
+  const DASHBOARD_SHOW_RECENT_KEY = "dashboard-show-recent";
+  const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
+  const DASHBOARD_SHOW_STATS_KEY = "dashboard-show-stats";
   const MEASUREMENT_SYSTEM_KEY = "starlight-measurement-system";
   const WIDGET_WEATHER_CACHE_KEY = "starlight-widget-weather-current";
 
@@ -158,6 +161,35 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
   };
 
+  window.getDashboardSectionVisibility = function getDashboardSectionVisibility(section) {
+    const keyMap = {
+      recent: DASHBOARD_SHOW_RECENT_KEY,
+      favorites: DASHBOARD_SHOW_FAVORITES_KEY,
+      stats: DASHBOARD_SHOW_STATS_KEY
+    };
+    const key = keyMap[String(section || "")];
+    if (!key) {
+      return "on";
+    }
+    return localStorage.getItem(key) === "off" ? "off" : "on";
+  };
+
+  window.changeDashboardSectionVisibility = function changeDashboardSectionVisibility(section, value) {
+    const keyMap = {
+      recent: DASHBOARD_SHOW_RECENT_KEY,
+      favorites: DASHBOARD_SHOW_FAVORITES_KEY,
+      stats: DASHBOARD_SHOW_STATS_KEY
+    };
+    const key = keyMap[String(section || "")];
+    if (!key) {
+      return;
+    }
+    localStorage.setItem(key, value === "off" ? "off" : "on");
+    if (window.location.pathname === "/" && typeof window.router === "function") {
+      window.router();
+    }
+  };
+
   window.changeGamesPaginationMode = function changeGamesPaginationMode(newMode) {
     localStorage.setItem("games-pagination-mode", newMode);
     if (window.location.pathname === "/games" && window.StarlightGames) {
@@ -272,6 +304,18 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       window.changeMeasurementSystem("imperial");
       return;
     }
+    if (cardId === "layout-dashboard-recent") {
+      window.changeDashboardSectionVisibility("recent", "on");
+      return;
+    }
+    if (cardId === "layout-dashboard-favorites") {
+      window.changeDashboardSectionVisibility("favorites", "on");
+      return;
+    }
+    if (cardId === "layout-dashboard-stats") {
+      window.changeDashboardSectionVisibility("stats", "on");
+      return;
+    }
     if (cardId === "games-pagination") {
       window.changeGamesPaginationMode("numbered");
       return;
@@ -343,7 +387,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   window.resetSettingsCategory = function resetSettingsCategory(category) {
     const map = {
-      layout: ["layout-sidebar", "layout-measurement"],
+      layout: ["layout-sidebar", "layout-measurement", "layout-dashboard-recent", "layout-dashboard-favorites", "layout-dashboard-stats", "games-pagination"],
       games: ["games-pagination"],
       particles: ["particles-enabled", "particles-bonds", "particles-color", "particles-shape", "particles-frequency", "particles-size"],
       shortcut: ["shortcut-main", "shortcut-anticlose"],
@@ -643,7 +687,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   function formatWidgetWeatherTemp() {
     const targetSystem = window.getMeasurementSystem();
-    const unit = targetSystem === "metric" ? "C" : "F";
+    const unit = targetSystem === "metric" ? "°C" : "°F";
     const converted = convertTemp(widgetWeatherTempValue, widgetWeatherTempSystem, targetSystem);
     if (!Number.isFinite(converted)) {
       return "--";
@@ -1115,6 +1159,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   });
 
   readWidgetWeatherFromCache();
+
+  if (window.StarlightWeather && typeof window.StarlightWeather.prefetchWidgetWeather === "function") {
+    window.StarlightWeather.prefetchWidgetWeather();
+  }
 
   mountInfoWidget();
 })();

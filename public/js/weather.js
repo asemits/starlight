@@ -3,7 +3,8 @@
     mountSelector: "#weather-root",
     data: null,
     loading: false,
-    error: ""
+    error: "",
+    widgetPrefetchStarted: false
   };
 
   function escapeHtml(value) {
@@ -157,7 +158,7 @@
   }
 
   function tempUnitLabel(system) {
-    return system === "metric" ? "C" : "F";
+    return system === "metric" ? "°C" : "°F";
   }
 
   function windUnitLabel(system) {
@@ -492,5 +493,29 @@
     load();
   }
 
-  window.StarlightWeather = { mount, refresh };
+  async function prefetchWidgetWeather() {
+    if (state.widgetPrefetchStarted) {
+      return;
+    }
+    state.widgetPrefetchStarted = true;
+    try {
+      const payload = await getWeatherPayload();
+      const current = payload && payload.forecast ? (payload.forecast.current || {}) : {};
+      const system = payload && payload.system ? payload.system : measurementSystem();
+      const tempUnit = tempUnitLabel(system);
+      const widgetTemp = `${Math.round(current.temperature_2m || 0)}${tempUnit}`;
+      window.dispatchEvent(new CustomEvent("starlight:weather-current", {
+        detail: {
+          icon: weatherIconClass(current.weather_code),
+          temp: widgetTemp,
+          tempValue: Number(current.temperature_2m || 0),
+          system
+        }
+      }));
+    } catch (_error) {
+    }
+  }
+
+  window.StarlightWeather = { mount, refresh, prefetchWidgetWeather };
+  prefetchWidgetWeather();
 })();

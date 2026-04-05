@@ -3,6 +3,9 @@
   const USERNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
   const AUTO_SYNC_INTERVAL_MS = 30 * 60 * 1000;
   const MANUAL_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+  const DASHBOARD_SHOW_RECENT_KEY = "dashboard-show-recent";
+  const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
+  const DASHBOARD_SHOW_STATS_KEY = "dashboard-show-stats";
   const TOS_REQUIRED_MS = 30 * 1000;
   const USER_DOC_COLLECTION = "users";
   const USERNAME_COLLECTION = "usernames";
@@ -117,6 +120,35 @@
       return value.seconds * 1000;
     }
     return 0;
+  }
+
+  function dashboardSectionEnabled(section) {
+    const keyMap = {
+      recent: DASHBOARD_SHOW_RECENT_KEY,
+      favorites: DASHBOARD_SHOW_FAVORITES_KEY,
+      stats: DASHBOARD_SHOW_STATS_KEY
+    };
+    const key = keyMap[String(section || "")];
+    if (!key) {
+      return true;
+    }
+    return localStorage.getItem(key) !== "off";
+  }
+
+  function decodeGamePathFromId(gameId) {
+    const raw = String(gameId || "").trim();
+    if (!raw) {
+      return "";
+    }
+    try {
+      const pad = (4 - (raw.length % 4)) % 4;
+      const padded = raw + "=".repeat(pad);
+      const binary = atob(padded);
+      const bytes = Array.from(binary, (char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join("");
+      return decodeURIComponent(bytes);
+    } catch (_error) {
+      return "";
+    }
   }
 
   async function hashText(value) {
@@ -853,6 +885,9 @@
       "info-widget-show-weather",
       "info-widget-show-datetime",
       "info-widget-show-battery",
+      "dashboard-show-recent",
+      "dashboard-show-favorites",
+      "dashboard-show-stats",
       "starlight-measurement-system"
     ];
     const snapshot = {};
@@ -865,6 +900,64 @@
     return snapshot;
   }
 
+  async function collectGameProgressSnapshot() {
+    const firestore = db();
+    const user = currentUser();
+    if (!firestore || !user) {
+      return { updatedAtMs: Date.now(), items: [] };
+    }
+
+    let sourceDocs = [];
+    try {
+      const snap = await firestore.collectionGroup("players").where("uid", "==", user.uid).limit(180).get();
+      sourceDocs = snap.docs;
+    } catch (_queryError) {
+      sourceDocs = [];
+    }
+
+    if (!sourceDocs.length) {
+      try {
+        const statsSnap = await firestore.collection("gameStats").orderBy("updatedAt", "desc").limit(220).get();
+        const playerDocs = await Promise.all(statsSnap.docs.map(async (statsDoc) => {
+          try {
+            const playerDoc = await statsDoc.ref.collection("players").doc(user.uid).get();
+            return playerDoc.exists ? playerDoc : null;
+          } catch (_playerError) {
+            return null;
+          }
+        }));
+        sourceDocs = playerDocs.filter(Boolean);
+      } catch (_fallbackError) {
+        sourceDocs = [];
+      }
+    }
+
+    const items = sourceDocs.map((doc) => {
+      const data = doc.data() || {};
+      const parentStats = doc.ref && doc.ref.parent ? doc.ref.parent.parent : null;
+      const parentGameId = parentStats ? String(parentStats.id || "") : "";
+      const fallbackPath = decodeGamePathFromId(parentGameId);
+      return {
+        gamePath: String(data.gamePath || data.activeGamePath || fallbackPath || ""),
+        sourceBase: String(data.sourceBase || ""),
+        gameName: String(data.gameName || ""),
+        gameImage: String(data.gameImage || ""),
+        clickCount: Number(data.clickCount || 0),
+        rating: Number(data.rating || 0),
+        isFavorite: Boolean(data.isFavorite),
+        lastPlayedAtMs: toMillis(data.lastPlayedAt),
+        lastRatedAtMs: toMillis(data.lastRatedAt)
+      };
+    }).filter((item) => item.gamePath)
+      .sort((a, b) => b.lastPlayedAtMs - a.lastPlayedAtMs)
+      .slice(0, 120);
+
+    return {
+      updatedAtMs: Date.now(),
+      items
+    };
+  }
+
   async function syncUserData(mode, silent) {
     const user = currentUser();
     const firestore = db();
@@ -875,6 +968,7 @@
     const isManual = mode === "manual";
     const userRef = firestore.collection(USER_DOC_COLLECTION).doc(user.uid);
     const snapshot = collectSyncSettingsSnapshot();
+    const gameProgress = await collectGameProgressSnapshot();
 
     try {
       await firestore.runTransaction(async (tx) => {
@@ -896,6 +990,7 @@
           uid: user.uid,
           providers: (user.providerData || []).map((item) => item.providerId).filter(Boolean),
           settings: snapshot,
+          gameProgress,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         if (isManual) {
@@ -962,6 +1057,9 @@
     }).join("");
 
     if (isLoggedIn()) {
+      const showRecent = dashboardSectionEnabled("recent");
+      const showFavorites = dashboardSectionEnabled("favorites");
+      const showStats = dashboardSectionEnabled("stats");
       root.innerHTML = `
         <section class="starlight-home-shell starlight-dashboard-shell">
           <header class="starlight-home-hero">
@@ -970,27 +1068,27 @@
             <p class="starlight-home-tagline">welcome back</p>
           </header>
 
-          <section class="starlight-dashboard-section">
+          ${showRecent ? `<section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
               <h2>Recently Played</h2>
               <button id="dashboard-clear-recent" type="button" class="starlight-btn starlight-btn-muted">Clear Recent</button>
             </div>
             <div id="dashboard-recent" class="starlight-dashboard-grid"></div>
-          </section>
+          </section>` : ""}
 
-          <section class="starlight-dashboard-section">
+          ${showFavorites ? `<section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
               <h2>Favorites</h2>
             </div>
             <div id="dashboard-favorites" class="starlight-dashboard-grid"></div>
-          </section>
+          </section>` : ""}
 
-          <section class="starlight-dashboard-section">
+          ${showStats ? `<section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
               <h2>Stats</h2>
             </div>
             <div id="dashboard-stats" class="starlight-dashboard-stats"></div>
-          </section>
+          </section>` : ""}
         </section>
       `;
       loadSignedInDashboard();
@@ -1032,13 +1130,26 @@
     const recentNode = document.getElementById("dashboard-recent");
     const favoritesNode = document.getElementById("dashboard-favorites");
     const statsNode = document.getElementById("dashboard-stats");
-    if (!firestore || !user || !recentNode || !favoritesNode || !statsNode) {
+    if (!firestore || !user) {
       return;
     }
 
-    recentNode.innerHTML = '<p class="starlight-dashboard-empty">Loading...</p>';
-    favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">Loading...</p>';
-    statsNode.innerHTML = '';
+    const showRecent = dashboardSectionEnabled("recent");
+    const showFavorites = dashboardSectionEnabled("favorites");
+    const showStats = dashboardSectionEnabled("stats");
+    if ((showRecent && !recentNode) || (showFavorites && !favoritesNode) || (showStats && !statsNode)) {
+      return;
+    }
+
+    if (showRecent && recentNode) {
+      recentNode.innerHTML = '<p class="starlight-dashboard-empty">Loading...</p>';
+    }
+    if (showFavorites && favoritesNode) {
+      favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">Loading...</p>';
+    }
+    if (showStats && statsNode) {
+      statsNode.innerHTML = '';
+    }
 
     try {
       let sourceDocs = [];
@@ -1068,11 +1179,14 @@
 
       const list = sourceDocs.map((doc) => {
         const data = doc.data() || {};
+        const parentStats = doc.ref && doc.ref.parent ? doc.ref.parent.parent : null;
+        const parentGameId = parentStats ? String(parentStats.id || "") : "";
+        const fallbackPath = decodeGamePathFromId(parentGameId);
         return {
           docPath: doc.ref.path,
           gameName: String(data.gameName || "Unknown game"),
           gameImage: String(data.gameImage || ""),
-          gamePath: String(data.gamePath || ""),
+          gamePath: String(data.gamePath || data.activeGamePath || fallbackPath || ""),
           sourceBase: String(data.sourceBase || ""),
           clickCount: Number(data.clickCount || 0),
           rating: Number(data.rating || 0),
@@ -1125,17 +1239,24 @@
         `;
       }
 
-      recentNode.innerHTML = recent.length ? recent.map((item) => tileMarkup(item, false)).join("") : '<p class="starlight-dashboard-empty">No recent games yet.</p>';
-      favoritesNode.innerHTML = favorites.length ? favorites.map((item) => tileMarkup(item, true)).join("") : '<p class="starlight-dashboard-empty">No favorites yet. Star games in Games.</p>';
+      if (showRecent && recentNode) {
+        recentNode.innerHTML = recent.length ? recent.map((item) => tileMarkup(item, false)).join("") : '<p class="starlight-dashboard-empty">No recent games yet.</p>';
+      }
+      if (showFavorites && favoritesNode) {
+        favoritesNode.innerHTML = favorites.length ? favorites.map((item) => tileMarkup(item, true)).join("") : '<p class="starlight-dashboard-empty">No favorites yet. Star games in Games.</p>';
+      }
 
-      statsNode.innerHTML = `
+      if (showStats && statsNode) {
+        statsNode.innerHTML = `
         <article class="starlight-stat-card"><h3>Total Plays</h3><p>${totalPlays}</p></article>
         <article class="starlight-stat-card"><h3>Games Played</h3><p>${gamesPlayed}</p></article>
         <article class="starlight-stat-card"><h3>Thumbs Up Given</h3><p>${thumbsUpGiven}</p></article>
         <article class="starlight-stat-card"><h3>Thumbs Down Given</h3><p>${thumbsDownGiven}</p></article>
       `;
+      }
 
-      favoritesNode.querySelectorAll("[data-remove-favorite='1']").forEach((button) => {
+      if (showFavorites && favoritesNode) {
+        favoritesNode.querySelectorAll("[data-remove-favorite='1']").forEach((button) => {
         button.addEventListener("click", async (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -1151,8 +1272,10 @@
           }
         });
       });
+      }
 
-      recentNode.querySelectorAll("[data-remove-recent='1']").forEach((button) => {
+      if (showRecent && recentNode) {
+        recentNode.querySelectorAll("[data-remove-recent='1']").forEach((button) => {
         button.addEventListener("click", async (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -1173,6 +1296,7 @@
           }
         });
       });
+      }
 
       const clearRecentBtn = document.getElementById("dashboard-clear-recent");
       if (clearRecentBtn) {
@@ -1193,9 +1317,15 @@
         });
       }
     } catch (_error) {
-      recentNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load recent games.</p>';
-      favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load favorites.</p>';
-      statsNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load stats.</p>';
+      if (showRecent && recentNode) {
+        recentNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load recent games.</p>';
+      }
+      if (showFavorites && favoritesNode) {
+        favoritesNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load favorites.</p>';
+      }
+      if (showStats && statsNode) {
+        statsNode.innerHTML = '<p class="starlight-dashboard-empty">Could not load stats.</p>';
+      }
     }
   }
 
@@ -1764,9 +1894,14 @@
       await user.updateProfile({ displayName: username });
       await ensureUserDoc(user, username);
       setStatus("settings-username-status", "Username updated.", true);
-      await mountSettingsAuthPanel(true);
-      if (typeof window.switchSettingsCategory === "function") {
-        window.switchSettingsCategory("account");
+      const currentUsername = document.getElementById("settings-current-username");
+      if (currentUsername) {
+        currentUsername.textContent = `Current username: ${username}`;
+      }
+      const nextAllowed = document.getElementById("settings-next-username-change");
+      const nextAllowedMs = Date.now() + USERNAME_CHANGE_COOLDOWN_MS;
+      if (nextAllowed) {
+        nextAllowed.textContent = `Next allowed change: ${new Date(nextAllowedMs).toLocaleString()}`;
       }
     } catch (error) {
       setStatus("settings-username-status", error && error.message ? error.message : "Could not update username.", false);
@@ -2021,11 +2156,11 @@
 
       <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
         <label class="block mb-2 text-sm text-gray-300">Username</label>
-        <p class="text-sm text-gray-300 mb-2">Current username: ${escapeHtml(String(user && user.displayName ? user.displayName : "Not set"))}</p>
-        <p class="text-sm text-gray-300 mb-3">Next allowed change: ${escapeHtml(nextAllowedText)}</p>
+        <p id="settings-current-username" class="text-sm text-gray-300 mb-2">Current username: ${escapeHtml(String(user && user.displayName ? user.displayName : "Not set"))}</p>
+        <p id="settings-next-username-change" class="text-sm text-gray-300 mb-3">Next allowed change: ${escapeHtml(nextAllowedText)}</p>
         <div class="flex flex-wrap gap-2">
           <input id="settings-username-input" type="text" minlength="3" maxlength="24" pattern="[A-Za-z0-9_.-]{3,24}" class="flex-1 min-w-[220px] bg-black border border-white/20 p-3 rounded-xl text-white outline-none" placeholder="New username" />
-          <button id="settings-username-save" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition" ${canChangeNow ? "" : "disabled"}>Save Username</button>
+          <button id="settings-username-save" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Save Username</button>
         </div>
         <p class="text-sm text-gray-300 mt-2">You can change your username once every 7 days.</p>
         <p id="settings-username-status" class="text-sm mt-3"></p>
@@ -2034,10 +2169,10 @@
       <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
         <label class="block mb-2 text-sm text-gray-300">Data Sync</label>
         <p class="text-sm text-gray-300 mb-1">Auto sync: every 30 minutes</p>
-        <p class="text-sm text-gray-300 mb-1">Last sync: ${escapeHtml(lastSyncText)}</p>
-        <p class="text-sm text-gray-300 mb-1">Next auto sync: ${escapeHtml(nextAutoSyncText)}</p>
-        <p class="text-sm text-gray-300 mb-3">Next manual sync: ${escapeHtml(nextManualSyncText)}</p>
-        <button id="settings-sync-now" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition" ${canManualSyncNow ? "" : "disabled"}>Sync Now</button>
+        <p id="settings-last-sync" class="text-sm text-gray-300 mb-1">Last sync: ${escapeHtml(lastSyncText)}</p>
+        <p id="settings-next-auto-sync" class="text-sm text-gray-300 mb-1">Next auto sync: ${escapeHtml(nextAutoSyncText)}</p>
+        <p id="settings-next-manual-sync" class="text-sm text-gray-300 mb-3">Next manual sync: ${escapeHtml(nextManualSyncText)}</p>
+        <button id="settings-sync-now" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Sync Now</button>
         <p id="settings-sync-status" class="text-sm mt-3"></p>
       </article>
 
@@ -2075,12 +2210,28 @@
         const ok = await syncUserData("manual", false);
         if (ok) {
           setStatus("settings-sync-status", "Data synced.", true);
-          await mountSettingsAuthPanel(true);
-          if (typeof window.switchSettingsCategory === "function") {
-            window.switchSettingsCategory("account");
+          const now = Date.now();
+          const lastSync = document.getElementById("settings-last-sync");
+          const nextManual = document.getElementById("settings-next-manual-sync");
+          const nextAuto = document.getElementById("settings-next-auto-sync");
+          if (lastSync) {
+            lastSync.textContent = `Last sync: ${new Date(now).toLocaleString()}`;
+          }
+          if (nextManual) {
+            nextManual.textContent = `Next manual sync: ${new Date(now + MANUAL_SYNC_INTERVAL_MS).toLocaleString()}`;
+          }
+          if (nextAuto) {
+            nextAuto.textContent = `Next auto sync: ${new Date(now + AUTO_SYNC_INTERVAL_MS).toLocaleString()}`;
           }
         }
       });
+    }
+
+    if (!canChangeNow && nextAllowedMs) {
+      setStatus("settings-username-status", `Wait until ${new Date(nextAllowedMs).toLocaleString()} to change your username again.`, false);
+    }
+    if (!canManualSyncNow && nextManualSyncMs) {
+      setStatus("settings-sync-status", `Wait until ${new Date(nextManualSyncMs).toLocaleString()} to sync your data again.`, false);
     }
 
     const logoutDangerBtn = document.getElementById("settings-danger-logout");
