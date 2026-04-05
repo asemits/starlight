@@ -1,32 +1,32 @@
 document.addEventListener('DOMContentLoaded', () => {
     const cursorGlow = document.createElement('div');
 
-    cursorGlow.style.cssText = `
-    
+cursorGlow.style.cssText = `
         position: fixed;
         pointer-events: none;
-        /* Smaller size for a precise cursor look */
-        width: 20px; 
-        height: 20px;
+        width: 45px;
+        height: 45px;
         border-radius: 50%;
         transform: translate(-50%, -50%);
-        z-index: 99999999999999999999999999999999999999999999999999999; /* Because of that shitty sidebar */
+        z-index: 99999999999999999;
         opacity: 0;
-
-        /* The "Empty Center" Look */
         background: transparent;
-        /* Thin white border */
-        border: 1px solid rgba(255, 255, 255, 0.8); 
-        
-        /* Subtle glow so it doesn't disappear on white backgrounds */
+        border: 1px solid rgba(255, 255, 255, 0.8);
         box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
-
-        /* Remove the heavy filters for a sharp circle */
-        filter: none;
-        mix-blend-mode: normal;
-
-        transition: opacity 0.2s ease, width 0.2s ease, height 0.2s ease, border-color 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.2s ease, width 0.25s ease, height 0.25s ease, border-color 0.2s ease, background-color 0.2s ease;
     `;
+
+    const centerDot = document.createElement('div');
+    centerDot.style.cssText = `
+        width: 2px;
+        height: 2px;
+        background: #fff;
+        border-radius: 50%;
+    `;
+    cursorGlow.appendChild(centerDot);
 
     document.body.appendChild(cursorGlow);
 
@@ -49,30 +49,32 @@ document.addEventListener('DOMContentLoaded', () => {
         cursorGlow.style.opacity = '0';
     });
 
-    // Interaction Effect: Hover over buttons to turn the border Neon Mint
-    document.querySelectorAll('a, button, .control-btn').forEach(el => {
-        el.addEventListener('mouseenter', () => {
-            cursorGlow.style.borderColor = '#5a5a5a'; // Your Neon Mint
-            cursorGlow.style.width = '35px';
-            cursorGlow.style.height = '35px';
-        });
-        el.addEventListener('mouseleave', () => {
-            cursorGlow.style.borderColor = 'rgba(255, 255, 255, 0.8)';
-            cursorGlow.style.width = '20px';
-            cursorGlow.style.height = '20px';
-        });
+    document.addEventListener('mouseover', (e) => {
+        const style = window.getComputedStyle(e.target);
+        const isInteractive = e.target.closest('a, button, input, select, textarea, [role="button"]') || 
+                             style.cursor === 'pointer';
+
+        if (isInteractive) {
+            cursorGlow.style.width = '45px';
+            cursorGlow.style.height = '45px';
+            cursorGlow.style.borderColor = '#5a5a5a';
+            cursorGlow.style.backgroundColor = 'rgba(175, 175, 175, 0.1)';
+        }
+    });
+
+    document.addEventListener('mouseout', () => {
+        cursorGlow.style.width = '20px';
+        cursorGlow.style.height = '20px';
+        cursorGlow.style.borderColor = 'rgba(255, 255, 255, 0.8)';
+        cursorGlow.style.backgroundColor = 'transparent';
     });
 
     function animate() {
-        // Keeps that smooth 'floaty' feel
-        const ease = 0.18; 
-
+        const ease = 0.18;
         currentX += (mouseX - currentX) * ease;
         currentY += (mouseY - currentY) * ease;
-
         cursorGlow.style.left = currentX + 'px';
         cursorGlow.style.top = currentY + 'px';
-
         requestAnimationFrame(animate);
     }
 
