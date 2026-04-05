@@ -1169,8 +1169,19 @@
 	}
 
 	function hideOverlayInstant() {
+		if (document.fullscreenElement && typeof document.exitFullscreen === "function") {
+			document.exitFullscreen().catch(() => {});
+		}
+
 		document.querySelectorAll(".game-overlay").forEach((node) => {
 			try {
+				node.style.opacity = "0";
+				node.style.visibility = "hidden";
+				node.style.pointerEvents = "none";
+				const frame = node.querySelector(".game-frame");
+				if (frame) {
+					frame.setAttribute("src", "about:blank");
+				}
 				node.remove();
 			} catch (_error) {
 			}

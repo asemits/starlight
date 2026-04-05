@@ -41,6 +41,13 @@
   async function router() {
     let path = window.location.pathname;
 
+    if (path !== "/games" && window.StarlightGames && typeof window.StarlightGames.hideOverlayInstant === "function") {
+      try {
+        window.StarlightGames.hideOverlayInstant();
+      } catch (_error) {
+      }
+    }
+
     if (window.StarlightAuthUI) {
       path = window.StarlightAuthUI.guardedPath(path);
       window.StarlightAuthUI.syncLockedState(path);
