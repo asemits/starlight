@@ -50,9 +50,9 @@
     verifyDeadline: 0,
     resendAllowedAt: 0,
     verifyTimerId: 0,
-    verificationId: "",
-    recaptcha: null,
-    recaptchaWidgetId: null,
+    totpSecret: null,
+    totpSecretKey: "",
+    totpQrUrl: "",
     autoSyncTimerId: 0
   };
 
@@ -232,36 +232,49 @@
 
   function friendlyMfaMessage(error) {
     const code = authErrorCode(error);
-    if (code === "auth/invalid-phone-number") return "Invalid phone number. Use format like +15551234567.";
-    if (code === "auth/missing-phone-number") return "Enter a phone number first.";
-    if (code === "auth/captcha-check-failed") return "Verification failed. Try sending the code again.";
-    if (code === "auth/quota-exceeded") return "SMS quota exceeded. Try again later.";
+    if (code === "auth/invalid-verification-code") return "Invalid authenticator code.";
+    if (code === "auth/code-expired") return "Authenticator code expired. Enter the latest code.";
+    if (code === "auth/invalid-multi-factor-session") return "2FA session expired. Generate setup again.";
     if (code === "auth/too-many-requests") return "Too many attempts. Try again later.";
-    if (code === "auth/operation-not-allowed") return "Phone auth is not enabled for this project.";
+    if (code === "auth/operation-not-allowed") return "Authenticator app 2FA is not enabled for this project.";
     if (code === "auth/requires-recent-login") return "Please log in again, then try adding 2FA.";
-    return "Could not send code. Please try again.";
+    return "Could not complete authenticator setup. Please try again.";
   }
 
-  async function ensureMfaRecaptchaVerifier() {
-    const instance = auth();
-    const container = document.getElementById("mfa-recaptcha");
-    if (!instance || !container) {
-      throw new Error("mfa-recaptcha-unavailable");
+  function getTotpGenerator() {
+    if (!firebase || !firebase.auth || !firebase.auth.TotpMultiFactorGenerator) {
+      return null;
     }
+    return firebase.auth.TotpMultiFactorGenerator;
+  }
 
-    if (state.recaptcha) {
+  function getTotpSecretKey(secret) {
+    if (!secret) {
+      return "";
+    }
+    if (typeof secret.secretKey === "string") {
+      return String(secret.secretKey);
+    }
+    if (typeof secret.secretKey === "function") {
       try {
-        state.recaptcha.clear();
+        return String(secret.secretKey() || "");
       } catch (_error) {
+        return "";
       }
-      state.recaptcha = null;
-      state.recaptchaWidgetId = null;
     }
+    return "";
+  }
 
-    container.innerHTML = "";
-    state.recaptcha = new firebase.auth.RecaptchaVerifier("mfa-recaptcha", { size: "invisible" }, instance);
-    state.recaptchaWidgetId = await state.recaptcha.render();
-    return state.recaptcha;
+  function getTotpQrUrl(secret, user) {
+    if (!secret || typeof secret.generateQrCodeUrl !== "function") {
+      return "";
+    }
+    const accountName = String((user && user.email) || "starlight-user");
+    try {
+      return String(secret.generateQrCodeUrl(accountName, "starlight") || "");
+    } catch (_error) {
+      return "";
+    }
   }
 
   function deleteAccountMessage(error) {
@@ -1765,20 +1778,36 @@
       setStatus("settings-mfa-status", "You must be logged in.", false);
       return;
     }
-    const phone = String(document.getElementById("mfa-phone").value || "").trim();
-    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
-      setStatus("settings-mfa-status", "Use E.164 phone format, example +15551234567.", false);
-      return;
-    }
 
     try {
-      setStatus("settings-mfa-status", "Sending code...", true);
-      const verifier = await ensureMfaRecaptchaVerifier();
+      const generator = getTotpGenerator();
+      if (!generator) {
+        setStatus("settings-mfa-status", "Authenticator app 2FA is unavailable in this build.", false);
+        return;
+      }
+      setStatus("settings-mfa-status", "Generating authenticator setup...", true);
       const session = await user.multiFactor.getSession();
-      const phoneInfoOptions = { phoneNumber: phone, session };
-      const phoneAuthProvider = new firebase.auth.PhoneAuthProvider();
-      state.verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, verifier);
-      setStatus("settings-mfa-status", "Code sent. Enter it below to finish enrollment.", true);
+      const secret = await generator.generateSecret(session);
+      state.totpSecret = secret;
+      state.totpSecretKey = getTotpSecretKey(secret);
+      state.totpQrUrl = getTotpQrUrl(secret, user);
+
+      const secretInput = document.getElementById("mfa-totp-secret");
+      if (secretInput) {
+        secretInput.value = state.totpSecretKey;
+      }
+
+      const qrLink = document.getElementById("mfa-totp-qr-link");
+      if (qrLink) {
+        if (state.totpQrUrl) {
+          qrLink.setAttribute("href", state.totpQrUrl);
+          qrLink.classList.remove("hidden");
+        } else {
+          qrLink.classList.add("hidden");
+        }
+      }
+
+      setStatus("settings-mfa-status", "Authenticator setup ready. Add it in your app, then enter the 6-digit code.", true);
     } catch (error) {
       setStatus("settings-mfa-status", friendlyMfaMessage(error), false);
     }
@@ -1790,8 +1819,8 @@
       setStatus("settings-mfa-status", "You must be logged in.", false);
       return;
     }
-    if (!state.verificationId) {
-      setStatus("settings-mfa-status", "Request a code first.", false);
+    if (!state.totpSecret) {
+      setStatus("settings-mfa-status", "Generate authenticator setup first.", false);
       return;
     }
     const code = String(document.getElementById("mfa-code").value || "").trim();
@@ -1801,14 +1830,20 @@
     }
 
     try {
-      const credential = firebase.auth.PhoneAuthProvider.credential(state.verificationId, code);
-      const assertion = firebase.auth.PhoneMultiFactorGenerator.assertion(credential);
-      await user.multiFactor.enroll(assertion, "phone");
-      state.verificationId = "";
-      setStatus("settings-mfa-status", "2FA phone method added.", true);
+      const generator = getTotpGenerator();
+      if (!generator) {
+        setStatus("settings-mfa-status", "Authenticator app 2FA is unavailable in this build.", false);
+        return;
+      }
+      const assertion = generator.assertionForEnrollment(state.totpSecret, code);
+      await user.multiFactor.enroll(assertion, "auth-app");
+      state.totpSecret = null;
+      state.totpSecretKey = "";
+      state.totpQrUrl = "";
+      setStatus("settings-mfa-status", "Authenticator app 2FA enabled.", true);
       mountSettingsAuthPanel(true);
     } catch (error) {
-      setStatus("settings-mfa-status", error && error.message ? error.message : "Could not enroll 2FA.", false);
+      setStatus("settings-mfa-status", friendlyMfaMessage(error), false);
     }
   }
 
@@ -1830,7 +1865,7 @@
       setStatus("settings-mfa-status", "2FA method removed.", true);
       mountSettingsAuthPanel(true);
     } catch (error) {
-      setStatus("settings-mfa-status", error && error.message ? error.message : "Could not disable 2FA.", false);
+      setStatus("settings-mfa-status", friendlyMfaMessage(error), false);
     }
   }
 
@@ -2063,14 +2098,9 @@
     }
 
     if (forceRefresh) {
-      if (state.recaptcha) {
-        try {
-          state.recaptcha.clear();
-        } catch (_error) {
-        }
-        state.recaptcha = null;
-        state.recaptchaWidgetId = null;
-      }
+      state.totpSecret = null;
+      state.totpSecretKey = "";
+      state.totpQrUrl = "";
       const existingTabRow = document.getElementById("settings-account-tab-row");
       const existingPanel = document.querySelector("[data-settings-panel='account']");
       if (existingTabRow) {
@@ -2141,14 +2171,14 @@
       </article>
 
       <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-        <label class="block mb-2 text-sm text-gray-300">Two-Factor Authentication (SMS)</label>
+        <label class="block mb-2 text-sm text-gray-300">Two-Factor Authentication (Authenticator App)</label>
         <p class="text-sm text-gray-300 mb-3">Current status: ${hasMfa ? "Enabled" : "Not configured"}</p>
-        <input id="mfa-phone" type="text" placeholder="+15551234567" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-2" />
-        <button id="mfa-send" type="button" class="w-full mb-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Send Code</button>
-        <input id="mfa-code" type="text" placeholder="6-digit code" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-2" />
-        <button id="mfa-enroll" type="button" class="w-full px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Enroll 2FA</button>
+        <button id="mfa-send" type="button" class="w-full mb-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Generate Setup</button>
+        <input id="mfa-totp-secret" type="text" readonly value="${escapeHtml(state.totpSecretKey || "")}" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-2" placeholder="Authenticator secret key" />
+        <a id="mfa-totp-qr-link" href="${escapeHtml(state.totpQrUrl || "#")}" target="_blank" rel="noopener" class="text-sm text-cyan-300 hover:text-cyan-200 underline ${state.totpQrUrl ? "" : "hidden"}">Open authenticator setup link</a>
+        <input id="mfa-code" type="text" placeholder="6-digit authenticator code" class="w-full mt-2 bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-2" />
+        <button id="mfa-enroll" type="button" class="w-full px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Verify & Enable 2FA</button>
         ${hasMfa ? '<button id="mfa-disable" type="button" class="w-full mt-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Disable 2FA</button>' : ''}
-        <div id="mfa-recaptcha"></div>
         <p id="settings-mfa-status" class="text-sm mt-3"></p>
       </article>
 
