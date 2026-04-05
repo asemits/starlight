@@ -707,9 +707,71 @@
     };
     if (usernameMaybe) {
       const normalized = normalizeUsername(usernameMaybe);
-      payload.usernameHash = await hashText(normalized);
+      if (/^[a-z0-9_.-]{3,24}$/.test(normalized)) {
+        payload.usernameHash = await hashText(normalized);
+      }
     }
     await firestore.collection(USER_DOC_COLLECTION).doc(user.uid).set(payload, { merge: true });
+  }
+
+  async function userHasReservedUsername(user) {
+    const firestore = db();
+    if (!firestore || !user) {
+      return false;
+    }
+    try {
+      const snap = await firestore.collection(USER_DOC_COLLECTION).doc(user.uid).get();
+      const data = snap.exists ? (snap.data() || {}) : {};
+      const usernameHash = String(data.usernameHash || "");
+      return Boolean(usernameHash);
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  async function shouldCompleteGoogleSignup(result) {
+    const user = result && result.user ? result.user : null;
+    if (!user) {
+      return false;
+    }
+    const isNewUser = Boolean(result && result.additionalUserInfo && result.additionalUserInfo.isNewUser);
+    if (isNewUser) {
+      return true;
+    }
+    const hasReserved = await userHasReservedUsername(user);
+    return !hasReserved;
+  }
+
+  async function maybeRejectDuplicateGoogleAccount(result, statusTargetId) {
+    const instance = auth();
+    const user = result && result.user ? result.user : null;
+    if (!instance || !user || !user.email) {
+      return false;
+    }
+
+    const isNewUser = Boolean(result && result.additionalUserInfo && result.additionalUserInfo.isNewUser);
+    if (!isNewUser) {
+      return false;
+    }
+
+    try {
+      const methods = await instance.fetchSignInMethodsForEmail(String(user.email));
+      if (Array.isArray(methods) && methods.includes("password")) {
+        try {
+          await user.delete();
+        } catch (_deleteError) {
+        }
+        try {
+          await instance.signOut();
+        } catch (_signoutError) {
+        }
+        setStatus(statusTargetId, "An account with this email already exists. Log in with email/password and link Google in Account settings.", false);
+        return true;
+      }
+    } catch (_error) {
+    }
+
+    return false;
   }
 
   async function reserveUsername(user, username, options) {
@@ -1179,12 +1241,30 @@
         try {
           const provider = new firebase.auth.GoogleAuthProvider();
           const result = await instance.signInWithPopup(provider);
+          const rejected = await maybeRejectDuplicateGoogleAccount(result, "login-status");
+          if (rejected) {
+            return;
+          }
           try {
-            await ensureUserDoc(result.user, result.user.displayName || "");
+            await ensureUserDoc(result.user, "");
           } catch (_error) {
+          }
+          const needsSignupComplete = await shouldCompleteGoogleSignup(result);
+          if (needsSignupComplete) {
+            try {
+              await result.user.updateProfile({ displayName: "" });
+            } catch (_error) {
+            }
+            openUsernameModal();
+            return;
           }
           closeModal();
         } catch (error) {
+          const code = authErrorCode(error);
+          if (code === "auth/account-exists-with-different-credential") {
+            setStatus("login-status", "An account with this email already exists. Log in with email/password and link Google in Account settings.", false);
+            return;
+          }
           setStatus("login-status", friendlyAuthMessage(error, "google"), false);
         }
       });
@@ -1332,12 +1412,25 @@
         try {
           const provider = new firebase.auth.GoogleAuthProvider();
           const result = await instance.signInWithPopup(provider);
+          const rejected = await maybeRejectDuplicateGoogleAccount(result, "signup-form-status");
+          if (rejected) {
+            return;
+          }
           try {
-            await ensureUserDoc(result.user, result.user.displayName || "");
+            await ensureUserDoc(result.user, "");
           } catch (_error) {
           }
-          closeModal();
+          try {
+            await result.user.updateProfile({ displayName: "" });
+          } catch (_error) {
+          }
+          openUsernameModal();
         } catch (error) {
+          const code = authErrorCode(error);
+          if (code === "auth/account-exists-with-different-credential") {
+            setStatus("signup-form-status", "An account with this email already exists. Log in with email/password and link Google in Account settings.", false);
+            return;
+          }
           setStatus("signup-form-status", friendlyAuthMessage(error, "google"), false);
         }
       });
