@@ -229,6 +229,129 @@
     return "Something went wrong. Please try again.";
   }
 
+  function deleteAccountMessage(error) {
+    const code = authErrorCode(error);
+    if (code === "auth/requires-recent-login") {
+      return "Please sign in again before deleting your account.";
+    }
+    if (code === "auth/wrong-password" || code === "auth/invalid-login-credentials" || code === "auth/invalid-credential") {
+      return "Incorrect password.";
+    }
+    if (code === "auth/popup-closed-by-user") {
+      return "Account deletion was canceled.";
+    }
+    if (code === "auth/too-many-requests") {
+      return "Too many attempts. Try again later.";
+    }
+    return "Could not delete account. Please try again.";
+  }
+
+  async function ensureRecentLoginForDeletion(user) {
+    const providers = Array.isArray(user && user.providerData) ? user.providerData : [];
+    const providerIds = providers.map((item) => item && item.providerId ? String(item.providerId) : "").filter(Boolean);
+
+    if (providerIds.includes("google.com")) {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await user.reauthenticateWithPopup(provider);
+      return;
+    }
+
+    if (providerIds.includes("password")) {
+      const password = String(window.prompt("For security, enter your current password to delete your account:") || "");
+      if (!password || !user.email) {
+        const error = new Error("recent-login-required");
+        error.code = "auth/requires-recent-login";
+        throw error;
+      }
+      const credential = firebase.auth.EmailAuthProvider.credential(String(user.email), password);
+      await user.reauthenticateWithCredential(credential);
+      return;
+    }
+
+    const fallback = new Error("recent-login-required");
+    fallback.code = "auth/requires-recent-login";
+    throw fallback;
+  }
+
+  async function deleteUserFirestoreData(user) {
+    const firestore = db();
+    if (!firestore || !user) {
+      return;
+    }
+
+    let batch = firestore.batch();
+    let opCount = 0;
+
+    async function queueDelete(ref) {
+      batch.delete(ref);
+      opCount += 1;
+      if (opCount >= 400) {
+        await batch.commit();
+        batch = firestore.batch();
+        opCount = 0;
+      }
+    }
+
+    async function flushBatch() {
+      if (opCount > 0) {
+        await batch.commit();
+        batch = firestore.batch();
+        opCount = 0;
+      }
+    }
+
+    const userRef = firestore.collection(USER_DOC_COLLECTION).doc(user.uid);
+    const userSnap = await userRef.get();
+    await queueDelete(userRef);
+
+    if (userSnap.exists) {
+      const userData = userSnap.data() || {};
+      const usernameHash = String(userData.usernameHash || "");
+      if (usernameHash) {
+        await queueDelete(firestore.collection(USERNAME_COLLECTION).doc(usernameHash));
+      }
+    }
+
+    try {
+      const playersSnap = await firestore.collectionGroup("players").where("uid", "==", user.uid).get();
+      for (const doc of playersSnap.docs) {
+        await queueDelete(doc.ref);
+      }
+    } catch (_error) {
+    }
+
+    const docIdField = firebase.firestore.FieldPath.documentId();
+    let lastDoc = null;
+    while (true) {
+      let query = firestore.collection("gameStats").orderBy(docIdField).limit(200);
+      if (lastDoc) {
+        query = query.startAfter(lastDoc);
+      }
+      const page = await query.get();
+      if (page.empty) {
+        break;
+      }
+
+      for (const statsDoc of page.docs) {
+        try {
+          const playerRef = statsDoc.ref.collection("players").doc(user.uid);
+          const playerSnap = await playerRef.get();
+          if (playerSnap.exists) {
+            await queueDelete(playerRef);
+          }
+        } catch (_error) {
+        }
+      }
+
+      lastDoc = page.docs[page.docs.length - 1];
+      if (page.docs.length < 200) {
+        break;
+      }
+    }
+
+    await flushBatch();
+  }
+
   async function canAuthenticateWithPassword(email, password) {
     const instance = auth();
     if (!instance || !instance.app || !instance.app.options || !instance.app.options.apiKey) {
@@ -1545,32 +1668,26 @@
     }
 
     try {
-      const firestore = db();
-      if (firestore) {
-        const userRef = firestore.collection(USER_DOC_COLLECTION).doc(user.uid);
-        const userSnap = await userRef.get();
-        const batch = firestore.batch();
-        batch.delete(userRef);
-
-        if (userSnap.exists) {
-          const userData = userSnap.data() || {};
-          const usernameHash = String(userData.usernameHash || "");
-          if (usernameHash) {
-            batch.delete(firestore.collection(USERNAME_COLLECTION).doc(usernameHash));
-          }
-        }
-
-        await batch.commit();
-      }
-
+      setStatus("settings-danger-status", "Confirming your identity...", true);
+      await ensureRecentLoginForDeletion(user);
+      setStatus("settings-danger-status", "Deleting account data...", true);
+      await deleteUserFirestoreData(user);
       await user.delete();
-    } catch (error) {
-      const code = error && error.code ? String(error.code) : "";
-      if (code === "auth/requires-recent-login") {
-        setStatus("settings-danger-status", "Please sign in again, then retry deleting your account.", false);
-        return;
+      const instance = auth();
+      if (instance) {
+        try {
+          await instance.signOut();
+        } catch (_error) {
+        }
       }
-      setStatus("settings-danger-status", error && error.message ? error.message : "Could not delete account.", false);
+      if (window.location.pathname !== "/") {
+        window.history.replaceState({}, "", "/");
+      }
+      if (typeof window.router === "function") {
+        window.router();
+      }
+    } catch (error) {
+      setStatus("settings-danger-status", deleteAccountMessage(error), false);
     }
   }
 
