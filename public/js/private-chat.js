@@ -212,22 +212,25 @@
       const username = currentUsername();
       const usernameLower = normalizeUsername(username);
       const profileRef = firestore.collection(PROFILE_COLLECTION).doc(user.uid);
-      await profileRef.set(
-        {
+      try {
+        await profileRef.set(
+          {
+            uid: user.uid,
+            username,
+            usernameLower,
+            chatPublicKeyJwk: identity.publicJwk,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          },
+          { merge: true }
+        );
+        state.profileCache.set(user.uid, {
           uid: user.uid,
           username,
           usernameLower,
-          chatPublicKeyJwk: identity.publicJwk,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        },
-        { merge: true }
-      );
-      state.profileCache.set(user.uid, {
-        uid: user.uid,
-        username,
-        usernameLower,
-        chatPublicKeyJwk: identity.publicJwk
-      });
+          chatPublicKeyJwk: identity.publicJwk
+        });
+      } catch (_error) {
+      }
     }
 
     return state.identity;
@@ -245,7 +248,12 @@
     if (!firestore) {
       return null;
     }
-    const snap = await firestore.collection(PROFILE_COLLECTION).doc(clean).get();
+    let snap;
+    try {
+      snap = await firestore.collection(PROFILE_COLLECTION).doc(clean).get();
+    } catch (_error) {
+      return null;
+    }
     if (!snap.exists) {
       return null;
     }
@@ -272,11 +280,16 @@
       return null;
     }
 
-    const querySnap = await firestore
-      .collection(PROFILE_COLLECTION)
-      .where("usernameLower", "==", normalized)
-      .limit(1)
-      .get();
+    let querySnap;
+    try {
+      querySnap = await firestore
+        .collection(PROFILE_COLLECTION)
+        .where("usernameLower", "==", normalized)
+        .limit(1)
+        .get();
+    } catch (_error) {
+      return null;
+    }
 
     if (querySnap.empty) {
       return null;
@@ -1386,10 +1399,14 @@
       showLockedState();
       return;
     }
-    await ensureIdentity(user);
     state.root.innerHTML = template();
     bindControls();
     renderStatus();
+    try {
+      await ensureIdentity(user);
+    } catch (_error) {
+      setStatus("Profile sync is unavailable. Chat UI is loaded.", "error");
+    }
     subscribeChats();
   }
 
