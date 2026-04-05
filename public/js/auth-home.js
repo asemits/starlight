@@ -229,6 +229,45 @@
     return "Something went wrong. Please try again.";
   }
 
+  async function canAuthenticateWithPassword(email, password) {
+    const instance = auth();
+    if (!instance || !instance.app || !instance.app.options || !instance.app.options.apiKey) {
+      throw new Error("auth-unavailable");
+    }
+    const apiKey = String(instance.app.options.apiKey || "").trim();
+    if (!apiKey) {
+      throw new Error("auth-unavailable");
+    }
+
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: true
+      })
+    });
+
+    if (response.ok) {
+      return true;
+    }
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (_error) {
+      payload = null;
+    }
+    const message = payload && payload.error && payload.error.message ? String(payload.error.message) : "";
+    if (message === "INVALID_PASSWORD" || message === "EMAIL_NOT_FOUND" || message === "INVALID_LOGIN_CREDENTIALS") {
+      return false;
+    }
+    throw new Error(message || "auth-check-failed");
+  }
+
   async function closeModal() {
     const modal = document.getElementById("starlight-auth-modal");
     const modalKind = modal ? String(modal.getAttribute("data-modal-kind") || "") : "";
@@ -500,21 +539,31 @@
         try {
           const email = await instance.verifyPasswordResetCode(action.oobCode);
           try {
-            await instance.signInWithEmailAndPassword(email, password);
-            await instance.signOut();
-            setStatus("reset-action-status", "You cannot reuse your previous password.", false);
-            return;
-          } catch (previousPasswordError) {
-            const code = previousPasswordError && previousPasswordError.code ? String(previousPasswordError.code) : "";
-            if (code && code !== "auth/wrong-password" && code !== "auth/user-not-found" && code !== "auth/invalid-login-credentials" && code !== "auth/invalid-credential") {
-              setStatus("reset-action-status", friendlyAuthMessage(previousPasswordError, "password-reuse-check"), false);
+            const isPreviousPassword = await canAuthenticateWithPassword(email, password);
+            if (isPreviousPassword) {
+              setStatus("reset-action-status", "You cannot reuse your previous password.", false);
               return;
             }
+          } catch (previousPasswordError) {
+            const raw = previousPasswordError && previousPasswordError.message ? String(previousPasswordError.message) : "";
+            if (raw === "auth-unavailable" || raw === "auth-check-failed" || raw === "TOO_MANY_ATTEMPTS_TRY_LATER" || raw === "USER_DISABLED") {
+              setStatus("reset-action-status", friendlyAuthMessage({ code: "auth/too-many-requests" }, "password-reuse-check"), false);
+              return;
+            }
+            setStatus("reset-action-status", friendlyAuthMessage(null, "password-reuse-check"), false);
+            return;
           }
 
           await instance.confirmPasswordReset(action.oobCode, password);
-          setStatus("reset-action-status", "Password updated. You can now log in.", true);
+          try {
+            await instance.signOut();
+          } catch (_error) {
+          }
           clearActionParams();
+          if (typeof window.router === "function") {
+            window.router();
+          }
+          openLoginModal();
         } catch (error) {
           setStatus("reset-action-status", friendlyAuthMessage(error, "reset-password"), false);
         }
