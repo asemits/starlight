@@ -1232,12 +1232,11 @@ header.scrolled {
     justify-content: center;
   }
 }
-.skip-btn { font-size:18px !important; }
-.scorller {
-  overflow-y:scroll
+.row:last-of-type {
+  padding-bottom: 120px;
 }
+.skip-btn { font-size:18px !important; }
         </style>
-        <div class="scorller">
         <canvas id="pipCanvas" width="500" height="500" style="display:none;"></canvas>
 <video id="pipVideo" muted autoplay playsinline style="display:none;"></video>
 <div class="scanline"></div>
@@ -1402,11 +1401,6 @@ header.scrolled {
         </div>
     </div>
 </div>
-</div>
-<br>
-<br>
-<br>
-<br>
 <!-- PLAYER BAR -->
 <div class="player-bar">
     <!-- Now Playing -->
