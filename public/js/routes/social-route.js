@@ -3,27 +3,13 @@
   modules["/social"] = {
     render: function renderSocialRoute() {
       return `
-        <section class="starlight-social-shell">
-          <header class="starlight-social-header">
-            <h1>Social</h1>
-            <p>Connect through encrypted private messages and group chats.</p>
-          </header>
-
-          <div class="starlight-social-grid">
-            <a href="/private-chat" class="nav-link starlight-social-card">
-              <div class="starlight-social-card-icon">
-                <i class="fa-solid fa-user-group"></i>
-              </div>
-              <div>
-                <h2>Private Chat</h2>
-                <p>Open encrypted DMs and GCs with a Discord-style layout.</p>
-              </div>
-              <span class="starlight-social-card-arrow">
-                <i class="fa-solid fa-arrow-right"></i>
-              </span>
-            </a>
-          </div>
-        </section>
+        <h1 class="text-4xl font-bold mb-6">Social</h1>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <a href="#/private-chat" class="block p-6 bg-gray-800 rounded-lg shadow-md hover:bg-gray-700 transition">
+            <h2 class="text-2xl font-semibold mb-2 text-white"><i class="fas fa-comments"></i> Private Chat</h2>
+            <p class="text-gray-400">Direct messages and group chats.</p>
+          </a>
+        </div>
       `;
     }
   };
