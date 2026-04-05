@@ -26,10 +26,6 @@
                 <button type="button" onclick="resetSettingsCategory('layout')" title="Reset Layout defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
               <div class="flex items-center gap-2 mb-2">
-                <button type="button" data-settings-tab="games" onclick="switchSettingsCategory('games')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-gamepad"></i><span>Games</span></button>
-                <button type="button" onclick="resetSettingsCategory('games')" title="Reset Games defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-              </div>
-              <div class="flex items-center gap-2 mb-2">
                 <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Particles</span></button>
                 <button type="button" onclick="resetSettingsCategory('particles')" title="Reset Particles defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
@@ -106,13 +102,6 @@
                     <option value="on" ${window.getDashboardSectionVisibility('stats') === 'on' ? 'selected' : ''}>On</option>
                     <option value="off" ${window.getDashboardSectionVisibility('stats') === 'off' ? 'selected' : ''}>Off</option>
                   </select>
-                </article>
-              </div>
-
-              <div data-settings-panel="games" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
-                  <label class="block mb-2 text-sm text-gray-300">Games settings moved to other categories</label>
-                  <p class="text-sm text-gray-300">Games Pagination is now under Layout. Particles settings are in the Particles category.</p>
                 </article>
               </div>
 
