@@ -51,6 +51,13 @@
       return;
     }
 
+    if (path !== "/games" && window.StarlightGames && typeof window.StarlightGames.closeOverlay === "function") {
+      try {
+        await window.StarlightGames.closeOverlay();
+      } catch (_error) {
+      }
+    }
+
     const token = ++routeToken;
     appContent.classList.add("route-exit");
     await new Promise((resolve) => setTimeout(resolve, 170));

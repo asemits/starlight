@@ -1021,7 +1021,10 @@
 		}
 
 		if (state.overlayCleanup) {
-			state.overlayCleanup();
+			try {
+				await state.overlayCleanup();
+			} catch (_error) {
+			}
 		}
 
 		const frameUrl = createGameRunnerUrl(game.path, game.sourceBase);
@@ -1163,6 +1166,18 @@
 		}
 
 		state.overlayCleanup = cleanup;
+	}
+
+	async function closeOverlay() {
+		if (!state.overlayCleanup) {
+			return;
+		}
+		const cleanup = state.overlayCleanup;
+		state.overlayCleanup = null;
+		try {
+			await cleanup();
+		} catch (_error) {
+		}
 	}
 
 	function baseMarkup() {
@@ -1699,6 +1714,7 @@
 	window.StarlightGames = {
 		mount,
 		render,
+		closeOverlay,
 		setFavoriteByPath: async function setFavoriteByPath(path, sourceBase, favoriteOn) {
 			const game = findGame(path, sourceBase || PRIMARY_CDN_BASE);
 			if (!game) {
