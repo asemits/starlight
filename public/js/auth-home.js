@@ -267,6 +267,13 @@
     window.history.replaceState({}, "", "/");
   }
 
+  function getActionCodeSettings() {
+    return {
+      url: `${window.location.origin}/`,
+      handleCodeInApp: false
+    };
+  }
+
   function renderActionHome(root, action) {
     if (!root || !action) {
       return false;
@@ -964,7 +971,7 @@
           return;
         }
         try {
-          await instance.sendPasswordResetEmail(email);
+          await instance.sendPasswordResetEmail(email, getActionCodeSettings());
           setStatus("login-status", "Password reset email sent.", true);
         } catch (error) {
           setStatus("login-status", error && error.message ? error.message : "Could not send password reset email.", false);
@@ -1072,7 +1079,7 @@
             setStatus("signup-form-status", "Could not create account.", false);
             return;
           }
-          await user.sendEmailVerification();
+          await user.sendEmailVerification(getActionCodeSettings());
           state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
           state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
           openVerifyEmailModal();
@@ -1152,7 +1159,7 @@
           return;
         }
         try {
-          await user.sendEmailVerification();
+          await user.sendEmailVerification(getActionCodeSettings());
           state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
           state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
           setStatus("verify-status", "Verification email resent.", true);
