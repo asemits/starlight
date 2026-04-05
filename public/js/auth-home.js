@@ -989,7 +989,7 @@
 
           <section class="starlight-dashboard-section">
             <div class="starlight-dashboard-head">
-              <h2>Your Stats</h2>
+              <h2>Stats</h2>
             </div>
             <div id="dashboard-stats" class="starlight-dashboard-stats"></div>
           </section>
