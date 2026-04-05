@@ -1081,6 +1081,52 @@ header.scrolled {
 .music-modal-btn.primary:hover {
   box-shadow: 0 14px 32px rgba(255,255,255,0.16);
 }
+.download-format-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.download-format-btn {
+  min-height: 64px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  color: rgba(255,255,255,0.84);
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 10px 12px;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.download-format-btn:hover {
+  border-color: rgba(255,255,255,0.24);
+  background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04));
+  transform: translateY(-1px);
+}
+.download-format-name {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+}
+.download-format-meta {
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.52);
+}
+.download-format-note {
+  margin-top: 12px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+}
 @media (max-width: 1100px) {
   header {
     padding-right: 24px;
@@ -1112,6 +1158,9 @@ header.scrolled {
   }
 }
 @media (max-width: 760px) {
+  .download-format-grid {
+    grid-template-columns: 1fr;
+  }
   header {
     left: 0;
     padding: 16px 16px 16px 82px;
@@ -1388,6 +1437,9 @@ header.scrolled {
             </button>
             <button class="control-btn" id="loop-btn" onclick="toggleLoop()" title="Loop">
             <i class="fa-solid fa-repeat"></i>
+            </button>
+            <button class="control-btn" onclick="downloadCurrentTrack()" title="Download current track as...">
+              <i class="fa-solid fa-download"></i>
             </button>
             <div class="player-eq eq-paused" id="player-eq">
                 <div class="eq-bar" style="height:4px;animation-duration:0.6s"></div>

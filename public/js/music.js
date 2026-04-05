@@ -2,6 +2,9 @@ const PROXY_URL = "https://script.google.com/macros/s/AKfycbx8oqYPseZoVohUBfMTdw
 function getAudio() { return document.getElementById('mainAudio'); }
 let currentTrackData = null;
 let favorites = JSON.parse(localStorage.getItem('cl-favs')) || [];
+const DOWNLOAD_FORMATS = ['mp3', 'wav', 'm4a', 'flac'];
+let ffmpegInstance = null;
+let ffmpegLoadPromise = null;
 
 function getSecureRandomInt(max) {
     if (!Number.isInteger(max) || max <= 0) return 0;
@@ -59,6 +62,60 @@ function showConfirmModal({ title, message, confirmLabel = 'Confirm', cancelLabe
         close();
         if (typeof onConfirm === 'function') onConfirm();
     };
+}
+
+function showDownloadFormatModal(track) {
+    const modal = document.getElementById('music-modal');
+    const titleEl = document.getElementById('music-modal-title');
+    const copyEl = document.getElementById('music-modal-copy');
+    const confirmBtn = document.getElementById('music-modal-confirm');
+    const cancelBtn = document.getElementById('music-modal-cancel');
+
+    if (!modal || !titleEl || !copyEl || !confirmBtn || !cancelBtn) {
+        downloadTrack(track, 'mp3');
+        return;
+    }
+
+    titleEl.textContent = 'Download Format';
+    copyEl.innerHTML = `
+        <div class="download-format-grid">
+            ${DOWNLOAD_FORMATS.map(fmt => `
+                <button class="download-format-btn" type="button" data-format="${fmt}">
+                    <span class="download-format-name">${fmt.toUpperCase()}</span>
+                    <span class="download-format-meta">Download as ${fmt.toUpperCase()}</span>
+                </button>
+            `).join('')}
+        </div>
+        <div class="download-format-note">Format conversion runs in your browser when needed.</div>
+    `;
+
+    confirmBtn.style.display = 'none';
+    cancelBtn.textContent = 'Cancel';
+    modal.classList.add('visible');
+    modal.setAttribute('aria-hidden', 'false');
+
+    const close = () => {
+        modal.classList.remove('visible');
+        modal.setAttribute('aria-hidden', 'true');
+        confirmBtn.style.display = '';
+        confirmBtn.onclick = null;
+        cancelBtn.onclick = null;
+        modal.onclick = null;
+        copyEl.textContent = '';
+    };
+
+    cancelBtn.onclick = close;
+    modal.onclick = (event) => {
+        if (event.target === modal) close();
+    };
+
+    copyEl.querySelectorAll('.download-format-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const format = btn.getAttribute('data-format') || 'mp3';
+            close();
+            downloadTrack(track, format);
+        });
+    });
 }
 
 /* ══════════════════════════════════════════════════════
@@ -242,14 +299,18 @@ function buildTrackRow(track, idx, source) {
         <div class="eq-bar" style="animation-duration:0.75s;animation-delay:0.05s"></div>
     </div>`;
 
+    const trackPayload = JSON.stringify(track).replace(/"/g,'&quot;');
+
     // Actions differ per source
     const actionsHtml = source === 'playlist'
         ? `<div class="track-row-actions">
-                <button class="row-icon-btn" onclick="addToQueue(${JSON.stringify(track).replace(/"/g,'&quot;')})" title="Add to Queue"><i class="fa-solid fa-layer-group"></i></button>
+                <button class="row-icon-btn" onclick="downloadTrack(${trackPayload})" title="Download as..."><i class="fa-solid fa-download"></i></button>
+                <button class="row-icon-btn" onclick="addToQueue(${trackPayload})" title="Add to Queue"><i class="fa-solid fa-layer-group"></i></button>
                 <button class="row-icon-btn remove" onclick="removeFromPlaylist('${track.apiUrl}')" title="Remove"><i class="fa-solid fa-xmark"></i></button>
            </div>`
         : `<div class="track-row-actions">
-                <button class="row-icon-btn" onclick="addToPlaylist(${JSON.stringify(track).replace(/"/g,'&quot;')})" title="Save to Playlist"><i class="fa-solid fa-list"></i></button>
+                <button class="row-icon-btn" onclick="downloadTrack(${trackPayload})" title="Download as..."><i class="fa-solid fa-download"></i></button>
+                <button class="row-icon-btn" onclick="addToPlaylist(${trackPayload})" title="Save to Playlist"><i class="fa-solid fa-list"></i></button>
                 <button class="row-icon-btn remove" onclick="removeFromQueue(${idx})" title="Remove"><i class="fa-solid fa-xmark"></i></button>
            </div>`;
 
@@ -335,6 +396,151 @@ function showToast(msg, icon = 'fa-circle-check') {
     }, 2400);
 }
 
+function sanitizeTrackFileNamePart(value) {
+    return String(value || '')
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function normalizeDownloadFormat(format) {
+    const value = String(format || '').toLowerCase();
+    return DOWNLOAD_FORMATS.includes(value) ? value : 'mp3';
+}
+
+function getDownloadMimeType(format) {
+    const selectedFormat = normalizeDownloadFormat(format);
+    if (selectedFormat === 'wav') return 'audio/wav';
+    if (selectedFormat === 'm4a') return 'audio/mp4';
+    if (selectedFormat === 'flac') return 'audio/flac';
+    return 'audio/mpeg';
+}
+
+function getDownloadFileName(track, format = 'mp3') {
+    const selectedFormat = normalizeDownloadFormat(format);
+    const artist = sanitizeTrackFileNamePart(track?.artist || '');
+    const title = sanitizeTrackFileNamePart(track?.title || '');
+    const base = [artist, title].filter(Boolean).join(' - ') || 'starlight-track';
+    return `${base.slice(0, 120)}.${selectedFormat}`;
+}
+
+function getFfmpegArgsForFormat(format, inputName, outputName) {
+    const selectedFormat = normalizeDownloadFormat(format);
+    if (selectedFormat === 'wav') {
+        return ['-i', inputName, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', outputName];
+    }
+    if (selectedFormat === 'm4a') {
+        return ['-i', inputName, '-vn', '-c:a', 'aac', '-b:a', '192k', outputName];
+    }
+    if (selectedFormat === 'flac') {
+        return ['-i', inputName, '-vn', '-c:a', 'flac', outputName];
+    }
+    return ['-i', inputName, '-vn', '-c:a', 'libmp3lame', '-q:a', '2', outputName];
+}
+
+async function ensureFfmpegLoaded() {
+    if (ffmpegInstance) return ffmpegInstance;
+    if (ffmpegLoadPromise) return ffmpegLoadPromise;
+
+    ffmpegLoadPromise = (async () => {
+        const ffmpegModule = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/classes.js');
+        const utilModule = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
+        const { FFmpeg } = ffmpegModule;
+        const { toBlobURL } = utilModule;
+        const baseUrl = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+        const classWorkerUrl = await toBlobURL('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js', 'text/javascript');
+        const ffmpeg = new FFmpeg();
+        await ffmpeg.load({
+            classWorkerURL: classWorkerUrl,
+            coreURL: await toBlobURL(`${baseUrl}/ffmpeg-core.js`, 'text/javascript'),
+            wasmURL: await toBlobURL(`${baseUrl}/ffmpeg-core.wasm`, 'application/wasm'),
+            workerURL: await toBlobURL(`${baseUrl}/ffmpeg-core.worker.js`, 'text/javascript')
+        });
+        ffmpegInstance = ffmpeg;
+        return ffmpeg;
+    })().catch((error) => {
+        ffmpegLoadPromise = null;
+        throw error;
+    });
+
+    return ffmpegLoadPromise;
+}
+
+async function convertAudioBlobToFormat(sourceBlob, format) {
+    const ffmpeg = await ensureFfmpegLoaded();
+    const selectedFormat = normalizeDownloadFormat(format);
+    const fileId = createSecureId('dl');
+    const inputName = `${fileId}.mp3`;
+    const outputName = `${fileId}.${selectedFormat}`;
+    const inputData = new Uint8Array(await sourceBlob.arrayBuffer());
+
+    await ffmpeg.writeFile(inputName, inputData);
+    try {
+        await ffmpeg.exec(getFfmpegArgsForFormat(selectedFormat, inputName, outputName));
+        const outputData = await ffmpeg.readFile(outputName);
+        const bytes = outputData instanceof Uint8Array ? outputData : new TextEncoder().encode(String(outputData || ''));
+        return new Blob([bytes], { type: getDownloadMimeType(selectedFormat) });
+    } finally {
+        try { await ffmpeg.deleteFile(inputName); } catch {}
+        try { await ffmpeg.deleteFile(outputName); } catch {}
+    }
+}
+
+function startBlobDownload(blob, fileName) {
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+}
+
+async function downloadTrack(track, format = null) {
+    if (!track || !track.apiUrl) {
+        showToast('Track unavailable', 'fa-circle-info');
+        return;
+    }
+
+    if (!format) {
+        showDownloadFormatModal(track);
+        return;
+    }
+
+    const selectedFormat = normalizeDownloadFormat(format);
+    showToast(`Preparing ${selectedFormat.toUpperCase()}...`, 'fa-gear');
+
+    const sourceBlob = await getTunneledDataBlob(track.apiUrl, 'stream');
+    if (!sourceBlob) {
+        showToast('Download failed', 'fa-triangle-exclamation');
+        return;
+    }
+
+    let outputBlob = sourceBlob;
+    if (selectedFormat !== 'mp3') {
+        try {
+            showToast(`Converting to ${selectedFormat.toUpperCase()}...`, 'fa-gear');
+            outputBlob = await convertAudioBlobToFormat(sourceBlob, selectedFormat);
+        } catch (error) {
+            showToast(`Could not convert to ${selectedFormat.toUpperCase()}`, 'fa-triangle-exclamation');
+            return;
+        }
+    }
+
+    startBlobDownload(outputBlob, getDownloadFileName(track, selectedFormat));
+    showToast('Download started', 'fa-download');
+}
+
+function downloadCurrentTrack(format = null) {
+    if (!currentTrackData) {
+        showToast('Play a track first', 'fa-circle-info');
+        return;
+    }
+    downloadTrack(currentTrackData, format);
+}
+
 /* ══════════════════════════════════════════════════════
    SCROLL / ARROWS
 ══════════════════════════════════════════════════════ */
@@ -375,7 +581,7 @@ document.addEventListener('keydown', e => {
 /* ══════════════════════════════════════════════════════
    TUNNEL ENGINE
 ══════════════════════════════════════════════════════ */
-async function getTunneledBlob(url, type) {
+async function getTunneledDataBlob(url, type) {
     try {
         const res = await fetch(`${PROXY_URL}?type=${type}&url=${encodeURIComponent(url)}`);
         const b64 = await res.text();
@@ -383,9 +589,15 @@ async function getTunneledBlob(url, type) {
         const byteChars = atob(b64.trim());
         const byteNums = new Array(byteChars.length);
         for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
-        const blob = new Blob([new Uint8Array(byteNums)], { type: type === 'image' ? 'image/jpeg' : 'audio/mpeg' });
-        return URL.createObjectURL(blob);
-    } catch (e) { return null; }
+        return new Blob([new Uint8Array(byteNums)], { type: type === 'image' ? 'image/jpeg' : 'audio/mpeg' });
+    } catch {
+        return null;
+    }
+}
+
+async function getTunneledBlob(url, type) {
+    const blob = await getTunneledDataBlob(url, type);
+    return blob ? URL.createObjectURL(blob) : null;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -610,6 +822,7 @@ function showCardContext(e, track) {
     `;
     const items = [
         { icon:'fa-play',           label:'Play Now',          fn: () => playTrack(track.apiUrl, track.title, track.artist, track.img) },
+        { icon:'fa-download',       label:'Download As...',    fn: () => downloadTrack(track) },
         { icon:'fa-layer-group',    label:'Add to Queue',      fn: () => addToQueue(track) },
         { icon:'fa-list',           label:'Add to Playlist',   fn: () => addToPlaylist(track) },
         { icon:'fa-heart',          label:'Add to Favorites',  fn: () => { if(!currentTrackData||currentTrackData.apiUrl!==track.apiUrl){ currentTrackData=track; } if(!favorites.some(f=>f.apiUrl===track.apiUrl)){favorites.push(track);localStorage.setItem('cl-favs',JSON.stringify(favorites));updateFavUI();showToast('Added to Favorites','fa-heart');} else showToast('Already in Favorites','fa-circle-info'); } },
