@@ -352,23 +352,23 @@
 
     let content = "";
     if (preview.type === "image" && preview.image) {
-      content = <img src="" alt="" />;
+      content = `<img src="${preview.image}" alt="" />`;
     } else if (preview.type === "video" && preview.video) {
-      content = <video src="" controls preload="metadata"></video>;
+      content = `<video src="${preview.video}" controls preload="metadata"></video>`;
     } else {
       content = 
-        <div class="nebula-chat-link-preview-body">
+        `<div class="nebula-chat-link-preview-body">
           <strong></strong>
           <p></p>
-        </div>
+        </div>`
       ;
     }
 
     previewZone.classList.remove("hidden");
     previewZone.innerHTML = 
-      <a href="" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
+      `<a href="" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
         
-      </a>
+      </a>`
     ;
   }
 
@@ -488,23 +488,23 @@
 
     let content = "";
     if (preview.type === "image" && preview.image) {
-      content = <img src="" alt="" />;
+      content = `<img src="${preview.image}" alt="" />`;
     } else if (preview.type === "video" && preview.video) {
-      content = <video src="" controls preload="metadata"></video>;
+      content = `<video src="${preview.video}" controls preload="metadata"></video>`;
     } else {
       content = 
-        <div class="nebula-chat-link-preview-body">
-          <strong></strong>
-          <p></p>
-        </div>
+        `<div class="nebula-chat-link-preview-body">
+          <strong>${preview.title}</strong>
+          <p>${preview.description}</p>
+        </div>`
       ;
     }
 
     previewZone.classList.remove("hidden");
     previewZone.innerHTML = 
-      <a href="" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
+      `<a href="" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
         
-      </a>
+      </a>`
     ;
   }
 
