@@ -1,5 +1,7 @@
 (function () {
   const VERIFICATION_WINDOW_MS = 5 * 60 * 1000;
+  const VERIFY_INITIAL_RESEND_DELAY_MS = 30 * 1000;
+  const VERIFY_TOO_MANY_REQUESTS_BACKOFF_MS = 30 * 60 * 1000;
   const USERNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
   const AUTO_SYNC_INTERVAL_MS = 30 * 60 * 1000;
   const MANUAL_SYNC_INTERVAL_MS = 5 * 60 * 1000;
@@ -2105,18 +2107,9 @@
             return;
           }
 
-          const verifySend = await sendVerificationEmailWithFallback(user);
-          if (!verifySend.ok) {
-            const verifySendStatus = `Account created, but verification email could not be sent. ${detailedAuthStatus(verifySend.error, "verify-email-send")}`;
-            state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
-            state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
-            openVerifyEmailModal(verifySendStatus, false);
-            return;
-          }
-
           state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
-          state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
-          openVerifyEmailModal("Verification email sent. Check inbox/spam, then click I Verified.", true);
+          state.resendAllowedAt = Date.now() + VERIFY_INITIAL_RESEND_DELAY_MS;
+          openVerifyEmailModal("Account created. Click Resend Email to send verification.", true);
         } catch (error) {
           setStatus("signup-form-status", friendlyAuthMessage(error, "signup"), false);
         }
@@ -2213,6 +2206,11 @@
         try {
           const verifySend = await sendVerificationEmailWithFallback(user);
           if (!verifySend.ok) {
+            const code = authErrorCode(verifySend.error);
+            if (code === "auth/too-many-requests") {
+              state.resendAllowedAt = Date.now() + VERIFY_TOO_MANY_REQUESTS_BACKOFF_MS;
+              refreshTimer();
+            }
             setStatus("verify-status", detailedAuthStatus(verifySend.error, "verify-email-send"), false);
             return;
           }
