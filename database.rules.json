@@ -34,6 +34,14 @@
             ".write": "auth != null && auth.uid === $uid",
             ".validate": "newData.exists() ? (newData.child('uid').val() === $blockedUid && newData.child('username').isString() && newData.child('usernameLower').isString() && (!newData.child('createdAt').exists() || newData.child('createdAt').isNumber())) : true"
           }
+        },
+        "privateChatIdentity": {
+          ".read": "auth != null && auth.uid === $uid",
+          "$docId": {
+            ".read": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && auth.uid === $uid && $docId === 'main'",
+            ".validate": "newData.exists() ? ($docId === 'main' && newData.child('uid').val() === $uid && newData.child('version').isNumber() && newData.child('publicJwk').hasChildren(['kty', 'n', 'e']) && newData.child('publicJwk').child('kty').isString() && newData.child('publicJwk').child('n').isString() && newData.child('publicJwk').child('e').isString() && newData.child('salt').isString() && newData.child('salt').val().length > 0 && newData.child('salt').val().length <= 512 && newData.child('iv').isString() && newData.child('iv').val().length > 0 && newData.child('iv').val().length <= 512 && newData.child('ciphertext').isString() && newData.child('ciphertext').val().length > 0 && newData.child('ciphertext').val().length <= 30000) : true"
+          }
         }
       }
     },

@@ -1,6 +1,9 @@
 (function () {
   const CHAT_COLLECTION = "privateChats";
   const PROFILE_COLLECTION = "userPublicProfiles";
+  const USER_COLLECTION = "users";
+  const PRIVATE_CHAT_IDENTITY_SUBCOLLECTION = "privateChatIdentity";
+  const PRIVATE_CHAT_IDENTITY_DOC_ID = "main";
   const FRIEND_REQUESTS_COLLECTION = "friendRequests";
   const BLOCKED_USERS_SUBCOLLECTION = "blockedUsers";
   const CHAIN_WINDOW_MS = 5 * 60 * 1000;
@@ -23,9 +26,15 @@
     authUnsub: null,
     pendingReply: null,
     linkPreview: null,
+    composeMentionContext: null,
+    composeMentionItems: [],
+    composeMentionIndex: 0,
     activeMenuMessageId: "",
     statusText: "",
     statusType: "",
+    keySyncLabel: "Checking...",
+    keySyncType: "pending",
+    keySyncLastSyncedMs: 0,
     profileCache: new Map(),
     memberCache: new Map(),
     friends: [],
@@ -125,6 +134,17 @@
       return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     } catch (_error) {
       return "Unknown";
+    }
+  }
+
+  function formatDateTime(ms) {
+    if (!ms) {
+      return "never";
+    }
+    try {
+      return new Date(ms).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch (_error) {
+      return "unknown";
     }
   }
 
@@ -274,276 +294,170 @@
     }
     return `${text.slice(0, Math.max(0, maxLen - 1))}\u2026`;
   }
-  function extractFirstUrl(value) {
-    const text = String(value || "");
-    const match = text.match(/https?:\/\/[^\s"'<>\(\)]+/i);
-    if (!match) {
+  function decodeHtmlEntities(value) {
+    const element = document.createElement("textarea");
+    element.innerHTML = String(value || "");
+    return element.value;
+  }
+
+  function normalizeMarkdownLinkUrl(rawUrl) {
+    const decoded = decodeHtmlEntities(rawUrl).trim();
+    if (!decoded) {
       return "";
     }
+    const withProtocol = /^www\./i.test(decoded) ? `https://${decoded}` : decoded;
     try {
-      return new URL(match[0].trim()).href;
+      const parsed = new URL(withProtocol);
+      const protocol = String(parsed.protocol || "").toLowerCase();
+      if (protocol !== "http:" && protocol !== "https:") {
+        return "";
+      }
+      return parsed.href;
     } catch (_error) {
       return "";
     }
   }
 
-  function isImageUrl(url) {
-    return /\.(jpe?g|png|gif|webp|bmp|svg|avif)(?:[?#].*)?$/i.test(String(url));
+  function stashMarkdownToken(pool, value) {
+    const token = `\uE000${pool.length}\uE001`;
+    pool.push(String(value || ""));
+    return token;
   }
 
-  function isVideoUrl(url) {
-    return /\.(mp4|webm|ogg|mov|m4v)(?:[?#].*)?$/i.test(String(url));
-  }
-
-  async function fetchLinkPreview(url) {
-    const normalized = extractFirstUrl(url);
-    if (!normalized) {
-      return null;
-    }
-
-    if (isImageUrl(normalized)) {
-      return { type: "image", url: normalized, title: "", description: "", image: normalized, video: "" };
-    }
-    if (isVideoUrl(normalized)) {
-      return { type: "video", url: normalized, title: "", description: "", image: "", video: normalized };
-    }
-
-    try {
-      const response = await fetch(normalized, {
-        method: "GET",
-        credentials: "omit"
-      });
-      if (!response.ok) {
-        return null;
+  function restoreMarkdownTokens(value, pool) {
+    return String(value || "").replace(/\uE000(\d+)\uE001/g, (_match, indexText) => {
+      const index = Number.parseInt(indexText, 10);
+      if (!Number.isFinite(index) || index < 0 || index >= pool.length) {
+        return "";
       }
-      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("text/html")) {
-        return null;
-      }
-
-      const html = await response.text();
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const title = (doc.querySelector("meta[property='og:title']")?.content || doc.querySelector("meta[name='twitter:title']")?.content || doc.querySelector("title")?.textContent || "").trim();
-      const description = (doc.querySelector("meta[property='og:description']")?.content || doc.querySelector("meta[name='description']")?.content || doc.querySelector("meta[name='twitter:description']")?.content || "").trim();
-      const image = (doc.querySelector("meta[property='og:image']")?.content || doc.querySelector("meta[name='twitter:image']")?.content || doc.querySelector("link[rel='image_src']")?.href || "").trim();
-      const video = (doc.querySelector("meta[property='og:video']")?.content || doc.querySelector("meta[name='twitter:player']")?.content || doc.querySelector("video source")?.src || doc.querySelector("video")?.src || "").trim();
-      const type = video ? "video" : image ? "image" : "link";
-      return {
-        type,
-        url: normalized,
-        title,
-        description,
-        image: image || "",
-        video: video || ""
-      };
-    } catch (_error) {
-      return null;
-    }
-  }
-
-  function renderLinkPreview() {
-    if (!state.root) {
-      return;
-    }
-
-    const previewZone = state.root.querySelector("#nebula-chat-link-preview");
-    if (!previewZone) {
-      return;
-    }
-
-    const preview = state.linkPreview;
-    if (!preview) {
-      previewZone.classList.add("hidden");
-      previewZone.innerHTML = "";
-      return;
-    }
-
-    let content = "";
-    if (preview.type === "image" && preview.image) {
-      content = `<img src="${preview.image}" alt="" />`;
-    } else if (preview.type === "video" && preview.video) {
-      content = `<video src="${preview.video}" controls preload="metadata"></video>`;
-    } else {
-      content = 
-        `<div class="nebula-chat-link-preview-body">
-          <strong></strong>
-          <p></p>
-        </div>`
-      ;
-    }
-
-    previewZone.classList.remove("hidden");
-    previewZone.innerHTML = 
-      `<a href="" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
-        
-      </a>`
-    ;
-  }
-
-  function updateLinkPreviewForInput(value) {
-    const url = extractFirstUrl(value);
-    if (!url) {
-      state.linkPreview = null;
-      renderLinkPreview();
-      return;
-    }
-
-    if (state.linkPreview && state.linkPreview.url === url) {
-      return;
-    }
-
-    state.linkPreview = null;
-    renderLinkPreview();
-    fetchLinkPreview(url).then((preview) => {
-      if (preview && extractFirstUrl(String(value || "")) === url) {
-        state.linkPreview = preview;
-        renderLinkPreview();
-      }
-    }).catch(() => {
-      state.linkPreview = null;
-      renderLinkPreview();
+      return pool[index];
     });
   }
 
-  function clearLinkPreview() {
-    state.linkPreview = null;
-    renderLinkPreview();
-  }
+  function renderMarkdownInline(value, tokenPool) {
+    let output = String(value || "");
 
-  function extractFirstUrl(value) {
-    const text = String(value || "");
-    const match = text.match(/https?:\/\/[^\s"'<>\(\)]+/i);
-    if (!match) {
-      return "";
-    }
-    try {
-      return new URL(match[0].trim()).href;
-    } catch (_error) {
-      return "";
-    }
-  }
-
-  function isImageUrl(url) {
-    return /\.(jpe?g|png|gif|webp|bmp|svg|avif)(?:[?#].*)?$/i.test(String(url));
-  }
-
-  function isVideoUrl(url) {
-    return /\.(mp4|webm|ogg|mov|m4v)(?:[?#].*)?$/i.test(String(url));
-  }
-
-  async function fetchLinkPreview(url) {
-    const normalized = extractFirstUrl(url);
-    if (!normalized) {
-      return null;
-    }
-
-    if (isImageUrl(normalized)) {
-      return { type: "image", url: normalized, title: "", description: "", image: normalized, video: "" };
-    }
-    if (isVideoUrl(normalized)) {
-      return { type: "video", url: normalized, title: "", description: "", image: "", video: normalized };
-    }
-
-    try {
-      const response = await fetch(normalized, {
-        method: "GET",
-        credentials: "omit"
-      });
-      if (!response.ok) {
-        return null;
-      }
-      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("text/html")) {
-        return null;
-      }
-
-      const html = await response.text();
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const title = (doc.querySelector("meta[property='og:title']")?.content || doc.querySelector("meta[name='twitter:title']")?.content || doc.querySelector("title")?.textContent || "").trim();
-      const description = (doc.querySelector("meta[property='og:description']")?.content || doc.querySelector("meta[name='description']")?.content || doc.querySelector("meta[name='twitter:description']")?.content || "").trim();
-      const image = (doc.querySelector("meta[property='og:image']")?.content || doc.querySelector("meta[name='twitter:image']")?.content || doc.querySelector("link[rel='image_src']")?.href || "").trim();
-      const video = (doc.querySelector("meta[property='og:video']")?.content || doc.querySelector("meta[name='twitter:player']")?.content || doc.querySelector("video source")?.src || doc.querySelector("video")?.src || "").trim();
-      const type = video ? "video" : image ? "image" : "link";
-      return {
-        type,
-        url: normalized,
-        title,
-        description,
-        image: image || "",
-        video: video || ""
-      };
-    } catch (_error) {
-      return null;
-    }
-  }
-
-  function renderLinkPreview() {
-    if (!state.root) {
-      return;
-    }
-
-    const previewZone = state.root.querySelector("#nebula-chat-link-preview");
-    if (!previewZone) {
-      return;
-    }
-
-    const preview = state.linkPreview;
-    if (!preview) {
-      previewZone.classList.add("hidden");
-      previewZone.innerHTML = "";
-      return;
-    }
-
-    let content = "";
-    if (preview.type === "image" && preview.image) {
-      content = `<img src="${preview.image}" alt="" />`;
-    } else if (preview.type === "video" && preview.video) {
-      content = `<video src="${preview.video}" controls preload="metadata"></video>`;
-    } else {
-      content = 
-        `<div class="nebula-chat-link-preview-body">
-          <strong>${preview.title}</strong>
-          <p>${preview.description}</p>
-        </div>`
-      ;
-    }
-
-    previewZone.classList.remove("hidden");
-    previewZone.innerHTML = 
-      `<a href="" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
-        
-      </a>`
-    ;
-  }
-
-  function updateLinkPreviewForInput(value) {
-    const url = extractFirstUrl(value);
-    if (!url) {
-      state.linkPreview = null;
-      renderLinkPreview();
-      return;
-    }
-
-    if (state.linkPreview && state.linkPreview.url === url) {
-      return;
-    }
-
-    state.linkPreview = null;
-    renderLinkPreview();
-    fetchLinkPreview(url).then((preview) => {
-      if (preview && extractFirstUrl(String(value || "")) === url) {
-        state.linkPreview = preview;
-        renderLinkPreview();
-      }
-    }).catch(() => {
-      state.linkPreview = null;
-      renderLinkPreview();
+    output = output.replace(/`([^`\n]+)`/g, (_match, codeText) => {
+      return stashMarkdownToken(tokenPool, `<code class="nebula-chat-md-code">${codeText}</code>`);
     });
+
+    output = output.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, rawUrl) => {
+      const href = normalizeMarkdownLinkUrl(rawUrl);
+      if (!href) {
+        return `${label} (${rawUrl})`;
+      }
+      return stashMarkdownToken(tokenPool, `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer noopener">${label}</a>`);
+    });
+
+    output = output.replace(/__\*\*([\s\S]+?)\*\*__/g, "<u><strong>$1</strong></u>");
+    output = output.replace(/__\*([\s\S]+?)\*__/g, "<u><em>$1</em></u>");
+    output = output.replace(/__([^_\n]+?)__/g, "<u>$1</u>");
+    output = output.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>");
+    output = output.replace(/~~([^~\n]+?)~~/g, "<del>$1</del>");
+    output = output.replace(/\*([^*\n]+?)\*/g, "<em>$1</em>");
+    output = output.replace(/_([^_\n]+?)_/g, "<em>$1</em>");
+
+    return output;
   }
 
-  function clearLinkPreview() {
-    state.linkPreview = null;
-    renderLinkPreview();
+  function renderMarkdownBlocks(value, tokenPool) {
+    const lines = String(value || "").replace(/\r\n?/g, "\n").split("\n");
+    const output = [];
+    let inList = false;
+
+    lines.forEach((line) => {
+      const current = String(line || "");
+      const listMatch = current.match(/^(\s*)([-*])\s+(.+)$/);
+      if (listMatch) {
+        if (!inList) {
+          output.push('<ul class="nebula-chat-md-list">');
+          inList = true;
+        }
+        const depth = Math.max(0, Math.min(4, Math.floor(String(listMatch[1] || "").length / 2)));
+        output.push(`<li class="depth-${depth}">${renderMarkdownInline(listMatch[3], tokenPool)}</li>`);
+        return;
+      }
+
+      if (inList) {
+        output.push("</ul>");
+        inList = false;
+      }
+
+      const trimmed = current.trim();
+      if (!trimmed) {
+        return;
+      }
+
+      const headerMatch = current.match(/^(#{1,3})\s+(.+)$/);
+      if (headerMatch) {
+        const level = headerMatch[1].length;
+        output.push(`<h${level}>${renderMarkdownInline(headerMatch[2], tokenPool)}</h${level}>`);
+        return;
+      }
+
+      const subtextMatch = current.match(/^-#\s+(.+)$/);
+      if (subtextMatch) {
+        output.push(`<p class="nebula-chat-md-subtext">${renderMarkdownInline(subtextMatch[1], tokenPool)}</p>`);
+        return;
+      }
+
+      const quoteMultiMatch = current.match(/^>>>\s?(.*)$/);
+      if (quoteMultiMatch) {
+        output.push(`<blockquote class="nebula-chat-md-quote multi">${renderMarkdownInline(quoteMultiMatch[1], tokenPool)}</blockquote>`);
+        return;
+      }
+
+      const quoteMatch = current.match(/^>\s?(.*)$/);
+      if (quoteMatch) {
+        output.push(`<blockquote class="nebula-chat-md-quote">${renderMarkdownInline(quoteMatch[1], tokenPool)}</blockquote>`);
+        return;
+      }
+
+      output.push(`<p>${renderMarkdownInline(current, tokenPool)}</p>`);
+    });
+
+    if (inList) {
+      output.push("</ul>");
+    }
+
+    return output.join("");
+  }
+
+  function renderMarkdown(value) {
+    const safeText = escapeHtml(String(value || ""));
+    const tokenPool = [];
+    let prepared = safeText;
+
+    prepared = prepared.replace(/\\([\\`*_~\[\]()>#-])/g, (_match, escapedChar) => {
+      return stashMarkdownToken(tokenPool, escapedChar);
+    });
+
+    prepared = prepared.replace(/```([\s\S]*?)```/g, (_match, codeText) => {
+      return stashMarkdownToken(tokenPool, `<pre class="nebula-chat-md-codeblock"><code>${codeText}</code></pre>`);
+    });
+
+    const rendered = renderMarkdownBlocks(prepared, tokenPool);
+    return restoreMarkdownTokens(rendered, tokenPool);
+  }
+
+  function markdownToPlainText(value) {
+    let output = String(value || "");
+    output = output.replace(/\\([\\`*_~\[\]()>#-])/g, "$1");
+    output = output.replace(/```([\s\S]*?)```/g, "$1");
+    output = output.replace(/`([^`\n]+)`/g, "$1");
+    output = output.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1");
+    output = output.replace(/__\*\*([\s\S]+?)\*\*__/g, "$1");
+    output = output.replace(/__\*([\s\S]+?)\*__/g, "$1");
+    output = output.replace(/__([^_\n]+?)__/g, "$1");
+    output = output.replace(/\*\*([^*\n]+?)\*\*/g, "$1");
+    output = output.replace(/~~([^~\n]+?)~~/g, "$1");
+    output = output.replace(/\*([^*\n]+?)\*/g, "$1");
+    output = output.replace(/_([^_\n]+?)_/g, "$1");
+    output = output.replace(/^\s*[-*]\s+/gm, "");
+    output = output.replace(/^\s*>+\s?/gm, "");
+    output = output.replace(/^\s*#{1,3}\s+/gm, "");
+    output = output.replace(/^\s*-#\s+/gm, "");
+    return output.trim();
   }
 
 
@@ -579,6 +493,185 @@
       .filter((friend) => !excluded.has(friend.uid))
       .filter((friend) => !filter || normalizeUsername(friend.username).includes(filter))
       .sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
+  }
+
+  function getChatMentionCandidates(chat) {
+    const out = [];
+    const seen = new Set();
+    const myUid = state.user && state.user.uid ? String(state.user.uid) : "";
+    const participants = chat && Array.isArray(chat.participants)
+      ? chat.participants.map((uid) => String(uid || ""))
+      : [];
+    const usernames = chat && chat.participantUsernames && typeof chat.participantUsernames === "object"
+      ? chat.participantUsernames
+      : {};
+
+    participants.forEach((uid) => {
+      if (!uid || uid === myUid) {
+        return;
+      }
+      const username = String(usernames[uid] || "").trim();
+      const key = normalizeUsername(username);
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      out.push({ uid, username });
+    });
+
+    state.friends.forEach((friend) => {
+      const username = String(friend.username || "").trim();
+      const key = normalizeUsername(username);
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      out.push({ uid: String(friend.uid || ""), username });
+    });
+
+    return out.sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
+  }
+
+  function getActiveMentionContext(inputValue, caretPosition) {
+    const text = String(inputValue || "");
+    const caret = Number.isFinite(Number(caretPosition)) ? Number(caretPosition) : text.length;
+    const head = text.slice(0, caret);
+    const match = head.match(/(^|[\s(])@([A-Za-z0-9._-]{0,24})$/);
+    if (!match) {
+      return null;
+    }
+    const query = String(match[2] || "");
+    const start = caret - query.length - 1;
+    if (start < 0) {
+      return null;
+    }
+    return {
+      start,
+      end: caret,
+      query
+    };
+  }
+
+  function resetComposeMentionState() {
+    state.composeMentionContext = null;
+    state.composeMentionItems = [];
+    state.composeMentionIndex = 0;
+  }
+
+  function hideComposeMentionSuggestions(container) {
+    resetComposeMentionState();
+    hideSuggestionList(container);
+  }
+
+  function applyComposeMentionSuggestion(input, container, suggestion) {
+    if (!input || !container || !suggestion || !suggestion.username) {
+      return;
+    }
+    const context = state.composeMentionContext;
+    if (!context) {
+      hideComposeMentionSuggestions(container);
+      return;
+    }
+
+    const currentValue = String(input.value || "");
+    const before = currentValue.slice(0, context.start);
+    const after = currentValue.slice(context.end);
+    const mentionText = `@${suggestion.username}`;
+    const nextAfter = after.startsWith(" ") ? after.slice(1) : after;
+    const nextValue = `${before}${mentionText} ${nextAfter}`;
+    const caret = (before + mentionText + " ").length;
+
+    input.value = nextValue;
+    input.setSelectionRange(caret, caret);
+    updateLinkPreviewForInput(nextValue);
+    hideComposeMentionSuggestions(container);
+    input.focus();
+  }
+
+  function renderComposeMentionSuggestions(input, container) {
+    if (!input || !container || !state.selectedChat) {
+      hideComposeMentionSuggestions(container);
+      return;
+    }
+
+    const value = String(input.value || "");
+    const caret = Number.isFinite(Number(input.selectionStart)) ? Number(input.selectionStart) : value.length;
+    const context = getActiveMentionContext(value, caret);
+
+    if (!context) {
+      hideComposeMentionSuggestions(container);
+      return;
+    }
+
+    const filter = normalizeUsername(context.query);
+    const items = getChatMentionCandidates(state.selectedChat)
+      .filter((item) => !filter || normalizeUsername(item.username).includes(filter))
+      .slice(0, 8);
+
+    if (!items.length) {
+      hideComposeMentionSuggestions(container);
+      return;
+    }
+
+    state.composeMentionContext = context;
+    state.composeMentionItems = items;
+    if (!Number.isFinite(Number(state.composeMentionIndex)) || state.composeMentionIndex < 0 || state.composeMentionIndex >= items.length) {
+      state.composeMentionIndex = 0;
+    }
+
+    container.classList.remove("hidden");
+    container.innerHTML = items
+      .map((item, index) => {
+        const active = index === state.composeMentionIndex ? " is-active" : "";
+        return `<button type="button" data-compose-mention-index="${index}" class="${active.trim()}">@${escapeHtml(item.username)}</button>`;
+      })
+      .join("");
+
+    container.querySelectorAll("button[data-compose-mention-index]").forEach((node) => {
+      node.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        const index = Number.parseInt(String(node.getAttribute("data-compose-mention-index") || "-1"), 10);
+        if (!Number.isFinite(index) || index < 0 || index >= state.composeMentionItems.length) {
+          return;
+        }
+        applyComposeMentionSuggestion(input, container, state.composeMentionItems[index]);
+      });
+    });
+  }
+
+  function handleComposeMentionKeydown(event, input, container) {
+    if (!event || !input || !container || container.classList.contains("hidden") || !state.composeMentionItems.length) {
+      return false;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      state.composeMentionIndex = (state.composeMentionIndex + 1) % state.composeMentionItems.length;
+      renderComposeMentionSuggestions(input, container);
+      return true;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      state.composeMentionIndex = (state.composeMentionIndex - 1 + state.composeMentionItems.length) % state.composeMentionItems.length;
+      renderComposeMentionSuggestions(input, container);
+      return true;
+    }
+
+    if (event.key === "Enter" || event.key === "Tab") {
+      event.preventDefault();
+      const index = Math.max(0, Math.min(state.composeMentionItems.length - 1, state.composeMentionIndex));
+      applyComposeMentionSuggestion(input, container, state.composeMentionItems[index]);
+      return true;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      hideComposeMentionSuggestions(container);
+      return true;
+    }
+
+    return false;
   }
 
   function isBlockedUid(uid) {
@@ -842,6 +935,32 @@
     return `nebula-chat-identity-v1:${uid}`;
   }
 
+  function backupIdentitySecret(user) {
+    const uid = String(user && user.uid ? user.uid : "");
+    const createdAt = String(user && user.metadata && user.metadata.creationTime ? user.metadata.creationTime : "");
+    return `${uid}\n${createdAt}\nnebula-chat-identity-backup-v1`;
+  }
+
+  function identityBackupDocRef(firestore, uid) {
+    return firestore
+      .collection(USER_COLLECTION)
+      .doc(uid)
+      .collection(PRIVATE_CHAT_IDENTITY_SUBCOLLECTION)
+      .doc(PRIVATE_CHAT_IDENTITY_DOC_ID);
+  }
+
+  async function deriveIdentityBackupKey(user, saltBytes) {
+    const secretBytes = utf8Encode(backupIdentitySecret(user));
+    const baseKey = await crypto.subtle.importKey("raw", secretBytes, "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: saltBytes, iterations: 210000, hash: "SHA-256" },
+      baseKey,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+
   async function generateIdentity() {
     const keyPair = await crypto.subtle.generateKey(
       {
@@ -881,6 +1000,169 @@
     return { publicJwk, privateJwk, publicKey, privateKey };
   }
 
+  function persistIdentityLocally(uid, identity) {
+    localStorage.setItem(
+      localIdentityKey(uid),
+      JSON.stringify({
+        publicJwk: identity.publicJwk,
+        privateJwk: identity.privateJwk
+      })
+    );
+  }
+
+  async function loadIdentityFromLocalStorage(uid) {
+    const raw = localStorage.getItem(localIdentityKey(uid));
+    if (!raw) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.publicJwk || !parsed.privateJwk) {
+        return null;
+      }
+      return await importIdentityFromJwk(parsed.publicJwk, parsed.privateJwk);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function identityJwkFingerprint(jwk) {
+    try {
+      return JSON.stringify(jwk || {});
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  async function encryptIdentityBackupBundle(user, identity) {
+    const salt = new Uint8Array(16);
+    const iv = new Uint8Array(12);
+    crypto.getRandomValues(salt);
+    crypto.getRandomValues(iv);
+    const key = await deriveIdentityBackupKey(user, salt);
+    const payload = utf8Encode(
+      JSON.stringify({
+        publicJwk: identity.publicJwk,
+        privateJwk: identity.privateJwk
+      })
+    );
+    const encrypted = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      payload
+    );
+    return {
+      uid: user.uid,
+      version: 1,
+      publicJwk: identity.publicJwk,
+      salt: bytesToBase64(salt),
+      iv: bytesToBase64(iv),
+      ciphertext: bytesToBase64(new Uint8Array(encrypted))
+    };
+  }
+
+  async function decryptIdentityBackupBundle(user, bundle) {
+    if (!bundle || !bundle.publicJwk || !bundle.salt || !bundle.iv || !bundle.ciphertext) {
+      return null;
+    }
+    const salt = base64ToBytes(bundle.salt);
+    const iv = base64ToBytes(bundle.iv);
+    const ciphertext = base64ToBytes(bundle.ciphertext);
+    const key = await deriveIdentityBackupKey(user, salt);
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      ciphertext
+    );
+    const parsed = JSON.parse(utf8Decode(new Uint8Array(plaintext)) || "{}");
+    if (!parsed || !parsed.publicJwk || !parsed.privateJwk) {
+      return null;
+    }
+    return importIdentityFromJwk(parsed.publicJwk, parsed.privateJwk);
+  }
+
+  async function fetchIdentityBackupBundle(user, firestore) {
+    if (!user || !user.uid || !firestore) {
+      return null;
+    }
+    try {
+      const snap = await identityBackupDocRef(firestore, user.uid).get();
+      if (!snap.exists) {
+        return null;
+      }
+      return snap.data() || null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function loadIdentityFromBackup(user, firestore) {
+    const bundle = await fetchIdentityBackupBundle(user, firestore);
+    if (!bundle) {
+      return null;
+    }
+    try {
+      return await decryptIdentityBackupBundle(user, bundle);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function syncIdentityBackup(user, firestore, identity) {
+    if (!user || !user.uid || !firestore || !identity) {
+      return;
+    }
+    const bundle = await encryptIdentityBackupBundle(user, identity);
+    await identityBackupDocRef(firestore, user.uid).set(
+      {
+        uid: user.uid,
+        version: bundle.version,
+        publicJwk: bundle.publicJwk,
+        salt: bundle.salt,
+        iv: bundle.iv,
+        ciphertext: bundle.ciphertext,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+    setKeySyncStatus("Synced", "ok", Date.now());
+  }
+
+  async function replaceIdentityFromBackup(user, firestore) {
+    const recovered = await loadIdentityFromBackup(user, firestore);
+    if (!recovered) {
+      return null;
+    }
+    persistIdentityLocally(user.uid, recovered);
+    let backupUpdatedAtMs = 0;
+    const bundle = await fetchIdentityBackupBundle(user, firestore);
+    if (bundle) {
+      backupUpdatedAtMs = toMillis(bundle.updatedAt);
+    }
+    state.identity = {
+      uid: user.uid,
+      ...recovered
+    };
+    setKeySyncStatus("Restored on this device", "ok", backupUpdatedAtMs || Date.now());
+    return state.identity;
+  }
+
+  async function userHasAnyChats(user, firestore) {
+    if (!user || !user.uid || !firestore) {
+      return true;
+    }
+    try {
+      const snap = await firestore
+        .collection(CHAT_COLLECTION)
+        .where("participants", "array-contains", user.uid)
+        .limit(1)
+        .get();
+      return !snap.empty;
+    } catch (_error) {
+      return true;
+    }
+  }
+
   async function ensureIdentity(user) {
     if (!user || !user.uid) {
       throw new Error("No active user.");
@@ -888,29 +1170,54 @@
     if (state.identity && state.identity.uid === user.uid) {
       return state.identity;
     }
-    const key = localIdentityKey(user.uid);
-    const raw = localStorage.getItem(key);
-    let identity = null;
+    const firestore = db();
+    setKeySyncStatus("Checking...", "pending");
+    let identity = await loadIdentityFromLocalStorage(user.uid);
+    const backupBundle = firestore ? await fetchIdentityBackupBundle(user, firestore) : null;
 
-    if (raw) {
+    if (backupBundle) {
+      const backupUpdatedAtMs = toMillis(backupBundle.updatedAt);
+      if (backupUpdatedAtMs > 0) {
+        setKeySyncStatus("Backup found", "pending", backupUpdatedAtMs);
+      }
+      const backupPublic = identityJwkFingerprint(backupBundle.publicJwk);
+      const localPublic = identity ? identityJwkFingerprint(identity.publicJwk) : "";
+      if (!identity || (backupPublic && localPublic && backupPublic !== localPublic)) {
+        try {
+          const recovered = await decryptIdentityBackupBundle(user, backupBundle);
+          if (recovered) {
+            identity = recovered;
+            persistIdentityLocally(user.uid, recovered);
+            setKeySyncStatus("Restored on this device", "ok", backupUpdatedAtMs || Date.now());
+          }
+        } catch (_error) {
+        }
+      }
+    }
+
+    let existingProfilePublicKey = null;
+    if (firestore) {
       try {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.publicJwk && parsed.privateJwk) {
-          identity = await importIdentityFromJwk(parsed.publicJwk, parsed.privateJwk);
+        const profileSnap = await firestore.collection(PROFILE_COLLECTION).doc(user.uid).get();
+        if (profileSnap.exists) {
+          const profileData = profileSnap.data() || {};
+          existingProfilePublicKey = profileData.chatPublicKeyJwk || null;
         }
       } catch (_error) {
       }
     }
 
     if (!identity) {
+      if (existingProfilePublicKey) {
+        const hasChats = await userHasAnyChats(user, firestore);
+        if (hasChats) {
+          setKeySyncStatus("Missing key on this device", "error");
+          throw new Error("This device is missing your chat key. Open chat on a linked device to sync your key backup.");
+        }
+      }
       identity = await generateIdentity();
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          publicJwk: identity.publicJwk,
-          privateJwk: identity.privateJwk
-        })
-      );
+      persistIdentityLocally(user.uid, identity);
+      setKeySyncStatus("Preparing backup...", "pending");
     }
 
     state.identity = {
@@ -918,7 +1225,6 @@
       ...identity
     };
 
-    const firestore = db();
     if (firestore) {
       const username = currentUsername();
       const usernameLower = normalizeUsername(username);
@@ -941,6 +1247,12 @@
           chatPublicKeyJwk: identity.publicJwk
         });
       } catch (_error) {
+      }
+
+      try {
+        await syncIdentityBackup(user, firestore, identity);
+      } catch (_error) {
+        setKeySyncStatus("Backup sync failed", "warn", state.keySyncLastSyncedMs);
       }
     }
 
@@ -1091,11 +1403,30 @@
     }
 
     const encryptedBytes = base64ToBytes(wrappedKey);
-    const raw = await crypto.subtle.decrypt(
-      { name: "RSA-OAEP" },
-      identity.privateKey,
-      encryptedBytes
-    );
+    let raw;
+    try {
+      raw = await crypto.subtle.decrypt(
+        { name: "RSA-OAEP" },
+        identity.privateKey,
+        encryptedBytes
+      );
+    } catch (_error) {
+      const recoveredIdentity = await replaceIdentityFromBackup(user, firestore);
+      if (!recoveredIdentity) {
+        setKeySyncStatus("Key unavailable on this device", "error", state.keySyncLastSyncedMs);
+        throw new Error("Could not decrypt conversation key on this device. Open chat on a linked device to sync keys.");
+      }
+      try {
+        raw = await crypto.subtle.decrypt(
+          { name: "RSA-OAEP" },
+          recoveredIdentity.privateKey,
+          encryptedBytes
+        );
+      } catch (_retryError) {
+        setKeySyncStatus("Key unavailable on this device", "error", state.keySyncLastSyncedMs);
+        throw new Error("Could not decrypt conversation key on this device. Open chat on a linked device to sync keys.");
+      }
+    }
 
     const aesKey = await importAesFromRaw(new Uint8Array(raw));
     state.chatAesKeys.set(chatId, aesKey);
@@ -1434,6 +1765,36 @@
     }
   }
 
+  function resetKeySyncStatus() {
+    state.keySyncLabel = "Checking...";
+    state.keySyncType = "pending";
+    state.keySyncLastSyncedMs = 0;
+    renderKeySyncStatus();
+  }
+
+  function setKeySyncStatus(label, type, lastSyncedMs) {
+    state.keySyncLabel = String(label || "Checking...");
+    const cleanType = String(type || "pending");
+    state.keySyncType = ["ok", "warn", "error", "pending"].includes(cleanType) ? cleanType : "pending";
+    if (typeof lastSyncedMs !== "undefined") {
+      const parsed = Number(lastSyncedMs);
+      state.keySyncLastSyncedMs = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    }
+    renderKeySyncStatus();
+  }
+
+  function renderKeySyncStatus() {
+    const labelNode = state.root ? state.root.querySelector("#nebula-chat-keysync-label") : null;
+    const lastNode = state.root ? state.root.querySelector("#nebula-chat-keysync-last") : null;
+    if (!labelNode || !lastNode) {
+      return;
+    }
+    labelNode.textContent = state.keySyncLabel;
+    labelNode.classList.remove("ok", "warn", "error", "pending");
+    labelNode.classList.add(state.keySyncType || "pending");
+    lastNode.textContent = `Last synced: ${formatDateTime(state.keySyncLastSyncedMs)}`;
+  }
+
   function closeContextMenu() {
     if (!state.root) {
       return;
@@ -1718,6 +2079,7 @@
     state.messageRows = [];
     state.pendingReply = null;
     state.linkPreview = null;
+    resetComposeMentionState();
     renderMainArea();
     renderChatList();
     subscribeMessages(next);
@@ -1797,9 +2159,13 @@
         <div class="nebula-chat-compose-wrap">
           <div id="nebula-chat-reply-chip" class="nebula-chat-reply-chip hidden"></div>
           <div id="nebula-chat-link-preview" class="nebula-chat-link-preview hidden"></div>
+          <div id="nebula-chat-compose-mentions" class="nebula-chat-suggestions nebula-chat-compose-mentions hidden"></div>
           <form id="nebula-chat-compose-form" class="nebula-chat-compose">
-            <input id="nebula-chat-compose-input" type="text" maxlength="4000" placeholder="Send an encrypted message" autocomplete="off" />
-            <button type="submit">Send</button>
+            <textarea id="nebula-chat-compose-input" maxlength="4000" rows="3" placeholder="Send an encrypted message" autocomplete="off"></textarea>
+            <div class="nebula-chat-compose-actions">
+              <button type="button" id="nebula-chat-compose-preview">Preview</button>
+              <button type="submit">Send</button>
+            </div>
           </form>
         </div>
       </section>
@@ -1807,16 +2173,68 @@
 
     const form = main.querySelector("#nebula-chat-compose-form");
     const input = main.querySelector("#nebula-chat-compose-input");
+    const previewBtn = main.querySelector("#nebula-chat-compose-preview");
+    const mentionContainer = main.querySelector("#nebula-chat-compose-mentions");
 
     if (form && input) {
       input.addEventListener("input", () => {
-        updateLinkPreviewForInput(String(input.value || ""));
+        const nextValue = String(input.value || "");
+        updateLinkPreviewForInput(nextValue);
+        renderComposeMentionSuggestions(input, mentionContainer);
       });
 
       input.addEventListener("paste", (event) => {
-        const pasted = event.clipboardData && event.clipboardData.getData ? event.clipboardData.getData("text/plain") : "";
-        updateLinkPreviewForInput(String(pasted || ""));
+        if (event && event.defaultPrevented) {
+          return;
+        }
+        window.setTimeout(() => {
+          const nextValue = String(input.value || "");
+          updateLinkPreviewForInput(nextValue);
+          renderComposeMentionSuggestions(input, mentionContainer);
+        }, 0);
       });
+
+      input.addEventListener("focus", () => {
+        renderComposeMentionSuggestions(input, mentionContainer);
+      });
+
+      input.addEventListener("click", () => {
+        renderComposeMentionSuggestions(input, mentionContainer);
+      });
+
+      input.addEventListener("keyup", (event) => {
+        if (!event || ["ArrowUp", "ArrowDown", "Enter", "Tab", "Escape"].includes(String(event.key || ""))) {
+          return;
+        }
+        renderComposeMentionSuggestions(input, mentionContainer);
+      });
+
+      input.addEventListener("blur", () => {
+        window.setTimeout(() => hideComposeMentionSuggestions(mentionContainer), 120);
+      });
+
+      input.addEventListener("keydown", (event) => {
+        if (handleComposeMentionKeydown(event, input, mentionContainer)) {
+          return;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+          event.preventDefault();
+          if (typeof form.requestSubmit === "function") {
+            form.requestSubmit();
+          }
+        }
+      });
+
+      if (previewBtn) {
+        previewBtn.addEventListener("click", () => {
+          const text = String(input.value || "");
+          if (!text.trim()) {
+            openModal("Markdown Preview", '<p class="nebula-chat-modal-copy">Nothing to preview yet.</p>');
+            return;
+          }
+          openModal("Markdown Preview", `<div class="nebula-chat-markdown-preview nebula-chat-bubble-markdown">${renderMarkdown(text)}</div>`);
+        });
+      }
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -1875,6 +2293,7 @@
           input.value = "";
           dismissReplyComposer();
           clearLinkPreview();
+          hideComposeMentionSuggestions(mentionContainer);
         } catch (error) {
           setStatus(error && error.message ? error.message : "Could not send message.", "error");
         } finally {
@@ -1920,7 +2339,7 @@
         const edited = row.editedAtMs ? " (edited)" : "";
         const reply = replyMap.get(row.id);
         const replyHtml = reply
-          ? `<div class="nebula-chat-inline-reply"><strong>${escapeHtml(reply.senderUsername)}</strong><span>${escapeHtml(truncate(reply.text, CHAT_PREVIEW_LIMIT))}</span></div>`
+          ? `<div class="nebula-chat-inline-reply"><strong>${escapeHtml(reply.senderUsername)}</strong><span>${escapeHtml(truncate(markdownToPlainText(reply.text), CHAT_PREVIEW_LIMIT))}</span></div>`
           : "";
         const preview = row.preview || null;
         const previewHtml = preview
@@ -1938,7 +2357,7 @@
             ${showMeta ? `<div class="nebula-chat-bubble-meta"><strong>${escapeHtml(row.senderUsername)}</strong><span>${escapeHtml(formatTime(row.chainAtMs) + edited)}</span></div>` : ""}
             ${replyHtml}
             ${previewHtml}
-            <p>${escapeHtml(row.text)}</p>
+            <div class="nebula-chat-bubble-markdown">${renderMarkdown(row.text)}</div>
           </article>
         `;
       })
@@ -2663,11 +3082,20 @@
     }
     const dmSuggestions = state.root.querySelector("#nebula-chat-create-dm-suggestions");
     const gcSuggestions = state.root.querySelector("#nebula-chat-create-gc-suggestions");
+    const composeSuggestions = state.root.querySelector("#nebula-chat-compose-mentions");
+    const composeInput = state.root.querySelector("#nebula-chat-compose-input");
     if (dmSuggestions && (!event.target || !dmSuggestions.contains(event.target))) {
       dmSuggestions.classList.add("hidden");
     }
     if (gcSuggestions && (!event.target || !gcSuggestions.contains(event.target))) {
       gcSuggestions.classList.add("hidden");
+    }
+    if (
+      composeSuggestions
+      && (!event.target || !composeSuggestions.contains(event.target))
+      && (!composeInput || !composeInput.contains(event.target))
+    ) {
+      hideComposeMentionSuggestions(composeSuggestions);
     }
     const menu = state.root.querySelector("#nebula-chat-context-menu");
     if (!menu || menu.classList.contains("hidden")) {
@@ -2683,6 +3111,8 @@
       return;
     }
     if (event.key === "Escape") {
+      const composeSuggestions = state.root ? state.root.querySelector("#nebula-chat-compose-mentions") : null;
+      hideComposeMentionSuggestions(composeSuggestions);
       closeContextMenu();
       closeModal();
     }
@@ -2715,6 +3145,13 @@
               <div id="nebula-chat-create-gc-suggestions" class="nebula-chat-suggestions hidden"></div>
             </div>
             <p id="nebula-chat-status" class="nebula-chat-status"></p>
+            <div class="nebula-chat-keysync">
+              <div class="nebula-chat-keysync-head">
+                <span>Key Sync</span>
+                <strong id="nebula-chat-keysync-label" class="pending">Checking...</strong>
+              </div>
+              <p id="nebula-chat-keysync-last">Last synced: never</p>
+            </div>
             <section class="nebula-chat-list-wrap">
               <h2>Direct Messages and Group Chats</h2>
               <ul id="nebula-chat-list" class="nebula-chat-list"></ul>
@@ -2746,11 +3183,12 @@
     }
     state.root.innerHTML = template();
     bindControls();
+    resetKeySyncStatus();
     renderStatus();
     try {
       await ensureIdentity(user);
-    } catch (_error) {
-      setStatus("Profile sync is unavailable. Chat UI is loaded.", "error");
+    } catch (error) {
+      setStatus(error && error.message ? error.message : "Profile sync is unavailable. Chat UI is loaded.", "error");
     }
     subscribeFriendsAndRequests();
     subscribeChats();
@@ -2817,12 +3255,19 @@
       state.messageRows = [];
       state.pendingReply = null;
       state.linkPreview = null;
+      state.composeMentionContext = null;
+      state.composeMentionItems = [];
+      state.composeMentionIndex = 0;
       state.chatAesKeys.clear();
       state.memberCache.clear();
+      state.identity = null;
       state.friends = [];
       state.blockedUsers = [];
       state.incomingFriendRequests = [];
       state.outgoingFriendRequests = [];
+      state.keySyncLabel = "Checking...";
+      state.keySyncType = "pending";
+      state.keySyncLastSyncedMs = 0;
       setStatus("", "");
 
       try {
@@ -2873,12 +3318,16 @@
     state.root = null;
     state.rootSelector = "";
     state.user = null;
+    state.identity = null;
     state.chats = [];
     state.selectedChatId = "";
     state.selectedChat = null;
     state.messageRows = [];
     state.pendingReply = null;
     state.linkPreview = null;
+    state.composeMentionContext = null;
+    state.composeMentionItems = [];
+    state.composeMentionIndex = 0;
     state.chatAesKeys.clear();
     state.memberCache.clear();
     state.friends = [];
@@ -2888,6 +3337,9 @@
     state.activeMenuMessageId = "";
     state.statusText = "";
     state.statusType = "";
+    state.keySyncLabel = "Checking...";
+    state.keySyncType = "pending";
+    state.keySyncLastSyncedMs = 0;
   }
 
   initNotificationWatchers();
