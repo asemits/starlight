@@ -26,6 +26,9 @@
     authUnsub: null,
     pendingReply: null,
     linkPreview: null,
+    composeMentionContext: null,
+    composeMentionItems: [],
+    composeMentionIndex: 0,
     activeMenuMessageId: "",
     statusText: "",
     statusType: "",
@@ -291,276 +294,170 @@
     }
     return `${text.slice(0, Math.max(0, maxLen - 1))}\u2026`;
   }
-  function extractFirstUrl(value) {
-    const text = String(value || "");
-    const match = text.match(/https?:\/\/[^\s"'<>\(\)]+/i);
-    if (!match) {
+  function decodeHtmlEntities(value) {
+    const element = document.createElement("textarea");
+    element.innerHTML = String(value || "");
+    return element.value;
+  }
+
+  function normalizeMarkdownLinkUrl(rawUrl) {
+    const decoded = decodeHtmlEntities(rawUrl).trim();
+    if (!decoded) {
       return "";
     }
+    const withProtocol = /^www\./i.test(decoded) ? `https://${decoded}` : decoded;
     try {
-      return new URL(match[0].trim()).href;
+      const parsed = new URL(withProtocol);
+      const protocol = String(parsed.protocol || "").toLowerCase();
+      if (protocol !== "http:" && protocol !== "https:") {
+        return "";
+      }
+      return parsed.href;
     } catch (_error) {
       return "";
     }
   }
 
-  function isImageUrl(url) {
-    return /\.(jpe?g|png|gif|webp|bmp|svg|avif)(?:[?#].*)?$/i.test(String(url));
+  function stashMarkdownToken(pool, value) {
+    const token = `\uE000${pool.length}\uE001`;
+    pool.push(String(value || ""));
+    return token;
   }
 
-  function isVideoUrl(url) {
-    return /\.(mp4|webm|ogg|mov|m4v)(?:[?#].*)?$/i.test(String(url));
-  }
-
-  async function fetchLinkPreview(url) {
-    const normalized = extractFirstUrl(url);
-    if (!normalized) {
-      return null;
-    }
-
-    if (isImageUrl(normalized)) {
-      return { type: "image", url: normalized, title: "", description: "", image: normalized, video: "" };
-    }
-    if (isVideoUrl(normalized)) {
-      return { type: "video", url: normalized, title: "", description: "", image: "", video: normalized };
-    }
-
-    try {
-      const response = await fetch(normalized, {
-        method: "GET",
-        credentials: "omit"
-      });
-      if (!response.ok) {
-        return null;
+  function restoreMarkdownTokens(value, pool) {
+    return String(value || "").replace(/\uE000(\d+)\uE001/g, (_match, indexText) => {
+      const index = Number.parseInt(indexText, 10);
+      if (!Number.isFinite(index) || index < 0 || index >= pool.length) {
+        return "";
       }
-      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("text/html")) {
-        return null;
-      }
-
-      const html = await response.text();
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const title = (doc.querySelector("meta[property='og:title']")?.content || doc.querySelector("meta[name='twitter:title']")?.content || doc.querySelector("title")?.textContent || "").trim();
-      const description = (doc.querySelector("meta[property='og:description']")?.content || doc.querySelector("meta[name='description']")?.content || doc.querySelector("meta[name='twitter:description']")?.content || "").trim();
-      const image = (doc.querySelector("meta[property='og:image']")?.content || doc.querySelector("meta[name='twitter:image']")?.content || doc.querySelector("link[rel='image_src']")?.href || "").trim();
-      const video = (doc.querySelector("meta[property='og:video']")?.content || doc.querySelector("meta[name='twitter:player']")?.content || doc.querySelector("video source")?.src || doc.querySelector("video")?.src || "").trim();
-      const type = video ? "video" : image ? "image" : "link";
-      return {
-        type,
-        url: normalized,
-        title,
-        description,
-        image: image || "",
-        video: video || ""
-      };
-    } catch (_error) {
-      return null;
-    }
-  }
-
-  function renderLinkPreview() {
-    if (!state.root) {
-      return;
-    }
-
-    const previewZone = state.root.querySelector("#nebula-chat-link-preview");
-    if (!previewZone) {
-      return;
-    }
-
-    const preview = state.linkPreview;
-    if (!preview) {
-      previewZone.classList.add("hidden");
-      previewZone.innerHTML = "";
-      return;
-    }
-
-    let content = "";
-    if (preview.type === "image" && preview.image) {
-      content = `<img src="${preview.image}" alt="" />`;
-    } else if (preview.type === "video" && preview.video) {
-      content = `<video src="${preview.video}" controls preload="metadata"></video>`;
-    } else {
-      content = 
-        `<div class="nebula-chat-link-preview-body">
-          <strong></strong>
-          <p></p>
-        </div>`
-      ;
-    }
-
-    previewZone.classList.remove("hidden");
-    previewZone.innerHTML = 
-      `<a href="" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
-        
-      </a>`
-    ;
-  }
-
-  function updateLinkPreviewForInput(value) {
-    const url = extractFirstUrl(value);
-    if (!url) {
-      state.linkPreview = null;
-      renderLinkPreview();
-      return;
-    }
-
-    if (state.linkPreview && state.linkPreview.url === url) {
-      return;
-    }
-
-    state.linkPreview = null;
-    renderLinkPreview();
-    fetchLinkPreview(url).then((preview) => {
-      if (preview && extractFirstUrl(String(value || "")) === url) {
-        state.linkPreview = preview;
-        renderLinkPreview();
-      }
-    }).catch(() => {
-      state.linkPreview = null;
-      renderLinkPreview();
+      return pool[index];
     });
   }
 
-  function clearLinkPreview() {
-    state.linkPreview = null;
-    renderLinkPreview();
-  }
+  function renderMarkdownInline(value, tokenPool) {
+    let output = String(value || "");
 
-  function extractFirstUrl(value) {
-    const text = String(value || "");
-    const match = text.match(/https?:\/\/[^\s"'<>\(\)]+/i);
-    if (!match) {
-      return "";
-    }
-    try {
-      return new URL(match[0].trim()).href;
-    } catch (_error) {
-      return "";
-    }
-  }
-
-  function isImageUrl(url) {
-    return /\.(jpe?g|png|gif|webp|bmp|svg|avif)(?:[?#].*)?$/i.test(String(url));
-  }
-
-  function isVideoUrl(url) {
-    return /\.(mp4|webm|ogg|mov|m4v)(?:[?#].*)?$/i.test(String(url));
-  }
-
-  async function fetchLinkPreview(url) {
-    const normalized = extractFirstUrl(url);
-    if (!normalized) {
-      return null;
-    }
-
-    if (isImageUrl(normalized)) {
-      return { type: "image", url: normalized, title: "", description: "", image: normalized, video: "" };
-    }
-    if (isVideoUrl(normalized)) {
-      return { type: "video", url: normalized, title: "", description: "", image: "", video: normalized };
-    }
-
-    try {
-      const response = await fetch(normalized, {
-        method: "GET",
-        credentials: "omit"
-      });
-      if (!response.ok) {
-        return null;
-      }
-      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("text/html")) {
-        return null;
-      }
-
-      const html = await response.text();
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const title = (doc.querySelector("meta[property='og:title']")?.content || doc.querySelector("meta[name='twitter:title']")?.content || doc.querySelector("title")?.textContent || "").trim();
-      const description = (doc.querySelector("meta[property='og:description']")?.content || doc.querySelector("meta[name='description']")?.content || doc.querySelector("meta[name='twitter:description']")?.content || "").trim();
-      const image = (doc.querySelector("meta[property='og:image']")?.content || doc.querySelector("meta[name='twitter:image']")?.content || doc.querySelector("link[rel='image_src']")?.href || "").trim();
-      const video = (doc.querySelector("meta[property='og:video']")?.content || doc.querySelector("meta[name='twitter:player']")?.content || doc.querySelector("video source")?.src || doc.querySelector("video")?.src || "").trim();
-      const type = video ? "video" : image ? "image" : "link";
-      return {
-        type,
-        url: normalized,
-        title,
-        description,
-        image: image || "",
-        video: video || ""
-      };
-    } catch (_error) {
-      return null;
-    }
-  }
-
-  function renderLinkPreview() {
-    if (!state.root) {
-      return;
-    }
-
-    const previewZone = state.root.querySelector("#nebula-chat-link-preview");
-    if (!previewZone) {
-      return;
-    }
-
-    const preview = state.linkPreview;
-    if (!preview) {
-      previewZone.classList.add("hidden");
-      previewZone.innerHTML = "";
-      return;
-    }
-
-    let content = "";
-    if (preview.type === "image" && preview.image) {
-      content = `<img src="${preview.image}" alt="" />`;
-    } else if (preview.type === "video" && preview.video) {
-      content = `<video src="${preview.video}" controls preload="metadata"></video>`;
-    } else {
-      content = 
-        `<div class="nebula-chat-link-preview-body">
-          <strong>${preview.title}</strong>
-          <p>${preview.description}</p>
-        </div>`
-      ;
-    }
-
-    previewZone.classList.remove("hidden");
-    previewZone.innerHTML = 
-      `<a href="" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
-        
-      </a>`
-    ;
-  }
-
-  function updateLinkPreviewForInput(value) {
-    const url = extractFirstUrl(value);
-    if (!url) {
-      state.linkPreview = null;
-      renderLinkPreview();
-      return;
-    }
-
-    if (state.linkPreview && state.linkPreview.url === url) {
-      return;
-    }
-
-    state.linkPreview = null;
-    renderLinkPreview();
-    fetchLinkPreview(url).then((preview) => {
-      if (preview && extractFirstUrl(String(value || "")) === url) {
-        state.linkPreview = preview;
-        renderLinkPreview();
-      }
-    }).catch(() => {
-      state.linkPreview = null;
-      renderLinkPreview();
+    output = output.replace(/`([^`\n]+)`/g, (_match, codeText) => {
+      return stashMarkdownToken(tokenPool, `<code class="nebula-chat-md-code">${codeText}</code>`);
     });
+
+    output = output.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, rawUrl) => {
+      const href = normalizeMarkdownLinkUrl(rawUrl);
+      if (!href) {
+        return `${label} (${rawUrl})`;
+      }
+      return stashMarkdownToken(tokenPool, `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer noopener">${label}</a>`);
+    });
+
+    output = output.replace(/__\*\*([\s\S]+?)\*\*__/g, "<u><strong>$1</strong></u>");
+    output = output.replace(/__\*([\s\S]+?)\*__/g, "<u><em>$1</em></u>");
+    output = output.replace(/__([^_\n]+?)__/g, "<u>$1</u>");
+    output = output.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>");
+    output = output.replace(/~~([^~\n]+?)~~/g, "<del>$1</del>");
+    output = output.replace(/\*([^*\n]+?)\*/g, "<em>$1</em>");
+    output = output.replace(/_([^_\n]+?)_/g, "<em>$1</em>");
+
+    return output;
   }
 
-  function clearLinkPreview() {
-    state.linkPreview = null;
-    renderLinkPreview();
+  function renderMarkdownBlocks(value, tokenPool) {
+    const lines = String(value || "").replace(/\r\n?/g, "\n").split("\n");
+    const output = [];
+    let inList = false;
+
+    lines.forEach((line) => {
+      const current = String(line || "");
+      const listMatch = current.match(/^(\s*)([-*])\s+(.+)$/);
+      if (listMatch) {
+        if (!inList) {
+          output.push('<ul class="nebula-chat-md-list">');
+          inList = true;
+        }
+        const depth = Math.max(0, Math.min(4, Math.floor(String(listMatch[1] || "").length / 2)));
+        output.push(`<li class="depth-${depth}">${renderMarkdownInline(listMatch[3], tokenPool)}</li>`);
+        return;
+      }
+
+      if (inList) {
+        output.push("</ul>");
+        inList = false;
+      }
+
+      const trimmed = current.trim();
+      if (!trimmed) {
+        return;
+      }
+
+      const headerMatch = current.match(/^(#{1,3})\s+(.+)$/);
+      if (headerMatch) {
+        const level = headerMatch[1].length;
+        output.push(`<h${level}>${renderMarkdownInline(headerMatch[2], tokenPool)}</h${level}>`);
+        return;
+      }
+
+      const subtextMatch = current.match(/^-#\s+(.+)$/);
+      if (subtextMatch) {
+        output.push(`<p class="nebula-chat-md-subtext">${renderMarkdownInline(subtextMatch[1], tokenPool)}</p>`);
+        return;
+      }
+
+      const quoteMultiMatch = current.match(/^>>>\s?(.*)$/);
+      if (quoteMultiMatch) {
+        output.push(`<blockquote class="nebula-chat-md-quote multi">${renderMarkdownInline(quoteMultiMatch[1], tokenPool)}</blockquote>`);
+        return;
+      }
+
+      const quoteMatch = current.match(/^>\s?(.*)$/);
+      if (quoteMatch) {
+        output.push(`<blockquote class="nebula-chat-md-quote">${renderMarkdownInline(quoteMatch[1], tokenPool)}</blockquote>`);
+        return;
+      }
+
+      output.push(`<p>${renderMarkdownInline(current, tokenPool)}</p>`);
+    });
+
+    if (inList) {
+      output.push("</ul>");
+    }
+
+    return output.join("");
+  }
+
+  function renderMarkdown(value) {
+    const safeText = escapeHtml(String(value || ""));
+    const tokenPool = [];
+    let prepared = safeText;
+
+    prepared = prepared.replace(/\\([\\`*_~\[\]()>#-])/g, (_match, escapedChar) => {
+      return stashMarkdownToken(tokenPool, escapedChar);
+    });
+
+    prepared = prepared.replace(/```([\s\S]*?)```/g, (_match, codeText) => {
+      return stashMarkdownToken(tokenPool, `<pre class="nebula-chat-md-codeblock"><code>${codeText}</code></pre>`);
+    });
+
+    const rendered = renderMarkdownBlocks(prepared, tokenPool);
+    return restoreMarkdownTokens(rendered, tokenPool);
+  }
+
+  function markdownToPlainText(value) {
+    let output = String(value || "");
+    output = output.replace(/\\([\\`*_~\[\]()>#-])/g, "$1");
+    output = output.replace(/```([\s\S]*?)```/g, "$1");
+    output = output.replace(/`([^`\n]+)`/g, "$1");
+    output = output.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1");
+    output = output.replace(/__\*\*([\s\S]+?)\*\*__/g, "$1");
+    output = output.replace(/__\*([\s\S]+?)\*__/g, "$1");
+    output = output.replace(/__([^_\n]+?)__/g, "$1");
+    output = output.replace(/\*\*([^*\n]+?)\*\*/g, "$1");
+    output = output.replace(/~~([^~\n]+?)~~/g, "$1");
+    output = output.replace(/\*([^*\n]+?)\*/g, "$1");
+    output = output.replace(/_([^_\n]+?)_/g, "$1");
+    output = output.replace(/^\s*[-*]\s+/gm, "");
+    output = output.replace(/^\s*>+\s?/gm, "");
+    output = output.replace(/^\s*#{1,3}\s+/gm, "");
+    output = output.replace(/^\s*-#\s+/gm, "");
+    return output.trim();
   }
 
 
@@ -596,6 +493,185 @@
       .filter((friend) => !excluded.has(friend.uid))
       .filter((friend) => !filter || normalizeUsername(friend.username).includes(filter))
       .sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
+  }
+
+  function getChatMentionCandidates(chat) {
+    const out = [];
+    const seen = new Set();
+    const myUid = state.user && state.user.uid ? String(state.user.uid) : "";
+    const participants = chat && Array.isArray(chat.participants)
+      ? chat.participants.map((uid) => String(uid || ""))
+      : [];
+    const usernames = chat && chat.participantUsernames && typeof chat.participantUsernames === "object"
+      ? chat.participantUsernames
+      : {};
+
+    participants.forEach((uid) => {
+      if (!uid || uid === myUid) {
+        return;
+      }
+      const username = String(usernames[uid] || "").trim();
+      const key = normalizeUsername(username);
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      out.push({ uid, username });
+    });
+
+    state.friends.forEach((friend) => {
+      const username = String(friend.username || "").trim();
+      const key = normalizeUsername(username);
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      out.push({ uid: String(friend.uid || ""), username });
+    });
+
+    return out.sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
+  }
+
+  function getActiveMentionContext(inputValue, caretPosition) {
+    const text = String(inputValue || "");
+    const caret = Number.isFinite(Number(caretPosition)) ? Number(caretPosition) : text.length;
+    const head = text.slice(0, caret);
+    const match = head.match(/(^|[\s(])@([A-Za-z0-9._-]{0,24})$/);
+    if (!match) {
+      return null;
+    }
+    const query = String(match[2] || "");
+    const start = caret - query.length - 1;
+    if (start < 0) {
+      return null;
+    }
+    return {
+      start,
+      end: caret,
+      query
+    };
+  }
+
+  function resetComposeMentionState() {
+    state.composeMentionContext = null;
+    state.composeMentionItems = [];
+    state.composeMentionIndex = 0;
+  }
+
+  function hideComposeMentionSuggestions(container) {
+    resetComposeMentionState();
+    hideSuggestionList(container);
+  }
+
+  function applyComposeMentionSuggestion(input, container, suggestion) {
+    if (!input || !container || !suggestion || !suggestion.username) {
+      return;
+    }
+    const context = state.composeMentionContext;
+    if (!context) {
+      hideComposeMentionSuggestions(container);
+      return;
+    }
+
+    const currentValue = String(input.value || "");
+    const before = currentValue.slice(0, context.start);
+    const after = currentValue.slice(context.end);
+    const mentionText = `@${suggestion.username}`;
+    const nextAfter = after.startsWith(" ") ? after.slice(1) : after;
+    const nextValue = `${before}${mentionText} ${nextAfter}`;
+    const caret = (before + mentionText + " ").length;
+
+    input.value = nextValue;
+    input.setSelectionRange(caret, caret);
+    updateLinkPreviewForInput(nextValue);
+    hideComposeMentionSuggestions(container);
+    input.focus();
+  }
+
+  function renderComposeMentionSuggestions(input, container) {
+    if (!input || !container || !state.selectedChat) {
+      hideComposeMentionSuggestions(container);
+      return;
+    }
+
+    const value = String(input.value || "");
+    const caret = Number.isFinite(Number(input.selectionStart)) ? Number(input.selectionStart) : value.length;
+    const context = getActiveMentionContext(value, caret);
+
+    if (!context) {
+      hideComposeMentionSuggestions(container);
+      return;
+    }
+
+    const filter = normalizeUsername(context.query);
+    const items = getChatMentionCandidates(state.selectedChat)
+      .filter((item) => !filter || normalizeUsername(item.username).includes(filter))
+      .slice(0, 8);
+
+    if (!items.length) {
+      hideComposeMentionSuggestions(container);
+      return;
+    }
+
+    state.composeMentionContext = context;
+    state.composeMentionItems = items;
+    if (!Number.isFinite(Number(state.composeMentionIndex)) || state.composeMentionIndex < 0 || state.composeMentionIndex >= items.length) {
+      state.composeMentionIndex = 0;
+    }
+
+    container.classList.remove("hidden");
+    container.innerHTML = items
+      .map((item, index) => {
+        const active = index === state.composeMentionIndex ? " is-active" : "";
+        return `<button type="button" data-compose-mention-index="${index}" class="${active.trim()}">@${escapeHtml(item.username)}</button>`;
+      })
+      .join("");
+
+    container.querySelectorAll("button[data-compose-mention-index]").forEach((node) => {
+      node.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        const index = Number.parseInt(String(node.getAttribute("data-compose-mention-index") || "-1"), 10);
+        if (!Number.isFinite(index) || index < 0 || index >= state.composeMentionItems.length) {
+          return;
+        }
+        applyComposeMentionSuggestion(input, container, state.composeMentionItems[index]);
+      });
+    });
+  }
+
+  function handleComposeMentionKeydown(event, input, container) {
+    if (!event || !input || !container || container.classList.contains("hidden") || !state.composeMentionItems.length) {
+      return false;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      state.composeMentionIndex = (state.composeMentionIndex + 1) % state.composeMentionItems.length;
+      renderComposeMentionSuggestions(input, container);
+      return true;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      state.composeMentionIndex = (state.composeMentionIndex - 1 + state.composeMentionItems.length) % state.composeMentionItems.length;
+      renderComposeMentionSuggestions(input, container);
+      return true;
+    }
+
+    if (event.key === "Enter" || event.key === "Tab") {
+      event.preventDefault();
+      const index = Math.max(0, Math.min(state.composeMentionItems.length - 1, state.composeMentionIndex));
+      applyComposeMentionSuggestion(input, container, state.composeMentionItems[index]);
+      return true;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      hideComposeMentionSuggestions(container);
+      return true;
+    }
+
+    return false;
   }
 
   function isBlockedUid(uid) {
@@ -2003,6 +2079,7 @@
     state.messageRows = [];
     state.pendingReply = null;
     state.linkPreview = null;
+    resetComposeMentionState();
     renderMainArea();
     renderChatList();
     subscribeMessages(next);
@@ -2082,9 +2159,13 @@
         <div class="nebula-chat-compose-wrap">
           <div id="nebula-chat-reply-chip" class="nebula-chat-reply-chip hidden"></div>
           <div id="nebula-chat-link-preview" class="nebula-chat-link-preview hidden"></div>
+          <div id="nebula-chat-compose-mentions" class="nebula-chat-suggestions nebula-chat-compose-mentions hidden"></div>
           <form id="nebula-chat-compose-form" class="nebula-chat-compose">
-            <input id="nebula-chat-compose-input" type="text" maxlength="4000" placeholder="Send an encrypted message" autocomplete="off" />
-            <button type="submit">Send</button>
+            <textarea id="nebula-chat-compose-input" maxlength="4000" rows="3" placeholder="Send an encrypted message" autocomplete="off"></textarea>
+            <div class="nebula-chat-compose-actions">
+              <button type="button" id="nebula-chat-compose-preview">Preview</button>
+              <button type="submit">Send</button>
+            </div>
           </form>
         </div>
       </section>
@@ -2092,16 +2173,68 @@
 
     const form = main.querySelector("#nebula-chat-compose-form");
     const input = main.querySelector("#nebula-chat-compose-input");
+    const previewBtn = main.querySelector("#nebula-chat-compose-preview");
+    const mentionContainer = main.querySelector("#nebula-chat-compose-mentions");
 
     if (form && input) {
       input.addEventListener("input", () => {
-        updateLinkPreviewForInput(String(input.value || ""));
+        const nextValue = String(input.value || "");
+        updateLinkPreviewForInput(nextValue);
+        renderComposeMentionSuggestions(input, mentionContainer);
       });
 
       input.addEventListener("paste", (event) => {
-        const pasted = event.clipboardData && event.clipboardData.getData ? event.clipboardData.getData("text/plain") : "";
-        updateLinkPreviewForInput(String(pasted || ""));
+        if (event && event.defaultPrevented) {
+          return;
+        }
+        window.setTimeout(() => {
+          const nextValue = String(input.value || "");
+          updateLinkPreviewForInput(nextValue);
+          renderComposeMentionSuggestions(input, mentionContainer);
+        }, 0);
       });
+
+      input.addEventListener("focus", () => {
+        renderComposeMentionSuggestions(input, mentionContainer);
+      });
+
+      input.addEventListener("click", () => {
+        renderComposeMentionSuggestions(input, mentionContainer);
+      });
+
+      input.addEventListener("keyup", (event) => {
+        if (!event || ["ArrowUp", "ArrowDown", "Enter", "Tab", "Escape"].includes(String(event.key || ""))) {
+          return;
+        }
+        renderComposeMentionSuggestions(input, mentionContainer);
+      });
+
+      input.addEventListener("blur", () => {
+        window.setTimeout(() => hideComposeMentionSuggestions(mentionContainer), 120);
+      });
+
+      input.addEventListener("keydown", (event) => {
+        if (handleComposeMentionKeydown(event, input, mentionContainer)) {
+          return;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+          event.preventDefault();
+          if (typeof form.requestSubmit === "function") {
+            form.requestSubmit();
+          }
+        }
+      });
+
+      if (previewBtn) {
+        previewBtn.addEventListener("click", () => {
+          const text = String(input.value || "");
+          if (!text.trim()) {
+            openModal("Markdown Preview", '<p class="nebula-chat-modal-copy">Nothing to preview yet.</p>');
+            return;
+          }
+          openModal("Markdown Preview", `<div class="nebula-chat-markdown-preview nebula-chat-bubble-markdown">${renderMarkdown(text)}</div>`);
+        });
+      }
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -2160,6 +2293,7 @@
           input.value = "";
           dismissReplyComposer();
           clearLinkPreview();
+          hideComposeMentionSuggestions(mentionContainer);
         } catch (error) {
           setStatus(error && error.message ? error.message : "Could not send message.", "error");
         } finally {
@@ -2205,7 +2339,7 @@
         const edited = row.editedAtMs ? " (edited)" : "";
         const reply = replyMap.get(row.id);
         const replyHtml = reply
-          ? `<div class="nebula-chat-inline-reply"><strong>${escapeHtml(reply.senderUsername)}</strong><span>${escapeHtml(truncate(reply.text, CHAT_PREVIEW_LIMIT))}</span></div>`
+          ? `<div class="nebula-chat-inline-reply"><strong>${escapeHtml(reply.senderUsername)}</strong><span>${escapeHtml(truncate(markdownToPlainText(reply.text), CHAT_PREVIEW_LIMIT))}</span></div>`
           : "";
         const preview = row.preview || null;
         const previewHtml = preview
@@ -2223,7 +2357,7 @@
             ${showMeta ? `<div class="nebula-chat-bubble-meta"><strong>${escapeHtml(row.senderUsername)}</strong><span>${escapeHtml(formatTime(row.chainAtMs) + edited)}</span></div>` : ""}
             ${replyHtml}
             ${previewHtml}
-            <p>${escapeHtml(row.text)}</p>
+            <div class="nebula-chat-bubble-markdown">${renderMarkdown(row.text)}</div>
           </article>
         `;
       })
@@ -2948,11 +3082,20 @@
     }
     const dmSuggestions = state.root.querySelector("#nebula-chat-create-dm-suggestions");
     const gcSuggestions = state.root.querySelector("#nebula-chat-create-gc-suggestions");
+    const composeSuggestions = state.root.querySelector("#nebula-chat-compose-mentions");
+    const composeInput = state.root.querySelector("#nebula-chat-compose-input");
     if (dmSuggestions && (!event.target || !dmSuggestions.contains(event.target))) {
       dmSuggestions.classList.add("hidden");
     }
     if (gcSuggestions && (!event.target || !gcSuggestions.contains(event.target))) {
       gcSuggestions.classList.add("hidden");
+    }
+    if (
+      composeSuggestions
+      && (!event.target || !composeSuggestions.contains(event.target))
+      && (!composeInput || !composeInput.contains(event.target))
+    ) {
+      hideComposeMentionSuggestions(composeSuggestions);
     }
     const menu = state.root.querySelector("#nebula-chat-context-menu");
     if (!menu || menu.classList.contains("hidden")) {
@@ -2968,6 +3111,8 @@
       return;
     }
     if (event.key === "Escape") {
+      const composeSuggestions = state.root ? state.root.querySelector("#nebula-chat-compose-mentions") : null;
+      hideComposeMentionSuggestions(composeSuggestions);
       closeContextMenu();
       closeModal();
     }
@@ -3110,6 +3255,9 @@
       state.messageRows = [];
       state.pendingReply = null;
       state.linkPreview = null;
+      state.composeMentionContext = null;
+      state.composeMentionItems = [];
+      state.composeMentionIndex = 0;
       state.chatAesKeys.clear();
       state.memberCache.clear();
       state.identity = null;
@@ -3177,6 +3325,9 @@
     state.messageRows = [];
     state.pendingReply = null;
     state.linkPreview = null;
+    state.composeMentionContext = null;
+    state.composeMentionItems = [];
+    state.composeMentionIndex = 0;
     state.chatAesKeys.clear();
     state.memberCache.clear();
     state.friends = [];

@@ -304,6 +304,15 @@
                   <h2 class="text-lg font-semibold mb-3">Terms of Service</h2>
                   <div class="text-sm text-gray-200 leading-6 max-h-[420px] overflow-y-auto pr-1">${tosHtml}</div>
                 </article>
+
+                <article class="bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
+                  <h2 class="text-lg font-semibold mb-2">Markdown Guide</h2>
+                  <p class="text-sm text-gray-200 leading-6 mb-4">Learn every chat formatting feature including headers, emphasis, code blocks, lists, block quotes, links, and escaping with a backslash.</p>
+                  <a href="/markdown-guide" class="nav-link inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span>Open Markdown Guide</span>
+                  </a>
+                </article>
               </div>
             </section>
           </div>
