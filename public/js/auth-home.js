@@ -245,12 +245,7 @@
   }
 
   function detailedAuthStatus(error, context) {
-    const base = friendlyAuthMessage(error, context);
-    const code = authErrorCode(error);
-    const raw = error && error.message ? String(error.message).trim() : "";
-    const rawSuffix = raw && raw !== code ? ` - ${raw}` : "";
-    const codeSuffix = code ? ` (${code})` : "";
-    return `${base}${codeSuffix}${rawSuffix}`;
+    return friendlyAuthMessage(error, context);
   }
 
   async function sendVerificationEmailWithFallback(user) {
