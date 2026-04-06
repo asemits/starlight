@@ -1439,6 +1439,20 @@
   align-content: end;
 }
 
+.nebula-chat-throttle-timer {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 120, 120, 0.96);
+  font-family: 'Geist', 'Montserrat', sans-serif;
+  font-weight: 300;
+  text-align: right;
+}
+
+.nebula-chat-throttle-timer.hidden {
+  display: none;
+}
+
 .nebula-chat-suggestions {
   margin-top: 6px;
   border: 0.5px solid var(--border);

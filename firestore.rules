@@ -370,6 +370,21 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /privateChats/{chatId}/messageRateLimits/{uid} {
+      allow read: if isChatParticipant(chatId) && request.auth.uid == uid;
+
+      allow create, update: if isChatParticipant(chatId)
+        && request.auth.uid == uid
+        && hasOnlyKeys(request.resource.data, ['uid', 'windowStartMs', 'windowCount', 'throttleStartedAtMs', 'updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.windowStartMs is timestamp
+        && isNonNegativeInt(request.resource.data.windowCount)
+        && request.resource.data.throttleStartedAtMs is timestamp
+        && request.resource.data.updatedAt is timestamp;
+
+      allow delete: if false;
+    }
+
     match /privateChats/{chatId}/messages/{messageId} {
       allow read: if isChatParticipant(chatId);
 

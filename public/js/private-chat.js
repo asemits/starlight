@@ -9,6 +9,9 @@
   const CHAIN_WINDOW_MS = 5 * 60 * 1000;
   const CHAT_PREVIEW_LIMIT = 90;
   const GC_TITLE_LIMIT = 72;
+  const MESSAGE_BURST_LIMIT = 10;
+  const MESSAGE_BURST_WINDOW_MS = 5000;
+  const MESSAGE_THROTTLE_MS = 60 * 1000;
 
   const state = {
     mounted: false,
@@ -35,6 +38,8 @@
     keySyncLabel: "Checking...",
     keySyncType: "pending",
     keySyncLastSyncedMs: 0,
+    sendThrottleUntilMs: 0,
+    sendThrottleTimerId: 0,
     profileCache: new Map(),
     memberCache: new Map(),
     friends: [],
@@ -65,6 +70,10 @@
 
   function db() {
     return window.nebulaDb || null;
+  }
+
+  function rtdb() {
+    return window.nebulaRtdb || null;
   }
 
   function escapeHtml(value) {
@@ -458,6 +467,222 @@
     output = output.replace(/^\s*#{1,3}\s+/gm, "");
     output = output.replace(/^\s*-#\s+/gm, "");
     return output.trim();
+  }
+
+  function messageRateLimitPath(chatId, uid) {
+    const cleanChatId = String(chatId || "").trim();
+    const cleanUid = String(uid || "").trim();
+    if (!cleanChatId || !cleanUid) {
+      return "";
+    }
+    return `privateChats/${cleanChatId}/messageRateLimits/${cleanUid}`;
+  }
+
+  function toFiniteNumber(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function normalizeRateLimitState(raw, uid) {
+    const safe = raw && typeof raw === "object" ? raw : {};
+    return {
+      uid: String(safe.uid || uid || ""),
+      windowStartMs: Math.max(0, toFiniteNumber(safe.windowStartMs, 0)),
+      windowCount: Math.max(0, toFiniteNumber(safe.windowCount, 0)),
+      throttleStartedAtMs: Math.max(0, toFiniteNumber(safe.throttleStartedAtMs, 0)),
+      updatedAtMs: Math.max(0, toFiniteNumber(safe.updatedAtMs, 0))
+    };
+  }
+
+  function throttleUntilFromRateState(rateState) {
+    const start = Math.max(0, toFiniteNumber(rateState && rateState.throttleStartedAtMs, 0));
+    if (!start) {
+      return 0;
+    }
+    return start + MESSAGE_THROTTLE_MS;
+  }
+
+  function getRateLimitServerTimestamp() {
+    const namespace = window.firebase && window.firebase.database ? window.firebase.database : null;
+    if (namespace && namespace.ServerValue && namespace.ServerValue.TIMESTAMP) {
+      return namespace.ServerValue.TIMESTAMP;
+    }
+    return Date.now();
+  }
+
+  function computeNextRateLimitState(currentRaw, nowMs, uid) {
+    const current = normalizeRateLimitState(currentRaw, uid);
+    const activeThrottleUntil = throttleUntilFromRateState(current);
+
+    if (activeThrottleUntil > nowMs) {
+      return {
+        blocked: true,
+        throttleUntilMs: activeThrottleUntil,
+        next: null,
+        resetWindow: false,
+        triggerThrottle: false
+      };
+    }
+
+    const withinWindow = current.windowStartMs > 0 && (nowMs - current.windowStartMs) <= MESSAGE_BURST_WINDOW_MS;
+    const nextWindowStartMs = withinWindow ? current.windowStartMs : nowMs;
+    const nextWindowCount = withinWindow ? current.windowCount + 1 : 1;
+    const triggerThrottle = withinWindow && nextWindowCount > MESSAGE_BURST_LIMIT;
+    const nextThrottleStartedAtMs = triggerThrottle ? nowMs : current.throttleStartedAtMs;
+    const next = {
+      uid: String(uid || current.uid || ""),
+      windowStartMs: nextWindowStartMs,
+      windowCount: nextWindowCount,
+      throttleStartedAtMs: nextThrottleStartedAtMs,
+      updatedAtMs: nowMs
+    };
+
+    return {
+      blocked: false,
+      throttleUntilMs: triggerThrottle ? nowMs + MESSAGE_THROTTLE_MS : 0,
+      next,
+      resetWindow: !withinWindow,
+      triggerThrottle
+    };
+  }
+
+  function buildRateLimitWriteState(next, resetWindow, triggerThrottle) {
+    const serverTs = getRateLimitServerTimestamp();
+    return {
+      uid: String(next.uid || ""),
+      windowStartMs: resetWindow ? serverTs : next.windowStartMs,
+      windowCount: next.windowCount,
+      throttleStartedAtMs: triggerThrottle ? serverTs : next.throttleStartedAtMs,
+      updatedAtMs: serverTs
+    };
+  }
+
+  function formatThrottleCountdown(ms) {
+    const totalSeconds = Math.max(0, Math.ceil(Math.max(0, Number(ms || 0)) / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  function stopSendThrottleTimer() {
+    if (state.sendThrottleTimerId) {
+      window.clearInterval(state.sendThrottleTimerId);
+      state.sendThrottleTimerId = 0;
+    }
+  }
+
+  function renderSendThrottleTimer() {
+    const node = state.root ? state.root.querySelector("#nebula-chat-throttle-timer") : null;
+    if (!node) {
+      return;
+    }
+    const remaining = Math.max(0, state.sendThrottleUntilMs - Date.now());
+    if (remaining <= 0) {
+      node.textContent = "";
+      node.classList.add("hidden");
+      return;
+    }
+    node.textContent = `Throttled: ${formatThrottleCountdown(remaining)}`;
+    node.classList.remove("hidden");
+  }
+
+  function setSendThrottleUntil(untilMs) {
+    const parsed = toFiniteNumber(untilMs, 0);
+    state.sendThrottleUntilMs = parsed > Date.now() ? parsed : 0;
+    renderSendThrottleTimer();
+    if (state.sendThrottleUntilMs > 0 && !state.sendThrottleTimerId) {
+      state.sendThrottleTimerId = window.setInterval(() => {
+        renderSendThrottleTimer();
+        if (state.sendThrottleUntilMs <= Date.now()) {
+          state.sendThrottleUntilMs = 0;
+          renderSendThrottleTimer();
+          stopSendThrottleTimer();
+        }
+      }, 250);
+    }
+    if (state.sendThrottleUntilMs <= 0) {
+      stopSendThrottleTimer();
+    }
+  }
+
+  function isSendThrottled() {
+    return state.sendThrottleUntilMs > Date.now();
+  }
+
+  function showSlowDownModal() {
+    openModal(
+      "Slow down!",
+      '<p class="nebula-chat-modal-copy">Bandwidth doesn\'t grow on trees. Your connection will be throttled for 1 minute.</p>'
+    );
+  }
+
+  async function syncSendThrottleFromServer(chatId) {
+    const user = state.user || currentUser();
+    const rtdbInstance = rtdb();
+    const path = messageRateLimitPath(chatId, user && user.uid ? user.uid : "");
+    if (!user || !path || !rtdbInstance) {
+      setSendThrottleUntil(0);
+      return;
+    }
+    try {
+      const snap = await rtdbInstance.ref(path).once("value");
+      const rateState = normalizeRateLimitState(snap && snap.val ? snap.val() : null, user.uid);
+      setSendThrottleUntil(throttleUntilFromRateState(rateState));
+    } catch (_error) {
+    }
+  }
+
+  async function sendMessageWithRateLimit(chatId, encryptedMessage, payloadText) {
+    const user = state.user || currentUser();
+    const rtdbInstance = rtdb();
+    const cleanChatId = String(chatId || "").trim();
+    if (!user || !user.uid || !cleanChatId || !rtdbInstance || !encryptedMessage) {
+      throw new Error("Database unavailable.");
+    }
+
+    const path = messageRateLimitPath(cleanChatId, user.uid);
+    if (!path) {
+      throw new Error("Rate limit path unavailable.");
+    }
+
+    const nowMs = Date.now();
+    const rateSnap = await rtdbInstance.ref(path).once("value");
+    const decision = computeNextRateLimitState(rateSnap && rateSnap.val ? rateSnap.val() : null, nowMs, user.uid);
+
+    if (decision.blocked) {
+      setSendThrottleUntil(decision.throttleUntilMs);
+      showSlowDownModal();
+      throw new Error("Bandwidth doesn't grow on trees. Your connection will be throttled for 1 minute.");
+    }
+
+    const messageId = shortId("msg-");
+    const serverTs = getRateLimitServerTimestamp();
+    const updates = {};
+    updates[`privateChats/${cleanChatId}/messages/${messageId}`] = {
+      senderId: user.uid,
+      senderUsername: currentUsername(),
+      ciphertext: encryptedMessage.ciphertext,
+      iv: encryptedMessage.iv,
+      createdAtClient: nowMs,
+      createdAt: serverTs
+    };
+    updates[`privateChats/${cleanChatId}/lastMessageAt`] = serverTs;
+    updates[path] = buildRateLimitWriteState(decision.next, decision.resetWindow, decision.triggerThrottle);
+
+    await rtdbInstance.ref().update(updates);
+
+    if (decision.triggerThrottle) {
+      setSendThrottleUntil(Date.now() + MESSAGE_THROTTLE_MS);
+      showSlowDownModal();
+    } else {
+      const nextUntil = throttleUntilFromRateState(decision.next);
+      setSendThrottleUntil(nextUntil);
+    }
+
+    return {
+      messageId,
+      text: String(payloadText || "")
+    };
   }
 
 
@@ -2165,6 +2390,7 @@
             <div class="nebula-chat-compose-actions">
               <button type="button" id="nebula-chat-compose-preview">Preview</button>
               <button type="submit">Send</button>
+              <p id="nebula-chat-throttle-timer" class="nebula-chat-throttle-timer hidden"></p>
             </div>
           </form>
         </div>
@@ -2250,6 +2476,12 @@
           return;
         }
 
+        if (isSendThrottled()) {
+          showSlowDownModal();
+          renderSendThrottleTimer();
+          return;
+        }
+
         const selectedChat = state.selectedChat || null;
         const participantIds = selectedChat && Array.isArray(selectedChat.participants)
           ? selectedChat.participants.map((value) => String(value || "")).filter(Boolean)
@@ -2275,33 +2507,17 @@
         input.disabled = true;
         try {
           const encrypted = await encryptPayload(state.selectedChatId, payload);
-          const firestore = db();
-          if (!firestore) {
-            throw new Error("Database unavailable.");
-          }
-
-          await firestore
-            .collection(CHAT_COLLECTION)
-            .doc(state.selectedChatId)
-            .collection("messages")
-            .add({
-              senderId: state.user.uid,
-              senderUsername: currentUsername(),
-              ciphertext: encrypted.ciphertext,
-              iv: encrypted.iv,
-              createdAtClient: Date.now(),
-              createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-          await firestore.collection(CHAT_COLLECTION).doc(state.selectedChatId).update({
-            lastMessageAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
+          await sendMessageWithRateLimit(state.selectedChatId, encrypted, text);
 
           input.value = "";
           dismissReplyComposer();
           clearLinkPreview();
           hideComposeMentionSuggestions(mentionContainer);
         } catch (error) {
+          await syncSendThrottleFromServer(state.selectedChatId);
+          if (isSendThrottled()) {
+            showSlowDownModal();
+          }
           setStatus(error && error.message ? error.message : "Could not send message.", "error");
         } finally {
           input.disabled = false;
@@ -2310,8 +2526,11 @@
       });
     }
 
+    syncSendThrottleFromServer(state.selectedChatId).catch(() => {});
+
     renderReplyChip();
     renderLinkPreview();
+    renderSendThrottleTimer();
     renderMessages();
   }
 
@@ -3265,6 +3484,8 @@
       state.composeMentionContext = null;
       state.composeMentionItems = [];
       state.composeMentionIndex = 0;
+      stopSendThrottleTimer();
+      state.sendThrottleUntilMs = 0;
       state.chatAesKeys.clear();
       state.memberCache.clear();
       state.identity = null;
@@ -3335,6 +3556,8 @@
     state.composeMentionContext = null;
     state.composeMentionItems = [];
     state.composeMentionIndex = 0;
+    stopSendThrottleTimer();
+    state.sendThrottleUntilMs = 0;
     state.chatAesKeys.clear();
     state.memberCache.clear();
     state.friends = [];
