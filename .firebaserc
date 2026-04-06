@@ -3,7 +3,7 @@
     "default": "starlight-28e40"
   },
   "targets": {
-    "nebula-28e40": {
+    "starlight-28e40": {
       "hosting": {
         "main": ["nebula-09sl2"],
         "site1": ["nebula-19s2l"],
