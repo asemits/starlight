@@ -1,6 +1,5 @@
 (function () {
   const VERIFICATION_WINDOW_MS = 5 * 60 * 1000;
-  const VERIFY_INITIAL_RESEND_DELAY_MS = 30 * 1000;
   const VERIFY_TOO_MANY_REQUESTS_BACKOFF_MS = 30 * 60 * 1000;
   const USERNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
   const AUTO_SYNC_INTERVAL_MS = 30 * 60 * 1000;
@@ -2107,9 +2106,17 @@
             return;
           }
 
+          const verifySend = await sendVerificationEmailWithFallback(user);
           state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
-          state.resendAllowedAt = Date.now() + VERIFY_INITIAL_RESEND_DELAY_MS;
-          openVerifyEmailModal("Account created. Click Resend Email to send verification.", true);
+          state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
+
+          if (!verifySend.ok) {
+            const verifySendStatus = `Account created, but verification email could not be sent. ${detailedAuthStatus(verifySend.error, "verify-email-send")}`;
+            openVerifyEmailModal(verifySendStatus, false);
+            return;
+          }
+
+          openVerifyEmailModal("Verification email sent. Check inbox/spam, then click I Verified.", true);
         } catch (error) {
           setStatus("signup-form-status", friendlyAuthMessage(error, "signup"), false);
         }
