@@ -1,6 +1,9 @@
 (function () {
   const CHAT_COLLECTION = "privateChats";
   const PROFILE_COLLECTION = "userPublicProfiles";
+  const USER_COLLECTION = "users";
+  const PRIVATE_CHAT_IDENTITY_SUBCOLLECTION = "privateChatIdentity";
+  const PRIVATE_CHAT_IDENTITY_DOC_ID = "main";
   const FRIEND_REQUESTS_COLLECTION = "friendRequests";
   const BLOCKED_USERS_SUBCOLLECTION = "blockedUsers";
   const CHAIN_WINDOW_MS = 5 * 60 * 1000;
@@ -26,6 +29,9 @@
     activeMenuMessageId: "",
     statusText: "",
     statusType: "",
+    keySyncLabel: "Checking...",
+    keySyncType: "pending",
+    keySyncLastSyncedMs: 0,
     profileCache: new Map(),
     memberCache: new Map(),
     friends: [],
@@ -125,6 +131,17 @@
       return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     } catch (_error) {
       return "Unknown";
+    }
+  }
+
+  function formatDateTime(ms) {
+    if (!ms) {
+      return "never";
+    }
+    try {
+      return new Date(ms).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch (_error) {
+      return "unknown";
     }
   }
 
@@ -842,6 +859,32 @@
     return `nebula-chat-identity-v1:${uid}`;
   }
 
+  function backupIdentitySecret(user) {
+    const uid = String(user && user.uid ? user.uid : "");
+    const createdAt = String(user && user.metadata && user.metadata.creationTime ? user.metadata.creationTime : "");
+    return `${uid}\n${createdAt}\nnebula-chat-identity-backup-v1`;
+  }
+
+  function identityBackupDocRef(firestore, uid) {
+    return firestore
+      .collection(USER_COLLECTION)
+      .doc(uid)
+      .collection(PRIVATE_CHAT_IDENTITY_SUBCOLLECTION)
+      .doc(PRIVATE_CHAT_IDENTITY_DOC_ID);
+  }
+
+  async function deriveIdentityBackupKey(user, saltBytes) {
+    const secretBytes = utf8Encode(backupIdentitySecret(user));
+    const baseKey = await crypto.subtle.importKey("raw", secretBytes, "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: saltBytes, iterations: 210000, hash: "SHA-256" },
+      baseKey,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+
   async function generateIdentity() {
     const keyPair = await crypto.subtle.generateKey(
       {
@@ -881,6 +924,169 @@
     return { publicJwk, privateJwk, publicKey, privateKey };
   }
 
+  function persistIdentityLocally(uid, identity) {
+    localStorage.setItem(
+      localIdentityKey(uid),
+      JSON.stringify({
+        publicJwk: identity.publicJwk,
+        privateJwk: identity.privateJwk
+      })
+    );
+  }
+
+  async function loadIdentityFromLocalStorage(uid) {
+    const raw = localStorage.getItem(localIdentityKey(uid));
+    if (!raw) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.publicJwk || !parsed.privateJwk) {
+        return null;
+      }
+      return await importIdentityFromJwk(parsed.publicJwk, parsed.privateJwk);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function identityJwkFingerprint(jwk) {
+    try {
+      return JSON.stringify(jwk || {});
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  async function encryptIdentityBackupBundle(user, identity) {
+    const salt = new Uint8Array(16);
+    const iv = new Uint8Array(12);
+    crypto.getRandomValues(salt);
+    crypto.getRandomValues(iv);
+    const key = await deriveIdentityBackupKey(user, salt);
+    const payload = utf8Encode(
+      JSON.stringify({
+        publicJwk: identity.publicJwk,
+        privateJwk: identity.privateJwk
+      })
+    );
+    const encrypted = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      payload
+    );
+    return {
+      uid: user.uid,
+      version: 1,
+      publicJwk: identity.publicJwk,
+      salt: bytesToBase64(salt),
+      iv: bytesToBase64(iv),
+      ciphertext: bytesToBase64(new Uint8Array(encrypted))
+    };
+  }
+
+  async function decryptIdentityBackupBundle(user, bundle) {
+    if (!bundle || !bundle.publicJwk || !bundle.salt || !bundle.iv || !bundle.ciphertext) {
+      return null;
+    }
+    const salt = base64ToBytes(bundle.salt);
+    const iv = base64ToBytes(bundle.iv);
+    const ciphertext = base64ToBytes(bundle.ciphertext);
+    const key = await deriveIdentityBackupKey(user, salt);
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      ciphertext
+    );
+    const parsed = JSON.parse(utf8Decode(new Uint8Array(plaintext)) || "{}");
+    if (!parsed || !parsed.publicJwk || !parsed.privateJwk) {
+      return null;
+    }
+    return importIdentityFromJwk(parsed.publicJwk, parsed.privateJwk);
+  }
+
+  async function fetchIdentityBackupBundle(user, firestore) {
+    if (!user || !user.uid || !firestore) {
+      return null;
+    }
+    try {
+      const snap = await identityBackupDocRef(firestore, user.uid).get();
+      if (!snap.exists) {
+        return null;
+      }
+      return snap.data() || null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function loadIdentityFromBackup(user, firestore) {
+    const bundle = await fetchIdentityBackupBundle(user, firestore);
+    if (!bundle) {
+      return null;
+    }
+    try {
+      return await decryptIdentityBackupBundle(user, bundle);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function syncIdentityBackup(user, firestore, identity) {
+    if (!user || !user.uid || !firestore || !identity) {
+      return;
+    }
+    const bundle = await encryptIdentityBackupBundle(user, identity);
+    await identityBackupDocRef(firestore, user.uid).set(
+      {
+        uid: user.uid,
+        version: bundle.version,
+        publicJwk: bundle.publicJwk,
+        salt: bundle.salt,
+        iv: bundle.iv,
+        ciphertext: bundle.ciphertext,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+    setKeySyncStatus("Synced", "ok", Date.now());
+  }
+
+  async function replaceIdentityFromBackup(user, firestore) {
+    const recovered = await loadIdentityFromBackup(user, firestore);
+    if (!recovered) {
+      return null;
+    }
+    persistIdentityLocally(user.uid, recovered);
+    let backupUpdatedAtMs = 0;
+    const bundle = await fetchIdentityBackupBundle(user, firestore);
+    if (bundle) {
+      backupUpdatedAtMs = toMillis(bundle.updatedAt);
+    }
+    state.identity = {
+      uid: user.uid,
+      ...recovered
+    };
+    setKeySyncStatus("Restored on this device", "ok", backupUpdatedAtMs || Date.now());
+    return state.identity;
+  }
+
+  async function userHasAnyChats(user, firestore) {
+    if (!user || !user.uid || !firestore) {
+      return true;
+    }
+    try {
+      const snap = await firestore
+        .collection(CHAT_COLLECTION)
+        .where("participants", "array-contains", user.uid)
+        .limit(1)
+        .get();
+      return !snap.empty;
+    } catch (_error) {
+      return true;
+    }
+  }
+
   async function ensureIdentity(user) {
     if (!user || !user.uid) {
       throw new Error("No active user.");
@@ -888,29 +1094,54 @@
     if (state.identity && state.identity.uid === user.uid) {
       return state.identity;
     }
-    const key = localIdentityKey(user.uid);
-    const raw = localStorage.getItem(key);
-    let identity = null;
+    const firestore = db();
+    setKeySyncStatus("Checking...", "pending");
+    let identity = await loadIdentityFromLocalStorage(user.uid);
+    const backupBundle = firestore ? await fetchIdentityBackupBundle(user, firestore) : null;
 
-    if (raw) {
+    if (backupBundle) {
+      const backupUpdatedAtMs = toMillis(backupBundle.updatedAt);
+      if (backupUpdatedAtMs > 0) {
+        setKeySyncStatus("Backup found", "pending", backupUpdatedAtMs);
+      }
+      const backupPublic = identityJwkFingerprint(backupBundle.publicJwk);
+      const localPublic = identity ? identityJwkFingerprint(identity.publicJwk) : "";
+      if (!identity || (backupPublic && localPublic && backupPublic !== localPublic)) {
+        try {
+          const recovered = await decryptIdentityBackupBundle(user, backupBundle);
+          if (recovered) {
+            identity = recovered;
+            persistIdentityLocally(user.uid, recovered);
+            setKeySyncStatus("Restored on this device", "ok", backupUpdatedAtMs || Date.now());
+          }
+        } catch (_error) {
+        }
+      }
+    }
+
+    let existingProfilePublicKey = null;
+    if (firestore) {
       try {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.publicJwk && parsed.privateJwk) {
-          identity = await importIdentityFromJwk(parsed.publicJwk, parsed.privateJwk);
+        const profileSnap = await firestore.collection(PROFILE_COLLECTION).doc(user.uid).get();
+        if (profileSnap.exists) {
+          const profileData = profileSnap.data() || {};
+          existingProfilePublicKey = profileData.chatPublicKeyJwk || null;
         }
       } catch (_error) {
       }
     }
 
     if (!identity) {
+      if (existingProfilePublicKey) {
+        const hasChats = await userHasAnyChats(user, firestore);
+        if (hasChats) {
+          setKeySyncStatus("Missing key on this device", "error");
+          throw new Error("This device is missing your chat key. Open chat on a linked device to sync your key backup.");
+        }
+      }
       identity = await generateIdentity();
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          publicJwk: identity.publicJwk,
-          privateJwk: identity.privateJwk
-        })
-      );
+      persistIdentityLocally(user.uid, identity);
+      setKeySyncStatus("Preparing backup...", "pending");
     }
 
     state.identity = {
@@ -918,7 +1149,6 @@
       ...identity
     };
 
-    const firestore = db();
     if (firestore) {
       const username = currentUsername();
       const usernameLower = normalizeUsername(username);
@@ -941,6 +1171,12 @@
           chatPublicKeyJwk: identity.publicJwk
         });
       } catch (_error) {
+      }
+
+      try {
+        await syncIdentityBackup(user, firestore, identity);
+      } catch (_error) {
+        setKeySyncStatus("Backup sync failed", "warn", state.keySyncLastSyncedMs);
       }
     }
 
@@ -1091,11 +1327,30 @@
     }
 
     const encryptedBytes = base64ToBytes(wrappedKey);
-    const raw = await crypto.subtle.decrypt(
-      { name: "RSA-OAEP" },
-      identity.privateKey,
-      encryptedBytes
-    );
+    let raw;
+    try {
+      raw = await crypto.subtle.decrypt(
+        { name: "RSA-OAEP" },
+        identity.privateKey,
+        encryptedBytes
+      );
+    } catch (_error) {
+      const recoveredIdentity = await replaceIdentityFromBackup(user, firestore);
+      if (!recoveredIdentity) {
+        setKeySyncStatus("Key unavailable on this device", "error", state.keySyncLastSyncedMs);
+        throw new Error("Could not decrypt conversation key on this device. Open chat on a linked device to sync keys.");
+      }
+      try {
+        raw = await crypto.subtle.decrypt(
+          { name: "RSA-OAEP" },
+          recoveredIdentity.privateKey,
+          encryptedBytes
+        );
+      } catch (_retryError) {
+        setKeySyncStatus("Key unavailable on this device", "error", state.keySyncLastSyncedMs);
+        throw new Error("Could not decrypt conversation key on this device. Open chat on a linked device to sync keys.");
+      }
+    }
 
     const aesKey = await importAesFromRaw(new Uint8Array(raw));
     state.chatAesKeys.set(chatId, aesKey);
@@ -1432,6 +1687,36 @@
     if (state.statusType === "error") {
       node.classList.add("error");
     }
+  }
+
+  function resetKeySyncStatus() {
+    state.keySyncLabel = "Checking...";
+    state.keySyncType = "pending";
+    state.keySyncLastSyncedMs = 0;
+    renderKeySyncStatus();
+  }
+
+  function setKeySyncStatus(label, type, lastSyncedMs) {
+    state.keySyncLabel = String(label || "Checking...");
+    const cleanType = String(type || "pending");
+    state.keySyncType = ["ok", "warn", "error", "pending"].includes(cleanType) ? cleanType : "pending";
+    if (typeof lastSyncedMs !== "undefined") {
+      const parsed = Number(lastSyncedMs);
+      state.keySyncLastSyncedMs = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    }
+    renderKeySyncStatus();
+  }
+
+  function renderKeySyncStatus() {
+    const labelNode = state.root ? state.root.querySelector("#nebula-chat-keysync-label") : null;
+    const lastNode = state.root ? state.root.querySelector("#nebula-chat-keysync-last") : null;
+    if (!labelNode || !lastNode) {
+      return;
+    }
+    labelNode.textContent = state.keySyncLabel;
+    labelNode.classList.remove("ok", "warn", "error", "pending");
+    labelNode.classList.add(state.keySyncType || "pending");
+    lastNode.textContent = `Last synced: ${formatDateTime(state.keySyncLastSyncedMs)}`;
   }
 
   function closeContextMenu() {
@@ -2715,6 +3000,13 @@
               <div id="nebula-chat-create-gc-suggestions" class="nebula-chat-suggestions hidden"></div>
             </div>
             <p id="nebula-chat-status" class="nebula-chat-status"></p>
+            <div class="nebula-chat-keysync">
+              <div class="nebula-chat-keysync-head">
+                <span>Key Sync</span>
+                <strong id="nebula-chat-keysync-label" class="pending">Checking...</strong>
+              </div>
+              <p id="nebula-chat-keysync-last">Last synced: never</p>
+            </div>
             <section class="nebula-chat-list-wrap">
               <h2>Direct Messages and Group Chats</h2>
               <ul id="nebula-chat-list" class="nebula-chat-list"></ul>
@@ -2746,11 +3038,12 @@
     }
     state.root.innerHTML = template();
     bindControls();
+    resetKeySyncStatus();
     renderStatus();
     try {
       await ensureIdentity(user);
-    } catch (_error) {
-      setStatus("Profile sync is unavailable. Chat UI is loaded.", "error");
+    } catch (error) {
+      setStatus(error && error.message ? error.message : "Profile sync is unavailable. Chat UI is loaded.", "error");
     }
     subscribeFriendsAndRequests();
     subscribeChats();
@@ -2819,10 +3112,14 @@
       state.linkPreview = null;
       state.chatAesKeys.clear();
       state.memberCache.clear();
+      state.identity = null;
       state.friends = [];
       state.blockedUsers = [];
       state.incomingFriendRequests = [];
       state.outgoingFriendRequests = [];
+      state.keySyncLabel = "Checking...";
+      state.keySyncType = "pending";
+      state.keySyncLastSyncedMs = 0;
       setStatus("", "");
 
       try {
@@ -2873,6 +3170,7 @@
     state.root = null;
     state.rootSelector = "";
     state.user = null;
+    state.identity = null;
     state.chats = [];
     state.selectedChatId = "";
     state.selectedChat = null;
@@ -2888,6 +3186,9 @@
     state.activeMenuMessageId = "";
     state.statusText = "";
     state.statusType = "";
+    state.keySyncLabel = "Checking...";
+    state.keySyncType = "pending";
+    state.keySyncLastSyncedMs = 0;
   }
 
   initNotificationWatchers();

@@ -221,6 +221,25 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
     }
 
+    match /users/{uid}/privateChatIdentity/{docId} {
+      allow read: if isOwner(uid) && docId == 'main';
+
+      allow create, update: if isOwner(uid)
+        && docId == 'main'
+        && hasOnlyKeys(request.resource.data, [
+          'uid', 'version', 'publicJwk', 'salt', 'iv', 'ciphertext', 'updatedAt'
+        ])
+        && request.resource.data.uid == uid
+        && isNonNegativeInt(request.resource.data.version)
+        && request.resource.data.publicJwk is map
+        && isNonEmptyString(request.resource.data.salt, 512)
+        && isNonEmptyString(request.resource.data.iv, 512)
+        && isNonEmptyString(request.resource.data.ciphertext, 30000)
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
+
+      allow delete: if isOwner(uid) && docId == 'main';
+    }
+
     match /friendRequests/{requestId} {
       allow read: if isSignedIn()
         && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
