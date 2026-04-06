@@ -214,24 +214,36 @@
         <h1 class="tools-title"><i class="fa-solid fa-shapes"></i>‎ ‎ Apps</h1>
         <br>
         <div class="cards-container">
-          <a href="/soundboard" class="nav-link tool-card" style="animation-delay: 0.35s;">
-            <i class="fa-solid fa-volume-high"></i>
+          <a href="/soundboard" class="nav-link tool-card" style="animation-delay: 0.2s;">
+            <i class="fa-solid fa-volume-high" style="font-size: 52px;"></i>
             <h2>Soundboard</h2>
             <p class="card-desc">Play sound effects</p>
             <div class="glow-bar"></div>
           </a>
-          <a href="/weather" class="nav-link tool-card" style="animation-delay: 0.4s;">
-            <i class="fa-solid fa-cloud-sun-rain"></i>
+          <a href="/weather" class="nav-link tool-card" style="animation-delay: 0.35s;">
+            <i class="fa-solid fa-cloud-sun-rain" style="font-size: 52px;"></i>
             <h2>Weather</h2>
             <p class="card-desc">Forecast and alerts</p>
             <div class="glow-bar"></div>
           </a>
           <a href="/music" class="nav-link tool-card" style="animation-delay: 0.5s;">
-            <i class="fa-solid fa-music"></i>
+            <i class="fa-solid fa-music" style="font-size: 52px;"></i>
             <h2>Music</h2>
             <p class="card-desc">Listen to your favorite tracks</p>
             <div class="glow-bar"></div>
           </a>
+          <a href="/notepad" class="nav-link tool-card" style="animation-delay: 0.7s;">
+            <i class="fa-regular fa-clipboard" style="font-size: 52px;"></i>
+            <h2>Notepad</h2>
+            <p class="card-desc">Take notes and jot down ideas.</p>
+            <div class="glow-bar"></div>
+          </a>
+          <a href="/timer" class="nav-link tool-card" style="animation-delay: 0.7s;">
+            <i class="fa-regular fa-clock" style="font-size: 52px;"></i>
+            <h2>Timer</h2>
+            <p class="card-desc">Set timers for tasks.</p>
+            <div class="glow-bar"></div>
+          </a>           
         </div>
       `;
     }
