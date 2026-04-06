@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "nebula-28e40"
+    "default": "starlight-28e40"
   },
   "targets": {
     "nebula-28e40": {
