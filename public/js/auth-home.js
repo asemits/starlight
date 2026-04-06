@@ -1783,6 +1783,79 @@
       const thumbsUpGiven = list.filter((item) => item.rating === 1).length;
       const thumbsDownGiven = list.filter((item) => item.rating === -1).length;
 
+function renderStatsCharts(statsNode, totalPlays, gamesPlayed, thumbsUpGiven, thumbsDownGiven, list) {
+
+statsNode.innerHTML = `
+    <div style="display:flex; justify-content:center; align-items:center; padding:20px;">
+        <article class="nebula-stat-card" style="padding:30px; width:100%; max-width:450px; background: rgba(255,255,255,0.03); border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);">
+            <canvas id="chart-all-in-one-ring"></canvas>
+        </article>
+    </div>
+`;
+
+    if (typeof Chart === "undefined") {
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js";
+        script.onload = () => drawUnifiedRing();
+        document.head.appendChild(script);
+    } else {
+        drawUnifiedRing();
+    }
+
+    function drawUnifiedRing() {
+        new Chart(document.getElementById("chart-all-in-one-ring"), {
+            type: "doughnut",
+            data: {
+                labels: ["Total Plays", "Unique Games", "Thumbs Up", "Thumbs Down"],
+                datasets: [{
+                    // All 4 metrics in one single array (one ring)
+                    data: [totalPlays, gamesPlayed, thumbsUpGiven, thumbsDownGiven],
+                    backgroundColor: [
+                        "rgba(255, 255, 255, 0.6)", // Total Plays (Brightest)
+                        "rgba(255, 255, 255, 0.35)", // Games Played
+                        "rgba(255, 255, 255, 0.15)", // Thumbs Up
+                        "rgba(255, 255, 255, 0.05)"  // Thumbs Down (Dimmest)
+                    ],
+                    borderColor: "rgba(255, 255, 255, 0.1)",
+                    borderWidth: 2,
+                    hoverOffset: 20, // Pops the slice out when you hover
+                    spacing: 5 // Adds a gap between slices for a modern look
+                }]
+            },
+            options: {
+                cutout: "65%", // Makes it a nice thick ring
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: "rgba(255,255,255,0.6)",
+                            font: { size: 12 },
+                            padding: 20,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: "rgba(15, 15, 15, 0.95)",
+                        titleFont: { size: 14 },
+                        bodyFont: { size: 13 },
+                        padding: 15,
+                        borderColor: "rgba(255,255,255,0.1)",
+                        borderWidth: 1,
+                        displayColors: true,
+                        callbacks: {
+                            label: (context) => ` ${context.label}: ${context.raw}`
+                        }
+                    }
+                },
+                layout: {
+                    padding: 10
+                }
+            }
+        });
+    }
+}
+
       function tileMarkup(item, favoriteMode) {
         const imageMarkup = item.gameImage
           ? `
@@ -1818,14 +1891,9 @@
         favoritesNode.innerHTML = favorites.length ? favorites.map((item) => tileMarkup(item, true)).join("") : '<p class="nebula-dashboard-empty">No favorites yet. Star games in Games.</p>';
       }
 
-      if (showStats && statsNode) {
-        statsNode.innerHTML = `
-        <article class="nebula-stat-card"><h3>Total Plays</h3><p>${totalPlays}</p></article>
-        <article class="nebula-stat-card"><h3>Games Played</h3><p>${gamesPlayed}</p></article>
-        <article class="nebula-stat-card"><h3>Thumbs Up Given</h3><p>${thumbsUpGiven}</p></article>
-        <article class="nebula-stat-card"><h3>Thumbs Down Given</h3><p>${thumbsDownGiven}</p></article>
-      `;
-      }
+if (showStats && statsNode) {
+    renderStatsCharts(statsNode, totalPlays, gamesPlayed, thumbsUpGiven, thumbsDownGiven, list);
+}
 
       if (showFavorites && favoritesNode) {
         favoritesNode.querySelectorAll("[data-remove-favorite='1']").forEach((button) => {
