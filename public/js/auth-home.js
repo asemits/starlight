@@ -1931,9 +1931,48 @@
       <button type="button" id="signup-tos-decline" class="nebula-btn nebula-btn-muted">I Decline</button>
     `);
 
+    const tosScroll = document.getElementById("signup-tos-scroll");
     const continueBtn = document.getElementById("signup-tos-continue");
+    let timerDone = false;
+    let scrolledToEnd = false;
+
+    function reachedBottom(node) {
+      if (!node) {
+        return false;
+      }
+      return node.scrollTop + node.clientHeight >= node.scrollHeight - 2;
+    }
+
+    function updateContinueState() {
+      if (!continueBtn) {
+        return;
+      }
+      const ready = timerDone && scrolledToEnd;
+      continueBtn.disabled = !ready;
+      continueBtn.textContent = ready ? "I Accept" : "Read Terms to Continue";
+    }
+
+    if (tosScroll) {
+      scrolledToEnd = reachedBottom(tosScroll);
+      tosScroll.addEventListener("scroll", () => {
+        scrolledToEnd = reachedBottom(tosScroll);
+        updateContinueState();
+      });
+    }
+
+    window.setTimeout(() => {
+      timerDone = true;
+      updateContinueState();
+    }, 30000);
+
+    updateContinueState();
+
     if (continueBtn) {
       continueBtn.addEventListener("click", () => {
+        if (timerDone && scrolledToEnd) {
+          openSignupFormModal();
+          return;
+        }
         const popupBody = "Read it, you lazy bum. \"Oh, it's boring! I don't want to read it! My highly-advanced single-celled brain can't handle it!\" Do it. Read it. We couldn't care less.";
         showModal("Slow down!", `<p class="nebula-popup-copy">${escapeHtml(popupBody)}</p><button type="button" id="nebula-popup-ok" class="nebula-btn nebula-btn-primary">OK</button>`);
         const ok = document.getElementById("nebula-popup-ok");
