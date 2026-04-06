@@ -23,8 +23,16 @@
         "friends": {
           ".read": "auth != null && auth.uid === $uid",
           "$friendUid": {
-            ".write": "auth != null && (auth.uid === $uid || (newData.exists() && (auth.uid === $uid || auth.uid === $friendUid) && newData.child('requestId').isString() && root.child('friendRequests').child(newData.child('requestId').val()).exists() && ((root.child('friendRequests').child(newData.child('requestId').val()).child('fromUid').val() === $uid && root.child('friendRequests').child(newData.child('requestId').val()).child('toUid').val() === $friendUid) || (root.child('friendRequests').child(newData.child('requestId').val()).child('fromUid').val() === $friendUid && root.child('friendRequests').child(newData.child('requestId').val()).child('toUid').val() === $uid))))",
+            ".write": "auth != null && (auth.uid === $uid || (newData.exists() && (auth.uid === $uid || auth.uid === $friendUid) && newData.child('requestId').isString() && root.child('friendRequests').child(newData.child('requestId').val()).exists() && ((root.child('friendRequests').child(newData.child('requestId').val()).child('fromUid').val() === $uid && root.child('friendRequests').child(newData.child('requestId').val()).child('toUid').val() === $friendUid) || (root.child('friendRequests').child(newData.child('requestId').val()).child('fromUid').val() === $friendUid && root.child('friendRequests').child(newData.child('requestId').val()).child('toUid').val() === $uid)))) && (!newData.exists() || (!root.child('users').child($uid).child('blockedUsers').child($friendUid).exists() && !root.child('users').child($friendUid).child('blockedUsers').child($uid).exists()))",
             ".validate": "newData.exists() ? (newData.child('uid').val() === $friendUid && newData.child('username').isString() && newData.child('usernameLower').isString() && newData.child('requestId').isString()) : true"
+          }
+        },
+        "blockedUsers": {
+          ".read": "auth != null && auth.uid === $uid",
+          "$blockedUid": {
+            ".read": "auth != null && (auth.uid === $uid || auth.uid === $blockedUid)",
+            ".write": "auth != null && auth.uid === $uid",
+            ".validate": "newData.exists() ? (newData.child('uid').val() === $blockedUid && newData.child('username').isString() && newData.child('usernameLower').isString() && (!newData.child('createdAt').exists() || newData.child('createdAt').isNumber())) : true"
           }
         }
       }
@@ -75,7 +83,7 @@
       ".read": false,
       "$requestId": {
         ".read": "auth != null && (data.child('fromUid').val() === auth.uid || data.child('toUid').val() === auth.uid)",
-        ".write": "auth != null && ((!data.exists() && newData.child('fromUid').val() === auth.uid) || (data.exists() && (data.child('fromUid').val() === auth.uid || data.child('toUid').val() === auth.uid)))"
+        ".write": "auth != null && ((!data.exists() && newData.child('fromUid').val() === auth.uid && !root.child('users').child(newData.child('fromUid').val()).child('blockedUsers').child(newData.child('toUid').val()).exists() && !root.child('users').child(newData.child('toUid').val()).child('blockedUsers').child(newData.child('fromUid').val()).exists()) || (data.exists() && (data.child('fromUid').val() === auth.uid || data.child('toUid').val() === auth.uid) && (newData.child('status').val() !== 'accepted' || (!root.child('users').child(data.child('fromUid').val()).child('blockedUsers').child(data.child('toUid').val()).exists() && !root.child('users').child(data.child('toUid').val()).child('blockedUsers').child(data.child('fromUid').val()).exists()))))"
       }
     },
     "privateChats": {
@@ -83,7 +91,7 @@
       ".read": false,
       "$chatId": {
         ".read": "auth != null && data.child('participantsMap').child(auth.uid).val() === true",
-        ".write": "auth != null && ((!data.exists() && newData.child('createdBy').val() === auth.uid && newData.child('participantsMap').child(auth.uid).val() === true) || (data.exists() && data.child('participantsMap').child(auth.uid).val() === true))",
+        ".write": "auth != null && ((!data.exists() && newData.child('createdBy').val() === auth.uid && newData.child('participantsMap').child(auth.uid).val() === true && (newData.child('type').val() !== 'dm' || (newData.child('participants').child('0').isString() && newData.child('participants').child('1').isString() && !newData.child('participants').child('2').exists() && !root.child('users').child(newData.child('participants').child('0').val()).child('blockedUsers').child(newData.child('participants').child('1').val()).exists() && !root.child('users').child(newData.child('participants').child('1').val()).child('blockedUsers').child(newData.child('participants').child('0').val()).exists()))) || (data.exists() && data.child('participantsMap').child(auth.uid).val() === true))",
         "members": {
           ".read": "auth != null && root.child('privateChats').child($chatId).child('participantsMap').child(auth.uid).val() === true",
           "$uid": {
@@ -96,7 +104,7 @@
           ".read": "auth != null && root.child('privateChats').child($chatId).child('participantsMap').child(auth.uid).val() === true",
           "$messageId": {
             ".read": "auth != null && root.child('privateChats').child($chatId).child('participantsMap').child(auth.uid).val() === true",
-            ".write": "auth != null && root.child('privateChats').child($chatId).child('participantsMap').child(auth.uid).val() === true && ((!data.exists() && newData.child('senderId').val() === auth.uid) || (data.exists() && data.child('senderId').val() === auth.uid))"
+            ".write": "auth != null && root.child('privateChats').child($chatId).child('participantsMap').child(auth.uid).val() === true && (root.child('privateChats').child($chatId).child('type').val() !== 'dm' || (root.child('privateChats').child($chatId).child('participants').child('0').isString() && root.child('privateChats').child($chatId).child('participants').child('1').isString() && !root.child('privateChats').child($chatId).child('participants').child('2').exists() && !root.child('users').child(root.child('privateChats').child($chatId).child('participants').child('0').val()).child('blockedUsers').child(root.child('privateChats').child($chatId).child('participants').child('1').val()).exists() && !root.child('users').child(root.child('privateChats').child($chatId).child('participants').child('1').val()).child('blockedUsers').child(root.child('privateChats').child($chatId).child('participants').child('0').val()).exists())) && ((!data.exists() && newData.child('senderId').val() === auth.uid) || (data.exists() && data.child('senderId').val() === auth.uid))"
           }
         }
       }

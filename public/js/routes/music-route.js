@@ -727,6 +727,33 @@ header.scrolled {
 .player-right {
   display:flex; align-items:center; justify-content:flex-end; gap:16px;
 }
+.player-volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+}
+.player-volume label {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--ink-faint);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+#music-volume {
+  width: 110px;
+  accent-color: #f6f7f9;
+}
+#music-volume-value {
+  min-width: 38px;
+  text-align: right;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+}
 .tunnel-badge {
   font-size:9px; font-weight:800;
   letter-spacing:0.24em;
@@ -1152,6 +1179,9 @@ header.scrolled {
     justify-content: space-between;
     flex-wrap: wrap;
   }
+  #music-volume {
+    width: 90px;
+  }
   .side-panel {
     width: min(100%, 420px);
     max-height: calc(100vh - 124px);
@@ -1230,6 +1260,14 @@ header.scrolled {
   .player-panel-btn {
     flex: 1;
     justify-content: center;
+  }
+  .player-volume {
+    width: 100%;
+    justify-content: space-between;
+  }
+  #music-volume {
+    flex: 1;
+    width: auto;
   }
 }
 .row:last-of-type {
@@ -1464,6 +1502,11 @@ header.scrolled {
                 <span class="btn-badge" id="q-count-badge" style="display:none">0</span>
             </button>
         </div>
+      <div class="player-volume">
+        <label for="music-volume">VOL</label>
+        <input type="range" id="music-volume" min="0" max="1" step="0.01" value="1" aria-label="Music volume">
+        <span id="music-volume-value">100%</span>
+      </div>
         <div class="tunnel-badge">{}</div>
     </div>
 </div>

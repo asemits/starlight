@@ -2,6 +2,7 @@
   const CHAT_COLLECTION = "privateChats";
   const PROFILE_COLLECTION = "userPublicProfiles";
   const FRIEND_REQUESTS_COLLECTION = "friendRequests";
+  const BLOCKED_USERS_SUBCOLLECTION = "blockedUsers";
   const CHAIN_WINDOW_MS = 5 * 60 * 1000;
   const CHAT_PREVIEW_LIMIT = 90;
   const GC_TITLE_LIMIT = 72;
@@ -27,11 +28,25 @@
     profileCache: new Map(),
     memberCache: new Map(),
     friends: [],
+    blockedUsers: [],
     incomingFriendRequests: [],
     outgoingFriendRequests: [],
     friendsUnsub: null,
+    blockedUsersUnsub: null,
     incomingFriendRequestsUnsub: null,
     outgoingFriendRequestsUnsub: null
+  };
+
+  const notificationState = {
+    authUnsub: null,
+    activeUid: "",
+    blockedUids: new Set(),
+    blockedUsersUnsub: null,
+    chatsUnsub: null,
+    friendRequestsUnsub: null,
+    messageUnsubs: new Map(),
+    seenFriendRequestIds: new Set(),
+    friendRequestsInitialized: false
   };
 
   function auth() {
@@ -156,6 +171,253 @@
       .filter((friend) => !excluded.has(friend.uid))
       .filter((friend) => !filter || normalizeUsername(friend.username).includes(filter))
       .sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
+  }
+
+  function isBlockedUid(uid) {
+    const target = String(uid || "").trim();
+    if (!target) {
+      return false;
+    }
+    return state.blockedUsers.some((item) => String(item.uid || "") === target);
+  }
+
+  async function hasUserBlockedMe(otherUid) {
+    const user = state.user || currentUser();
+    const firestore = db();
+    const cleanOther = String(otherUid || "").trim();
+    if (!user || !firestore || !cleanOther) {
+      return false;
+    }
+    try {
+      const doc = await firestore
+        .collection("users")
+        .doc(cleanOther)
+        .collection(BLOCKED_USERS_SUBCOLLECTION)
+        .doc(user.uid)
+        .get();
+      return Boolean(doc && doc.exists);
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function shouldSuppressMessageNotification(chatId) {
+    const path = String(window.location.pathname || "");
+    const inChatRoute = path === "/chat" || path === "/private-chat";
+    if (!inChatRoute) {
+      return false;
+    }
+    if (document.visibilityState !== "visible" || !document.hasFocus()) {
+      return false;
+    }
+    return String(state.selectedChatId || "") === String(chatId || "");
+  }
+
+  function emitNotification(payload) {
+    if (!window.showNebulaNotification || !payload || typeof payload !== "object") {
+      return;
+    }
+    window.showNebulaNotification(payload);
+  }
+
+  function stopNotificationWatchers() {
+    if (notificationState.chatsUnsub) {
+      notificationState.chatsUnsub();
+      notificationState.chatsUnsub = null;
+    }
+    if (notificationState.friendRequestsUnsub) {
+      notificationState.friendRequestsUnsub();
+      notificationState.friendRequestsUnsub = null;
+    }
+    if (notificationState.blockedUsersUnsub) {
+      notificationState.blockedUsersUnsub();
+      notificationState.blockedUsersUnsub = null;
+    }
+
+    notificationState.messageUnsubs.forEach((entry) => {
+      if (entry && typeof entry.unsub === "function") {
+        entry.unsub();
+      }
+    });
+    notificationState.messageUnsubs.clear();
+    notificationState.seenFriendRequestIds.clear();
+    notificationState.friendRequestsInitialized = false;
+    notificationState.blockedUids.clear();
+  }
+
+  function ensureChatMessageWatcher(user, chatId, chatData) {
+    const firestore = db();
+    if (!firestore || !user || !chatId) {
+      return;
+    }
+
+    const existing = notificationState.messageUnsubs.get(chatId);
+    if (existing) {
+      existing.chatData = chatData;
+      return;
+    }
+
+    const watcher = {
+      unsub: null,
+      initialized: false,
+      lastMessageId: "",
+      chatData
+    };
+
+    const query = firestore
+      .collection(CHAT_COLLECTION)
+      .doc(chatId)
+      .collection("messages")
+      .orderBy("createdAt", "desc")
+      .limit(1);
+
+    watcher.unsub = query.onSnapshot((snap) => {
+      if (!snap || snap.empty) {
+        watcher.initialized = true;
+        return;
+      }
+
+      const doc = snap.docs[0];
+      const data = doc.data() || {};
+      const messageId = String(doc.id || "");
+
+      if (!watcher.initialized) {
+        watcher.lastMessageId = messageId;
+        watcher.initialized = true;
+        return;
+      }
+      if (!messageId || messageId === watcher.lastMessageId) {
+        return;
+      }
+      watcher.lastMessageId = messageId;
+
+      const senderId = String(data.senderId || "");
+      if (!senderId || senderId === user.uid || notificationState.blockedUids.has(senderId)) {
+        return;
+      }
+      if (shouldSuppressMessageNotification(chatId)) {
+        return;
+      }
+
+      const sender = String(data.senderUsername || "Someone");
+      const title = chatTitle({ id: chatId, ...(watcher.chatData || {}) }, user.uid);
+      emitNotification({
+        type: "message",
+        title: "New Message",
+        body: `${sender} sent a message in ${title || "chat"}`,
+        route: "/chat",
+        tag: `chat:${chatId}`,
+        actionLabel: "Open Chat"
+      });
+    });
+
+    notificationState.messageUnsubs.set(chatId, watcher);
+  }
+
+  function startNotificationWatchers(user) {
+    const firestore = db();
+    if (!user || user.isAnonymous || !firestore) {
+      stopNotificationWatchers();
+      return;
+    }
+
+    stopNotificationWatchers();
+    notificationState.activeUid = user.uid;
+
+    notificationState.blockedUsersUnsub = firestore
+      .collection("users")
+      .doc(user.uid)
+      .collection(BLOCKED_USERS_SUBCOLLECTION)
+      .onSnapshot((snap) => {
+        notificationState.blockedUids = new Set((snap.docs || []).map((doc) => String(doc.id || "")));
+      });
+
+    notificationState.friendRequestsUnsub = firestore
+      .collection(FRIEND_REQUESTS_COLLECTION)
+      .where("toUid", "==", user.uid)
+      .onSnapshot((snap) => {
+        const pending = (snap.docs || [])
+          .map((doc) => ({ id: doc.id, ...(doc.data() || {}) }))
+          .filter((doc) => String(doc.status || "") === "pending");
+
+        const currentIds = new Set(pending.map((doc) => String(doc.id || "")));
+
+        if (!notificationState.friendRequestsInitialized) {
+          notificationState.seenFriendRequestIds = currentIds;
+          notificationState.friendRequestsInitialized = true;
+          return;
+        }
+
+        pending.forEach((request) => {
+          const id = String(request.id || "");
+          if (!id || notificationState.seenFriendRequestIds.has(id)) {
+            return;
+          }
+          notificationState.seenFriendRequestIds.add(id);
+          const fromUid = String(request.fromUid || "");
+          if (fromUid && notificationState.blockedUids.has(fromUid)) {
+            return;
+          }
+          emitNotification({
+            type: "friend-request",
+            title: "New Friend Request",
+            body: `${String(request.fromUsername || "Someone")} sent you a friend request`,
+            route: "/chat",
+            tag: `friend-request:${id}`,
+            actionLabel: "Open"
+          });
+        });
+
+        notificationState.seenFriendRequestIds.forEach((id) => {
+          if (!currentIds.has(id)) {
+            notificationState.seenFriendRequestIds.delete(id);
+          }
+        });
+      });
+
+    notificationState.chatsUnsub = firestore
+      .collection(CHAT_COLLECTION)
+      .where("participants", "array-contains", user.uid)
+      .onSnapshot((snap) => {
+        const activeIds = new Set();
+        (snap.docs || []).forEach((doc) => {
+          const chatId = String(doc.id || "");
+          if (!chatId) {
+            return;
+          }
+          activeIds.add(chatId);
+          ensureChatMessageWatcher(user, chatId, doc.data() || {});
+        });
+
+        notificationState.messageUnsubs.forEach((entry, chatId) => {
+          if (activeIds.has(chatId)) {
+            return;
+          }
+          if (entry && typeof entry.unsub === "function") {
+            entry.unsub();
+          }
+          notificationState.messageUnsubs.delete(chatId);
+        });
+      });
+  }
+
+  function initNotificationWatchers() {
+    const instance = auth();
+    if (!instance || notificationState.authUnsub) {
+      return;
+    }
+
+    notificationState.authUnsub = instance.onAuthStateChanged((user) => {
+      if (!user || user.isAnonymous) {
+        notificationState.activeUid = "";
+        stopNotificationWatchers();
+        return;
+      }
+      if (notificationState.activeUid === user.uid && notificationState.chatsUnsub) {
+        return;
+      }
+      startNotificationWatchers(user);
+    });
   }
 
   function currentUser() {
@@ -495,6 +757,12 @@
     if (otherProfile.uid === user.uid) {
       throw new Error("You cannot DM yourself.");
     }
+    if (isBlockedUid(otherProfile.uid)) {
+      throw new Error("Unblock this user before creating a DM.");
+    }
+    if (await hasUserBlockedMe(otherProfile.uid)) {
+      throw new Error("This user has blocked you.");
+    }
     const isFriend = state.friends.some((friend) => friend.uid === otherProfile.uid);
     if (!isFriend) {
       throw new Error("You can only DM users in your friends list.");
@@ -594,6 +862,12 @@
       const friend = friendsByName.get(normalized);
       if (!friend) {
         throw new Error(`Only friends can be added: ${normalized}`);
+      }
+      if (isBlockedUid(friend.uid)) {
+        throw new Error(`Unblock this user before adding: ${normalized}`);
+      }
+      if (await hasUserBlockedMe(friend.uid)) {
+        throw new Error(`This user has blocked you: ${normalized}`);
       }
       const profile = await getProfileByUid(friend.uid);
       if (!profile) {
@@ -1130,6 +1404,22 @@
           return;
         }
 
+        const selectedChat = state.selectedChat || null;
+        const participantIds = selectedChat && Array.isArray(selectedChat.participants)
+          ? selectedChat.participants.map((value) => String(value || "")).filter(Boolean)
+          : [];
+        const otherParticipantIds = participantIds.filter((uid) => uid !== state.user.uid);
+        if (otherParticipantIds.some((uid) => isBlockedUid(uid))) {
+          setStatus("Unblock this user before sending messages.", "error");
+          return;
+        }
+        for (const uid of otherParticipantIds) {
+          if (await hasUserBlockedMe(uid)) {
+            setStatus("This user has blocked you.", "error");
+            return;
+          }
+        }
+
         const payload = {
           text,
           replyToMessageId: state.pendingReply && state.pendingReply.id ? state.pendingReply.id : ""
@@ -1415,14 +1705,39 @@
     const friendsNode = document.getElementById("nebula-chat-friends-list");
     const incomingNode = document.getElementById("nebula-chat-friends-incoming");
     const outgoingNode = document.getElementById("nebula-chat-friends-outgoing");
+    const blockedNode = document.getElementById("nebula-chat-friends-blocked");
     if (friendsNode) {
       friendsNode.innerHTML = state.friends.length
         ? state.friends
             .slice()
             .sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")))
-            .map((friend) => `<li>${escapeHtml(friend.username)}</li>`)
+            .map((friend) => `
+              <li>
+                <span>${escapeHtml(friend.username)}</span>
+                <div>
+                  <button type="button" data-friend-remove="${escapeHtml(friend.uid)}">Remove</button>
+                  <button type="button" data-friend-block="${escapeHtml(friend.uid)}">Block</button>
+                </div>
+              </li>
+            `)
             .join("")
         : '<li class="nebula-chat-friends-empty">No friends yet.</li>';
+
+      friendsNode.querySelectorAll("button[data-friend-remove]").forEach((node) => {
+        node.addEventListener("click", async () => {
+          const uid = String(node.getAttribute("data-friend-remove") || "");
+          await removeFriend(uid);
+          renderFriendsModalContent();
+        });
+      });
+
+      friendsNode.querySelectorAll("button[data-friend-block]").forEach((node) => {
+        node.addEventListener("click", async () => {
+          const uid = String(node.getAttribute("data-friend-block") || "");
+          await blockFriend(uid);
+          renderFriendsModalContent();
+        });
+      });
     }
     if (incomingNode) {
       incomingNode.innerHTML = state.incomingFriendRequests.length
@@ -1469,6 +1784,28 @@
         });
       });
     }
+    if (blockedNode) {
+      blockedNode.innerHTML = state.blockedUsers.length
+        ? state.blockedUsers
+            .slice()
+            .sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")))
+            .map((entry) => `
+              <li>
+                <span>${escapeHtml(entry.username || "Unknown")}</span>
+                <button type="button" data-friend-unblock="${escapeHtml(entry.uid)}">Unblock</button>
+              </li>
+            `)
+            .join("")
+        : '<li class="nebula-chat-friends-empty">No blocked users.</li>';
+
+      blockedNode.querySelectorAll("button[data-friend-unblock]").forEach((node) => {
+        node.addEventListener("click", async () => {
+          const uid = String(node.getAttribute("data-friend-unblock") || "");
+          await unblockUser(uid);
+          renderFriendsModalContent();
+        });
+      });
+    }
   }
 
   async function sendFriendRequest(targetUsername) {
@@ -1485,6 +1822,12 @@
     }
     if (profile.uid === user.uid) {
       throw new Error("You cannot add yourself.");
+    }
+    if (isBlockedUid(profile.uid)) {
+      throw new Error("Unblock this user before sending a friend request.");
+    }
+    if (await hasUserBlockedMe(profile.uid)) {
+      throw new Error("This user has blocked you.");
     }
     if (state.friends.some((friend) => friend.uid === profile.uid)) {
       throw new Error("This user is already your friend.");
@@ -1515,6 +1858,10 @@
     const firestore = db();
     const request = state.incomingFriendRequests.find((item) => item.id === requestId);
     if (!user || !firestore || !request) {
+      return;
+    }
+    if (isBlockedUid(request.fromUid) || await hasUserBlockedMe(request.fromUid)) {
+      setStatus("Cannot accept this request because one side has blocked the other.", "error");
       return;
     }
     const batch = firestore.batch();
@@ -1568,6 +1915,87 @@
     setStatus("Friend request canceled.", "ok");
   }
 
+  async function removeFriend(friendUid) {
+    const user = state.user || currentUser();
+    const firestore = db();
+    const cleanFriendUid = String(friendUid || "").trim();
+    if (!user || !firestore || !cleanFriendUid) {
+      return;
+    }
+
+    const myRef = firestore.collection("users").doc(user.uid).collection("friends").doc(cleanFriendUid);
+    const theirRef = firestore.collection("users").doc(cleanFriendUid).collection("friends").doc(user.uid);
+    await Promise.all([
+      myRef.delete().catch(() => null),
+      theirRef.delete().catch(() => null)
+    ]);
+
+    setStatus("Friend removed.", "ok");
+  }
+
+  async function blockFriend(friendUid) {
+    const user = state.user || currentUser();
+    const firestore = db();
+    const cleanFriendUid = String(friendUid || "").trim();
+    if (!user || !firestore || !cleanFriendUid) {
+      return;
+    }
+
+    let targetProfile = await getProfileByUid(cleanFriendUid);
+    if (!targetProfile) {
+      const friend = state.friends.find((item) => String(item.uid || "") === cleanFriendUid) || null;
+      targetProfile = {
+        uid: cleanFriendUid,
+        username: friend ? String(friend.username || "Unknown") : "Unknown"
+      };
+    }
+
+    await firestore
+      .collection("users")
+      .doc(user.uid)
+      .collection(BLOCKED_USERS_SUBCOLLECTION)
+      .doc(cleanFriendUid)
+      .set({
+        uid: cleanFriendUid,
+        username: String(targetProfile.username || "Unknown"),
+        usernameLower: normalizeUsername(targetProfile.username || "unknown"),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+    await removeFriend(cleanFriendUid);
+
+    const requestsToCancel = state.incomingFriendRequests
+      .concat(state.outgoingFriendRequests)
+      .filter((request) => String(request.fromUid || "") === cleanFriendUid || String(request.toUid || "") === cleanFriendUid)
+      .map((request) => firestore.collection(FRIEND_REQUESTS_COLLECTION).doc(request.id).update({
+        status: "canceled",
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(() => null));
+
+    if (requestsToCancel.length) {
+      await Promise.all(requestsToCancel);
+    }
+
+    setStatus("User blocked.", "ok");
+  }
+
+  async function unblockUser(friendUid) {
+    const user = state.user || currentUser();
+    const firestore = db();
+    const cleanFriendUid = String(friendUid || "").trim();
+    if (!user || !firestore || !cleanFriendUid) {
+      return;
+    }
+    await firestore
+      .collection("users")
+      .doc(user.uid)
+      .collection(BLOCKED_USERS_SUBCOLLECTION)
+      .doc(cleanFriendUid)
+      .delete()
+      .catch(() => null);
+    setStatus("User unblocked.", "ok");
+  }
+
   function openFriendsModal() {
     openModal(
       "Friends and Requests",
@@ -1591,6 +2019,10 @@
           <section>
             <h4>Outgoing Requests</h4>
             <ul id="nebula-chat-friends-outgoing" class="nebula-chat-friends-list"></ul>
+          </section>
+          <section>
+            <h4>Blocked Users</h4>
+            <ul id="nebula-chat-friends-blocked" class="nebula-chat-friends-list"></ul>
           </section>
         </div>
       `
@@ -1626,6 +2058,10 @@
       state.friendsUnsub();
       state.friendsUnsub = null;
     }
+    if (state.blockedUsersUnsub) {
+      state.blockedUsersUnsub();
+      state.blockedUsersUnsub = null;
+    }
     if (state.incomingFriendRequestsUnsub) {
       state.incomingFriendRequestsUnsub();
       state.incomingFriendRequestsUnsub = null;
@@ -1639,6 +2075,7 @@
     const firestore = db();
     if (!user || !firestore) {
       state.friends = [];
+      state.blockedUsers = [];
       state.incomingFriendRequests = [];
       state.outgoingFriendRequests = [];
       return;
@@ -1671,6 +2108,20 @@
         state.outgoingFriendRequests = snap.docs
           .map((doc) => ({ id: doc.id, ...(doc.data() || {}) }))
           .filter((doc) => String(doc.status || "") === "pending");
+        renderFriendsModalContent();
+      });
+
+    state.blockedUsersUnsub = firestore
+      .collection("users")
+      .doc(user.uid)
+      .collection(BLOCKED_USERS_SUBCOLLECTION)
+      .onSnapshot((snap) => {
+        state.blockedUsers = snap.docs.map((doc) => ({
+          uid: String(doc.id),
+          ...(doc.data() || {})
+        }));
+        renderDmSuggestions();
+        renderGcSuggestions();
         renderFriendsModalContent();
       });
   }
@@ -1912,6 +2363,10 @@
         state.friendsUnsub();
         state.friendsUnsub = null;
       }
+      if (state.blockedUsersUnsub) {
+        state.blockedUsersUnsub();
+        state.blockedUsersUnsub = null;
+      }
       if (state.incomingFriendRequestsUnsub) {
         state.incomingFriendRequestsUnsub();
         state.incomingFriendRequestsUnsub = null;
@@ -1929,6 +2384,7 @@
       state.chatAesKeys.clear();
       state.memberCache.clear();
       state.friends = [];
+      state.blockedUsers = [];
       state.incomingFriendRequests = [];
       state.outgoingFriendRequests = [];
       setStatus("", "");
@@ -1954,6 +2410,10 @@
     if (state.friendsUnsub) {
       state.friendsUnsub();
       state.friendsUnsub = null;
+    }
+    if (state.blockedUsersUnsub) {
+      state.blockedUsersUnsub();
+      state.blockedUsersUnsub = null;
     }
     if (state.incomingFriendRequestsUnsub) {
       state.incomingFriendRequestsUnsub();
@@ -1985,12 +2445,15 @@
     state.chatAesKeys.clear();
     state.memberCache.clear();
     state.friends = [];
+    state.blockedUsers = [];
     state.incomingFriendRequests = [];
     state.outgoingFriendRequests = [];
     state.activeMenuMessageId = "";
     state.statusText = "";
     state.statusType = "";
   }
+
+  initNotificationWatchers();
 
   window.NebulaPrivateChat = {
     mount,

@@ -120,6 +120,79 @@ function showDownloadFormatModal(track) {
 
 const PLAYLIST_KEY = 'cl-playlist';
 const RECENT_MUSIC_KEY = 'nebula-music-recent';
+const MUSIC_VOLUME_KEY = 'nebula-music-volume';
+const PENDING_MUSIC_TRACK_KEY = 'nebula-pending-music-track';
+
+function sanitizeTrackPayload(track) {
+    if (!track || typeof track !== 'object') return null;
+    const apiUrl = String(track.apiUrl || '').trim();
+    const title = String(track.title || '').trim();
+    if (!apiUrl || !title) return null;
+    return {
+        apiUrl: apiUrl.slice(0, 2048),
+        title: title.slice(0, 256),
+        artist: String(track.artist || '').trim().slice(0, 256),
+        img: String(track.img || '').trim().slice(0, 2048)
+    };
+}
+
+function readMusicVolume() {
+    const raw = Number.parseFloat(localStorage.getItem(MUSIC_VOLUME_KEY) || '1');
+    if (!Number.isFinite(raw)) return 1;
+    return Math.max(0, Math.min(1, raw));
+}
+
+function writeMusicVolume(value) {
+    const clamped = Math.max(0, Math.min(1, Number(value)));
+    localStorage.setItem(MUSIC_VOLUME_KEY, String(clamped));
+    return clamped;
+}
+
+function updateMusicVolumeLabel(value) {
+    const node = document.getElementById('music-volume-value');
+    if (!node) return;
+    node.textContent = `${Math.round(value * 100)}%`;
+}
+
+function applyMusicVolumeControls() {
+    const slider = document.getElementById('music-volume');
+    const audio = getAudio();
+    const volume = readMusicVolume();
+    if (audio) {
+        audio.volume = volume;
+    }
+    if (slider) {
+        slider.value = String(volume);
+    }
+    updateMusicVolumeLabel(volume);
+}
+
+function bindMusicVolumeControls() {
+    const slider = document.getElementById('music-volume');
+    if (!slider || slider.dataset.bound === '1') return;
+    slider.dataset.bound = '1';
+    const handleChange = () => {
+        const volume = writeMusicVolume(slider.value);
+        const audio = getAudio();
+        if (audio) {
+            audio.volume = volume;
+        }
+        updateMusicVolumeLabel(volume);
+    };
+    slider.addEventListener('input', handleChange);
+    slider.addEventListener('change', handleChange);
+}
+
+function consumePendingMusicTrack() {
+    try {
+        const raw = sessionStorage.getItem(PENDING_MUSIC_TRACK_KEY);
+        if (!raw) return null;
+        sessionStorage.removeItem(PENDING_MUSIC_TRACK_KEY);
+        return sanitizeTrackPayload(JSON.parse(raw));
+    } catch (_error) {
+        return null;
+    }
+}
 
 function getPlaylist() {
     try { return JSON.parse(localStorage.getItem(PLAYLIST_KEY)) || []; }
@@ -652,12 +725,14 @@ async function playTrack(apiUrl, title, artist, img) {
 
     // Hero bg crossfade
     const heroBg = document.getElementById('hero-bg');
-    heroBg.style.transition = 'opacity 0.5s';
-    heroBg.style.opacity = '0';
-    setTimeout(() => {
-        heroBg.style.backgroundImage = `url('${img.replace('-large','-t500x500')}')`;
-        heroBg.style.opacity = '';
-    }, 500);
+    if (heroBg) {
+        heroBg.style.transition = 'opacity 0.5s';
+        heroBg.style.opacity = '0';
+        setTimeout(() => {
+            heroBg.style.backgroundImage = `url('${String(img || '').replace('-large','-t500x500')}')`;
+            heroBg.style.opacity = '';
+        }, 500);
+    }
 
     getTunneledBlob(img, 'image').then(url => {
         if (url) { document.getElementById('current-art').src = url; updateMediaSession(); }
@@ -665,7 +740,12 @@ async function playTrack(apiUrl, title, artist, img) {
 
     const blobUrl = await getTunneledBlob(apiUrl, 'stream');
     if (blobUrl) {
-        getAudio().src = blobUrl; getAudio().play();
+        const audio = getAudio();
+        if (audio) {
+            audio.volume = readMusicVolume();
+            audio.src = blobUrl;
+            audio.play();
+        }
         document.getElementById('status-msg').textContent = "Live";
     }
 
@@ -865,6 +945,10 @@ function manualSeek(val) {
 
 document.addEventListener('audioReady', function() {
   const audio = getAudio();
+    if (!audio) return;
+    applyMusicVolumeControls();
+    bindMusicVolumeControls();
+
   audio.onplay = () => {
     document.getElementById('progress-path').classList.add('animate-wiggle');
     document.getElementById('play-icon').className = 'fa-solid fa-pause';
@@ -894,4 +978,9 @@ document.addEventListener('audioReady', function() {
       if (getQueue().length) playNextInQueue();
     }
   };
+
+    const pendingTrack = consumePendingMusicTrack();
+    if (pendingTrack) {
+        playTrack(pendingTrack.apiUrl, pendingTrack.title, pendingTrack.artist, pendingTrack.img);
+    }
 });

@@ -39,6 +39,19 @@
   const DASHBOARD_SHOW_RECENT_MUSIC_KEY = "dashboard-show-recent-music";
   const MEASUREMENT_SYSTEM_KEY = "nebula-measurement-system";
   const WIDGET_WEATHER_CACHE_KEY = "nebula-widget-weather-current";
+  const NOTIFY_INAPP_KEY = "nebula-notify-inapp";
+  const NOTIFY_OS_KEY = "nebula-notify-os";
+  const NOTIFY_MESSAGES_KEY = "nebula-notify-messages";
+  const NOTIFY_FRIEND_REQUESTS_KEY = "nebula-notify-friend-requests";
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
 
   function normalizeTarget(input) {
     const raw = String(input || "").trim();
@@ -225,6 +238,238 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     crypto.getRandomValues(values);
     return values[0] / 4294967296;
   }
+
+  let nebulaNotificationToastHost = null;
+
+  function notificationDefaults() {
+    return {
+      inApp: true,
+      os: true,
+      messages: true,
+      friendRequests: true
+    };
+  }
+
+  function readNotificationPreferences() {
+    const defaults = notificationDefaults();
+    return {
+      inApp: localStorage.getItem(NOTIFY_INAPP_KEY) === "off" ? false : defaults.inApp,
+      os: localStorage.getItem(NOTIFY_OS_KEY) === "off" ? false : defaults.os,
+      messages: localStorage.getItem(NOTIFY_MESSAGES_KEY) === "off" ? false : defaults.messages,
+      friendRequests: localStorage.getItem(NOTIFY_FRIEND_REQUESTS_KEY) === "off" ? false : defaults.friendRequests
+    };
+  }
+
+  function notificationPreferenceStorageKey(category) {
+    if (category === "inApp") {
+      return NOTIFY_INAPP_KEY;
+    }
+    if (category === "os") {
+      return NOTIFY_OS_KEY;
+    }
+    if (category === "messages") {
+      return NOTIFY_MESSAGES_KEY;
+    }
+    if (category === "friendRequests") {
+      return NOTIFY_FRIEND_REQUESTS_KEY;
+    }
+    return "";
+  }
+
+  function syncNotificationPreferencesToServiceWorker() {
+    if (!("serviceWorker" in navigator)) {
+      return;
+    }
+    const payload = {
+      type: "nebula-notification-preferences",
+      preferences: readNotificationPreferences()
+    };
+
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage(payload);
+    }
+
+    navigator.serviceWorker.getRegistration().then((registration) => {
+      if (registration && registration.active) {
+        registration.active.postMessage(payload);
+      }
+    }).catch(() => {});
+  }
+
+  function openNotificationRoute(routeText) {
+    const route = normalizeTarget(routeText || "/chat");
+    if (window.location.pathname === route) {
+      return;
+    }
+    window.history.pushState({}, "", route);
+    if (typeof window.router === "function") {
+      window.router();
+    }
+  }
+
+  function ensureNotificationToastHost() {
+    if (nebulaNotificationToastHost && document.body.contains(nebulaNotificationToastHost)) {
+      return nebulaNotificationToastHost;
+    }
+    let host = document.getElementById("nebula-notification-stack");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "nebula-notification-stack";
+      host.className = "nebula-notification-stack";
+      document.body.appendChild(host);
+    }
+    nebulaNotificationToastHost = host;
+    return host;
+  }
+
+  function showInAppNotificationToast(payload) {
+    const host = ensureNotificationToastHost();
+    const toast = document.createElement("article");
+    toast.className = "nebula-notification-toast";
+    const title = escapeHtml(String(payload.title || "Notification"));
+    const body = escapeHtml(String(payload.body || ""));
+    const actionLabel = escapeHtml(String(payload.actionLabel || "Open"));
+    const route = escapeHtml(String(payload.route || "/chat"));
+    toast.innerHTML = `
+      <div class="nebula-notification-content">
+        <h4>${title}</h4>
+        <p>${body}</p>
+      </div>
+      <div class="nebula-notification-actions">
+        <button type="button" class="nebula-notification-open" data-notification-route="${route}">${actionLabel}</button>
+        <button type="button" class="nebula-notification-dismiss" aria-label="Dismiss notification"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    `;
+
+    const dismiss = () => {
+      toast.classList.add("is-removing");
+      window.setTimeout(() => {
+        toast.remove();
+      }, 220);
+    };
+
+    const openBtn = toast.querySelector(".nebula-notification-open");
+    if (openBtn) {
+      openBtn.addEventListener("click", () => {
+        openNotificationRoute(String(payload.route || "/chat"));
+        dismiss();
+      });
+    }
+
+    const dismissBtn = toast.querySelector(".nebula-notification-dismiss");
+    if (dismissBtn) {
+      dismissBtn.addEventListener("click", dismiss);
+    }
+
+    host.appendChild(toast);
+    window.setTimeout(dismiss, 9000);
+  }
+
+  function shouldShowNotificationType(preferences, type) {
+    if (type === "message") {
+      return preferences.messages;
+    }
+    if (type === "friend-request") {
+      return preferences.friendRequests;
+    }
+    return true;
+  }
+
+  function normalizeNotificationPayload(input) {
+    const raw = input && typeof input === "object" ? input : {};
+    const type = String(raw.type || "generic");
+    const route = normalizeTarget(raw.route || (type === "message" || type === "friend-request" ? "/chat" : "/"));
+    return {
+      type,
+      title: String(raw.title || "Notification").slice(0, 140),
+      body: String(raw.body || "").slice(0, 420),
+      route,
+      actionLabel: String(raw.actionLabel || "Open").slice(0, 28),
+      tag: String(raw.tag || `${type}:${Date.now()}`).slice(0, 160)
+    };
+  }
+
+  window.getNebulaNotificationPreferences = function getNebulaNotificationPreferences() {
+    return readNotificationPreferences();
+  };
+
+  window.setNebulaNotificationPreference = function setNebulaNotificationPreference(category, enabled) {
+    const key = notificationPreferenceStorageKey(String(category || ""));
+    if (!key) {
+      return;
+    }
+    localStorage.setItem(key, enabled ? "on" : "off");
+    syncNotificationPreferencesToServiceWorker();
+    window.dispatchEvent(new CustomEvent("nebula:notification-preferences-changed", {
+      detail: readNotificationPreferences()
+    }));
+  };
+
+  window.requestNebulaNotificationPermission = async function requestNebulaNotificationPermission() {
+    if (!("Notification" in window)) {
+      return "unsupported";
+    }
+    try {
+      return await Notification.requestPermission();
+    } catch (_error) {
+      return Notification.permission || "default";
+    }
+  };
+
+  window.showNebulaNotification = async function showNebulaNotification(input) {
+    const payload = normalizeNotificationPayload(input);
+    const preferences = readNotificationPreferences();
+    if (!shouldShowNotificationType(preferences, payload.type)) {
+      return;
+    }
+
+    if (preferences.inApp) {
+      showInAppNotificationToast(payload);
+    }
+
+    if (!preferences.os) {
+      return;
+    }
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+
+    if ("serviceWorker" in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration && typeof registration.showNotification === "function") {
+          await registration.showNotification(payload.title, {
+            body: payload.body,
+            tag: payload.tag,
+            data: {
+              route: payload.route,
+              type: payload.type
+            }
+          });
+          return;
+        }
+      } catch (_error) {
+      }
+    }
+
+    try {
+      const osNotification = new Notification(payload.title, {
+        body: payload.body,
+        tag: payload.tag,
+        data: {
+          route: payload.route,
+          type: payload.type
+        }
+      });
+      osNotification.onclick = () => {
+        window.focus();
+        openNotificationRoute(payload.route);
+      };
+    } catch (_error) {
+    }
+  };
+
+  syncNotificationPreferencesToServiceWorker();
 
   window.changeSidebarPos = function changeSidebarPos(newPos) {
     saveSidebarPosition(newPos);
@@ -1200,8 +1445,20 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
     const isDev = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
     const swPath = isDev ? "/public/sw.js" : "/sw.js";
+
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      const payload = event && event.data ? event.data : null;
+      if (!payload || payload.type !== "nebula-notification-click") {
+        return;
+      }
+      const route = normalizeTarget(payload.route || "/chat");
+      openNotificationRoute(route);
+    });
+
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register(swPath).catch(() => {});
+      navigator.serviceWorker.register(swPath).then(() => {
+        syncNotificationPreferencesToServiceWorker();
+      }).catch(() => {});
     });
   })();
 

@@ -4,11 +4,60 @@ import {
 let allowOverlap = false;
 let showFavorites = false;
 let currentAudios = [];
+const SOUNDBOARD_VOLUME_KEY = 'nebula-soundboard-volume';
 const toggleButton = document.getElementById('toggleButton');
 const stopButton = document.getElementById('stopButton');
 const searchInput = document.getElementById('searchInput');
 const favoriteButton = document.getElementById('toggleFavorites')
 const soundBoard = document.getElementById('soundboard');
+const soundboardVolume = document.getElementById('soundboardVolume');
+const soundboardVolumeValue = document.getElementById('soundboardVolumeValue');
+
+function readSoundboardVolume() {
+    const raw = Number.parseFloat(localStorage.getItem(SOUNDBOARD_VOLUME_KEY) || '1');
+    if (!Number.isFinite(raw)) return 1;
+    return Math.max(0, Math.min(1, raw));
+}
+
+function writeSoundboardVolume(value) {
+    const next = Math.max(0, Math.min(1, Number(value)));
+    localStorage.setItem(SOUNDBOARD_VOLUME_KEY, String(next));
+    return next;
+}
+
+function updateSoundboardVolumeValue(volume) {
+    if (soundboardVolumeValue) {
+        soundboardVolumeValue.textContent = `${Math.round(volume * 100)}%`;
+    }
+}
+
+function applySoundboardVolumeControl() {
+    const volume = readSoundboardVolume();
+    if (soundboardVolume) {
+        soundboardVolume.value = String(volume);
+    }
+    updateSoundboardVolumeValue(volume);
+}
+
+function bindSoundboardVolumeControl() {
+    if (!soundboardVolume || soundboardVolume.dataset.bound === '1') {
+        return;
+    }
+    soundboardVolume.dataset.bound = '1';
+    const onChange = () => {
+        const volume = writeSoundboardVolume(soundboardVolume.value);
+        currentAudios.forEach((audio) => {
+            audio.volume = volume;
+        });
+        updateSoundboardVolumeValue(volume);
+    };
+    soundboardVolume.addEventListener('input', onChange);
+    soundboardVolume.addEventListener('change', onChange);
+}
+
+applySoundboardVolumeControl();
+bindSoundboardVolumeControl();
+
 toggleButton.onclick = () => {
     allowOverlap = !allowOverlap;
     toggleButton.textContent = allowOverlap ? '🔊 Overlap: ON' : '🔇 Overlap: OFF';
@@ -50,6 +99,7 @@ function renderSounds(filter = '') {
                 currentAudios = [];
             }
             const audio = new Audio("https://cdn.jsdelivr.net/gh/genizy/soundboard@main/"+sound.mp3);
+            audio.volume = readSoundboardVolume();
             audio.play();
             currentAudios.push(audio);
             image.classList.add('pressed');

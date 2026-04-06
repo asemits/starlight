@@ -19,6 +19,13 @@
   const SYNC_PREF_MUSIC_PLAYLISTS_KEY = "nebula-sync-music-playlists";
   const MUSIC_RECENT_KEY = "nebula-music-recent";
   const MUSIC_PLAYLIST_KEY = "cl-playlist";
+  const PENDING_MUSIC_TRACK_KEY = "nebula-pending-music-track";
+  const MUSIC_VOLUME_KEY = "nebula-music-volume";
+  const SOUNDBOARD_VOLUME_KEY = "nebula-soundboard-volume";
+  const NOTIFY_INAPP_KEY = "nebula-notify-inapp";
+  const NOTIFY_OS_KEY = "nebula-notify-os";
+  const NOTIFY_MESSAGES_KEY = "nebula-notify-messages";
+  const NOTIFY_FRIEND_REQUESTS_KEY = "nebula-notify-friend-requests";
   const SYNC_SETTINGS_KEYS = [
     "sidebar-pos",
     "games-pagination-mode",
@@ -47,7 +54,13 @@
     "dashboard-show-favorites",
     "dashboard-show-stats",
     "dashboard-show-recent-music",
-    "nebula-measurement-system"
+    "nebula-measurement-system",
+    MUSIC_VOLUME_KEY,
+    SOUNDBOARD_VOLUME_KEY,
+    NOTIFY_INAPP_KEY,
+    NOTIFY_OS_KEY,
+    NOTIFY_MESSAGES_KEY,
+    NOTIFY_FRIEND_REQUESTS_KEY
   ];
   const USER_DOC_COLLECTION = "users";
   const USERNAME_COLLECTION = "usernames";
@@ -1524,6 +1537,7 @@
           ${showRecentMusic ? `<section class="nebula-dashboard-section">
             <div class="nebula-dashboard-head">
               <h2>Recently Played Music</h2>
+              <button id="dashboard-clear-recent-music" type="button" class="nebula-btn nebula-btn-muted">Clear Recent Music</button>
             </div>
             <div id="dashboard-recent-music" class="nebula-dashboard-grid"></div>
           </section>` : ""}
@@ -1582,11 +1596,62 @@
     }
 
     if (showRecentMusic && recentMusicNode) {
-      const recentMusicItems = collectRecentMusicSnapshot().slice(0, 6);
-      if (!recentMusicItems.length) {
-        recentMusicNode.innerHTML = '<p class="nebula-dashboard-empty">No recently played music yet.</p>';
-      } else {
-        recentMusicNode.innerHTML = recentMusicItems.map((track) => {
+      const clearRecentMusicBtn = document.getElementById("dashboard-clear-recent-music");
+
+      function writeRecentMusic(items) {
+        const cleaned = (Array.isArray(items) ? items : [])
+          .map(sanitizeTrackItem)
+          .filter(Boolean)
+          .slice(0, 80);
+        localStorage.setItem(MUSIC_RECENT_KEY, JSON.stringify(cleaned));
+        return cleaned;
+      }
+
+      function bindRecentMusicActions() {
+        recentMusicNode.querySelectorAll("[data-play-music='1']").forEach((link) => {
+          link.addEventListener("click", () => {
+            const track = sanitizeTrackItem({
+              apiUrl: link.getAttribute("data-track-api-url") || "",
+              title: link.getAttribute("data-track-title") || "",
+              artist: link.getAttribute("data-track-artist") || "",
+              img: link.getAttribute("data-track-img") || ""
+            });
+            if (!track) {
+              return;
+            }
+            try {
+              sessionStorage.setItem(PENDING_MUSIC_TRACK_KEY, JSON.stringify(track));
+            } catch (_error) {
+            }
+          });
+        });
+
+        recentMusicNode.querySelectorAll("[data-remove-recent-music='1']").forEach((button) => {
+          button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const apiUrl = String(button.getAttribute("data-track-api-url") || "").trim();
+            if (!apiUrl) {
+              return;
+            }
+            const next = writeRecentMusic(collectRecentMusicSnapshot().filter((item) => item.apiUrl !== apiUrl));
+            renderRecentMusic(next);
+          });
+        });
+      }
+
+      function renderRecentMusic(items) {
+        const safeItems = Array.isArray(items) ? items : [];
+        const visibleItems = safeItems.slice(0, 6);
+        if (!visibleItems.length) {
+          recentMusicNode.innerHTML = '<p class="nebula-dashboard-empty">No recently played music yet.</p>';
+          if (clearRecentMusicBtn) {
+            clearRecentMusicBtn.disabled = true;
+          }
+          return;
+        }
+
+        recentMusicNode.innerHTML = visibleItems.map((track) => {
           const imageMarkup = track.img
             ? `
             <div class="nebula-dashboard-thumb-backdrop" style="background-image:url('${escapeHtml(track.img)}');"></div>
@@ -1594,17 +1659,36 @@
           `
             : '<div class="nebula-dashboard-fallback"><i class="fa-solid fa-music"></i></div>';
           return `
-          <a href="/music" class="nav-link nebula-dashboard-item">
+          <a href="/music" class="nav-link nebula-dashboard-item" data-play-music="1" data-track-api-url="${escapeHtml(track.apiUrl)}" data-track-title="${escapeHtml(track.title)}" data-track-artist="${escapeHtml(track.artist || "")}" data-track-img="${escapeHtml(track.img || "")}">
             <div class="nebula-dashboard-thumb">
               ${imageMarkup}
               <div class="nebula-dashboard-meta">
                 <h3>${escapeHtml(track.title)}</h3>
                 <p>${escapeHtml(track.artist || "Unknown artist")}</p>
               </div>
+              <button type="button" class="nebula-dashboard-remove-favorite" data-remove-recent-music="1" data-track-api-url="${escapeHtml(track.apiUrl)}" aria-label="Remove from recently played music"><i class="fa-solid fa-trash"></i></button>
             </div>
           </a>
         `;
         }).join("");
+
+        if (clearRecentMusicBtn) {
+          clearRecentMusicBtn.disabled = !safeItems.length;
+        }
+        bindRecentMusicActions();
+      }
+
+      renderRecentMusic(collectRecentMusicSnapshot());
+
+      if (clearRecentMusicBtn) {
+        clearRecentMusicBtn.addEventListener("click", () => {
+          const items = collectRecentMusicSnapshot();
+          if (!items.length) {
+            return;
+          }
+          writeRecentMusic([]);
+          renderRecentMusic([]);
+        });
       }
     }
 
@@ -2611,6 +2695,29 @@
     const lastSyncText = lastSyncMs ? new Date(lastSyncMs).toLocaleString() : "Never";
     const googleLinked = isGoogleLinked(user);
     const syncSelections = getSyncSelectionsSnapshot();
+    const notificationPreferences = window.getNebulaNotificationPreferences
+      ? window.getNebulaNotificationPreferences()
+      : {
+          inApp: true,
+          os: true,
+          messages: true,
+          friendRequests: true
+        };
+
+    function notificationPermissionText(permission) {
+      if (permission === "granted") {
+        return "Allowed";
+      }
+      if (permission === "denied") {
+        return "Blocked";
+      }
+      if (permission === "unsupported") {
+        return "Unsupported";
+      }
+      return "Not requested";
+    }
+
+    const notificationPermission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
 
     const staleOpenAccountButton = document.getElementById("settings-open-account");
     if (staleOpenAccountButton) {
@@ -2712,6 +2819,43 @@
         <p id="settings-sync-status" class="text-sm mt-3"></p>
       </article>
 
+      <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
+        <label class="block mb-2 text-sm text-gray-300">Notifications</label>
+        <p id="settings-notify-permission-status" class="text-sm text-gray-300 mb-3">Browser permission: ${escapeHtml(notificationPermissionText(notificationPermission))}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block mb-2 text-sm text-gray-300">In-app Toasts</label>
+            <select id="settings-notify-inapp" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${notificationPreferences.inApp ? "selected" : ""}>On</option>
+              <option value="off" ${notificationPreferences.inApp ? "" : "selected"}>Off</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-2 text-sm text-gray-300">OS Notifications</label>
+            <select id="settings-notify-os" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${notificationPreferences.os ? "selected" : ""}>On</option>
+              <option value="off" ${notificationPreferences.os ? "" : "selected"}>Off</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-2 text-sm text-gray-300">Message Notifications</label>
+            <select id="settings-notify-messages" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${notificationPreferences.messages ? "selected" : ""}>On</option>
+              <option value="off" ${notificationPreferences.messages ? "" : "selected"}>Off</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-2 text-sm text-gray-300">Friend Request Notifications</label>
+            <select id="settings-notify-friend-requests" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${notificationPreferences.friendRequests ? "selected" : ""}>On</option>
+              <option value="off" ${notificationPreferences.friendRequests ? "" : "selected"}>Off</option>
+            </select>
+          </div>
+        </div>
+        <button id="settings-notify-permission" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Request Browser Permission</button>
+        <p id="settings-notify-status" class="text-sm mt-3"></p>
+      </article>
+
       <article class="relative bg-white/5 p-6 rounded-2xl border border-red-400/30 sm:col-span-2">
         <label class="block mb-2 text-sm text-red-200">Danger Zone</label>
         <p class="text-sm text-red-100/90 mb-3">These actions affect your account and cannot be reversed.</p>
@@ -2783,6 +2927,82 @@
         setStatus("settings-sync-status", "Sync options updated. Run Sync Now to upload changes.", true);
       });
     });
+
+    function refreshNotificationPermissionStatus() {
+      const node = document.getElementById("settings-notify-permission-status");
+      if (!node) {
+        return;
+      }
+      const permission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
+      node.textContent = `Browser permission: ${notificationPermissionText(permission)}`;
+    }
+
+    const notificationToggleIds = {
+      inApp: "settings-notify-inapp",
+      os: "settings-notify-os",
+      messages: "settings-notify-messages",
+      friendRequests: "settings-notify-friend-requests"
+    };
+
+    Object.keys(notificationToggleIds).forEach((category) => {
+      const node = document.getElementById(notificationToggleIds[category]);
+      if (!node) {
+        return;
+      }
+      node.addEventListener("change", async () => {
+        const enabled = node.value !== "off";
+        if (window.setNebulaNotificationPreference) {
+          window.setNebulaNotificationPreference(category, enabled);
+        }
+
+        if (category === "os" && enabled && window.requestNebulaNotificationPermission) {
+          const permission = await window.requestNebulaNotificationPermission();
+          refreshNotificationPermissionStatus();
+          if (permission !== "granted") {
+            node.value = "off";
+            if (window.setNebulaNotificationPreference) {
+              window.setNebulaNotificationPreference("os", false);
+            }
+            setStatus("settings-notify-status", "Browser permission was not granted.", false);
+            return;
+          }
+        }
+
+        setStatus("settings-notify-status", "Notification settings updated.", true);
+      });
+    });
+
+    const notificationPermissionBtn = document.getElementById("settings-notify-permission");
+    if (notificationPermissionBtn) {
+      notificationPermissionBtn.addEventListener("click", async () => {
+        if (!window.requestNebulaNotificationPermission) {
+          setStatus("settings-notify-status", "Notification permission is not available in this browser.", false);
+          return;
+        }
+        const permission = await window.requestNebulaNotificationPermission();
+        refreshNotificationPermissionStatus();
+        const osNode = document.getElementById("settings-notify-os");
+        if (permission === "granted") {
+          if (window.setNebulaNotificationPreference) {
+            window.setNebulaNotificationPreference("os", true);
+          }
+          if (osNode) {
+            osNode.value = "on";
+          }
+          setStatus("settings-notify-status", "Browser notification permission granted.", true);
+          return;
+        }
+        if (window.setNebulaNotificationPreference) {
+          window.setNebulaNotificationPreference("os", false);
+        }
+        if (osNode) {
+          osNode.value = "off";
+        }
+        setStatus("settings-notify-status", "Browser notification permission was not granted.", false);
+      });
+    }
+
+    refreshNotificationPermissionStatus();
 
     if (!canChangeNow && nextAllowedMs) {
       setStatus("settings-username-status", `Wait until ${new Date(nextAllowedMs).toLocaleString()} to change your username again.`, false);

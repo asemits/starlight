@@ -10,6 +10,26 @@
             border:2px solid white;
             color:white;
           }
+          #soundboardVolumeWrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0.5rem 0.8rem;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.35);
+            background: rgba(0,0,0,0.35);
+            color: white;
+            font-weight: 700;
+          }
+          #soundboardVolume {
+            width: 110px;
+            accent-color: #ffffff;
+          }
+          #soundboardVolumeValue {
+            min-width: 36px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+          }
         </style>
         <br>
         <div id="controls">
@@ -17,6 +37,7 @@
           <button id="toggleButton" class="control-button overlap-toggle">Overlap: OFF</button>
           <button id="stopButton" class="control-button stop-button">Stop All Sounds</button>
           <button id="ttsToggle" class="control-button">TTS</button>
+          <label id="soundboardVolumeWrap" for="soundboardVolume">Volume <input id="soundboardVolume" type="range" min="0" max="1" step="0.01" value="1"><span id="soundboardVolumeValue">100%</span></label>
           <input id="searchInput" type="text" placeholder="Search buttons">
         </div>
         <div id="soundboard"></div>
