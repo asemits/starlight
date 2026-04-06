@@ -267,6 +267,7 @@
       if (code === "auth/email-already-in-use") return "Email already exists.";
       if (code === "auth/weak-password" || code === "auth/password-does-not-meet-requirements") return "Password does not meet requirements.";
       if (code === "auth/operation-not-allowed") return "Account creation is currently unavailable.";
+      if (code === "auth/unauthorized-continue-uri" || code === "auth/unauthorized-domain") return "This site domain is not authorized in Firebase Auth.";
       return "Could not create account. Please try again.";
     }
 
@@ -570,8 +571,13 @@
   }
 
   function getActionCodeSettings() {
+    const instance = auth();
+    const authDomain = instance && instance.app && instance.app.options && instance.app.options.authDomain
+      ? String(instance.app.options.authDomain)
+      : "";
+    const base = authDomain ? `https://${authDomain}` : window.location.origin;
     return {
-      url: `${window.location.origin}/`,
+      url: new URL("/", base).toString(),
       handleCodeInApp: false
     };
   }
@@ -2063,7 +2069,22 @@
             setStatus("signup-form-status", "Could not create account.", false);
             return;
           }
-          await user.sendEmailVerification(getActionCodeSettings());
+
+          try {
+            await user.sendEmailVerification(getActionCodeSettings());
+          } catch (error) {
+            const code = authErrorCode(error);
+            if (code === "auth/unauthorized-continue-uri" || code === "auth/unauthorized-domain") {
+              setStatus("signup-form-status", "Account created, but verification email could not be sent because this domain is not authorized in Firebase Auth.", false);
+            } else {
+              setStatus("signup-form-status", "Account created, but verification email could not be sent. Try again from Verify Email.", false);
+            }
+            state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
+            state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
+            openVerifyEmailModal();
+            return;
+          }
+
           state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
           state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
           openVerifyEmailModal();
