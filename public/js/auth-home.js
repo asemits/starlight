@@ -2107,16 +2107,16 @@
 
           const verifySend = await sendVerificationEmailWithFallback(user);
           if (!verifySend.ok) {
-            setStatus("signup-form-status", `Account created, but verification email could not be sent. ${detailedAuthStatus(verifySend.error, "verify-email-send")}`, false);
+            const verifySendStatus = `Account created, but verification email could not be sent. ${detailedAuthStatus(verifySend.error, "verify-email-send")}`;
             state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
             state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
-            openVerifyEmailModal();
+            openVerifyEmailModal(verifySendStatus, false);
             return;
           }
 
           state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
           state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
-          openVerifyEmailModal();
+          openVerifyEmailModal("Verification email sent. Check inbox/spam, then click I Verified.", true);
         } catch (error) {
           setStatus("signup-form-status", friendlyAuthMessage(error, "signup"), false);
         }
@@ -2158,7 +2158,7 @@
     }
   }
 
-  function openVerifyEmailModal() {
+  function openVerifyEmailModal(initialStatusText, initialStatusOk) {
     showModal("Verify Email", `
       <div class="nebula-auth-form">
         <p>We sent a verification email. Verify within five minutes to continue.</p>
@@ -2173,6 +2173,10 @@
     const countdown = document.getElementById("verify-countdown");
     const resendBtn = document.getElementById("verify-resend");
     const refreshBtn = document.getElementById("verify-refresh");
+
+    if (initialStatusText) {
+      setStatus("verify-status", String(initialStatusText), Boolean(initialStatusOk));
+    }
 
     function refreshTimer() {
       const now = Date.now();
