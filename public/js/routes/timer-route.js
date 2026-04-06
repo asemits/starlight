@@ -217,7 +217,6 @@
   <article class="nebula-timer-card">
     <header class="nebula-timer-head">
       <h1>Timer</h1>
-      <p>Keep focus with a reliable stopwatch and countdown.</p>
     </header>
 
     <div class="nebula-timer-tabs" role="tablist" aria-label="Timer mode">
