@@ -68,7 +68,7 @@ body {
   font-family: var(--ff-body);
   font-weight: 300;
   overflow-x: hidden;
-  padding-bottom: 0 !important;
+  padding-bottom: 120px !important;
   opacity: 0;
   animation: bodyIn 0.6s ease 0.1s forwards;
 }
@@ -200,7 +200,7 @@ header.scrolled {
 
 .hero-bg {
   position:absolute; inset:0;
-  background: url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRdVD7HYYAAVqf2fKLOUgPHl7I_--dyl1maLA&s') center/cover no-repeat;
+  background: transparent;
   filter: brightness(0.18) saturate(0.6);
   transform: scale(1.05);
   transition: transform 8s ease;
