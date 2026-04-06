@@ -192,7 +192,15 @@
         video: video || ""
       };
     } catch (_error) {
-      return null;
+      // Fallback to basic link preview if CORS or other error
+      return {
+        type: "link",
+        url: normalized,
+        title: normalized,
+        description: "",
+        image: "",
+        video: ""
+      };
     }
   }
 
@@ -212,9 +220,9 @@
     }
     let content = "";
     if (preview.type === "image" && preview.image) {
-      content = `<img src="${escapeHtml(preview.image)}" alt="${escapeHtml(preview.title || "Link preview image")}" />`;
+      content = `<img src="${escapeHtml(preview.image)}" alt="${escapeHtml(preview.title || "Link preview image")}" referrerpolicy="no-referrer" />`;
     } else if (preview.type === "video" && preview.video) {
-      content = `<video src="${escapeHtml(preview.video)}" controls preload="metadata"></video>`;
+      content = `<video src="${escapeHtml(preview.video)}" controls preload="metadata" crossorigin="anonymous"></video>`;
     } else {
       content = `
         <div class="nebula-chat-link-preview-body">
