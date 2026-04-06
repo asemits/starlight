@@ -243,6 +243,29 @@
     node.classList.toggle("error", !ok);
   }
 
+  function detailedAuthStatus(error, context) {
+    const base = friendlyAuthMessage(error, context);
+    const code = authErrorCode(error);
+    const raw = error && error.message ? String(error.message).trim() : "";
+    const rawSuffix = raw && raw !== code ? ` - ${raw}` : "";
+    const codeSuffix = code ? ` (${code})` : "";
+    return `${base}${codeSuffix}${rawSuffix}`;
+  }
+
+  async function sendVerificationEmailWithFallback(user) {
+    try {
+      await user.sendEmailVerification(getActionCodeSettings());
+      return { ok: true };
+    } catch (primaryError) {
+      try {
+        await user.sendEmailVerification();
+        return { ok: true };
+      } catch (fallbackError) {
+        return { ok: false, error: fallbackError || primaryError };
+      }
+    }
+  }
+
   function authErrorCode(error) {
     if (!error || !error.code) {
       return "";
@@ -2082,15 +2105,9 @@
             return;
           }
 
-          try {
-            await user.sendEmailVerification(getActionCodeSettings());
-          } catch (error) {
-            const code = authErrorCode(error);
-            if (code === "auth/unauthorized-continue-uri" || code === "auth/unauthorized-domain") {
-              setStatus("signup-form-status", "Account created, but verification email could not be sent because this domain is not authorized in Firebase Auth.", false);
-            } else {
-              setStatus("signup-form-status", "Account created, but verification email could not be sent. Try again from Verify Email.", false);
-            }
+          const verifySend = await sendVerificationEmailWithFallback(user);
+          if (!verifySend.ok) {
+            setStatus("signup-form-status", `Account created, but verification email could not be sent. ${detailedAuthStatus(verifySend.error, "verify-email-send")}`, false);
             state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
             state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
             openVerifyEmailModal();
@@ -2190,30 +2207,17 @@
           return;
         }
         try {
-          await user.sendEmailVerification(getActionCodeSettings());
+          const verifySend = await sendVerificationEmailWithFallback(user);
+          if (!verifySend.ok) {
+            setStatus("verify-status", detailedAuthStatus(verifySend.error, "verify-email-send"), false);
+            return;
+          }
           state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
           state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
           setStatus("verify-status", "Verification email resent.", true);
           refreshTimer();
         } catch (error) {
-          const code = authErrorCode(error);
-          if (code === "auth/unauthorized-continue-uri" || code === "auth/unauthorized-domain") {
-            try {
-              await user.sendEmailVerification();
-              state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
-              state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
-              setStatus("verify-status", "Verification email resent.", true);
-              refreshTimer();
-              return;
-            } catch (fallbackError) {
-              const fallbackCode = authErrorCode(fallbackError);
-              const fallbackMessage = friendlyAuthMessage(fallbackError, "verify-email-send");
-              setStatus("verify-status", fallbackCode ? `${fallbackMessage} (${fallbackCode})` : fallbackMessage, false);
-              return;
-            }
-          }
-          const message = friendlyAuthMessage(error, "verify-email-send");
-          setStatus("verify-status", code ? `${message} (${code})` : message, false);
+          setStatus("verify-status", detailedAuthStatus(error, "verify-email-send"), false);
         }
       });
     }
