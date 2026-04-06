@@ -2,7 +2,7 @@
   const modules = window.NebulaRouteModules = window.NebulaRouteModules || {};
 
   function renderChatRoute() {
-    return '<div id="private-chat-root"><div class="nebula-chat-main-empty">Loading encrypted chat...</div></div>';
+    return '<div id="private-chat-root"><div class="nebula-chat-main-empty">Loading chat...</div></div>';
   }
 
   function mountChatRoute() {

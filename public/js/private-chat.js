@@ -1753,7 +1753,7 @@
       throw new Error("Your encryption profile is not ready yet.");
     }
     if (!otherProfile.chatPublicKeyJwk) {
-      throw new Error("That user has not opened encrypted chat yet.");
+      throw new Error("That user has not opened chat yet.");
     }
 
     const participants = [user.uid, otherProfile.uid];
@@ -1863,7 +1863,7 @@
 
     uniqueProfiles.forEach((profile) => {
       if (!profile.chatPublicKeyJwk) {
-        throw new Error(`User has not opened encrypted chat yet: ${profile.username}`);
+        throw new Error(`User has not opened chat yet: ${profile.username}`);
       }
     });
 
@@ -2367,7 +2367,7 @@
     }
 
     if (!state.selectedChat) {
-      main.innerHTML = `<div class="nebula-chat-main-empty">Pick a conversation from the left to view encrypted messages.</div>`;
+      main.innerHTML = `<div class="nebula-chat-main-empty">Pick a conversation from the left to view messages.</div>`;
       return;
     }
 
@@ -2386,7 +2386,7 @@
           <div id="nebula-chat-link-preview" class="nebula-chat-link-preview hidden"></div>
           <div id="nebula-chat-compose-mentions" class="nebula-chat-suggestions nebula-chat-compose-mentions hidden"></div>
           <form id="nebula-chat-compose-form" class="nebula-chat-compose">
-            <textarea id="nebula-chat-compose-input" maxlength="4000" rows="3" placeholder="Send an encrypted message" autocomplete="off"></textarea>
+            <textarea id="nebula-chat-compose-input" maxlength="4000" rows="3" placeholder="Send a message" autocomplete="off"></textarea>
             <div class="nebula-chat-compose-actions">
               <button type="button" id="nebula-chat-compose-preview">Preview</button>
               <button type="submit">Send</button>
@@ -3428,7 +3428,7 @@
     }
 
     state.mounted = true;
-    state.root.innerHTML = `<div class="nebula-chat-main-empty">Loading encrypted chat...</div>`;
+    state.root.innerHTML = `<div class="nebula-chat-main-empty">Loading chat...</div>`;
 
     const instance = auth();
     if (!instance) {
