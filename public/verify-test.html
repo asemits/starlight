@@ -161,12 +161,8 @@
     }
 
     function actionCodeSettings() {
-      const authDomain = auth && auth.app && auth.app.options && auth.app.options.authDomain
-        ? String(auth.app.options.authDomain)
-        : "";
-      const base = authDomain ? `https://${authDomain}` : window.location.origin;
       return {
-        url: new URL("/", base).toString(),
+        url: new URL("/", window.location.origin).toString(),
         handleCodeInApp: false
       };
     }

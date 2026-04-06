@@ -258,6 +258,14 @@
       await user.sendEmailVerification(getActionCodeSettings());
       return { ok: true };
     } catch (primaryError) {
+      const primaryCode = authErrorCode(primaryError);
+      if (
+        primaryCode === "auth/unauthorized-continue-uri" ||
+        primaryCode === "auth/unauthorized-domain" ||
+        primaryCode === "auth/invalid-continue-uri"
+      ) {
+        return { ok: false, error: primaryError };
+      }
       try {
         await user.sendEmailVerification();
         return { ok: true };
@@ -607,13 +615,8 @@
   }
 
   function getActionCodeSettings() {
-    const instance = auth();
-    const authDomain = instance && instance.app && instance.app.options && instance.app.options.authDomain
-      ? String(instance.app.options.authDomain)
-      : "";
-    const base = authDomain ? `https://${authDomain}` : window.location.origin;
     return {
-      url: new URL("/", base).toString(),
+      url: new URL("/", window.location.origin).toString(),
       handleCodeInApp: false
     };
   }
