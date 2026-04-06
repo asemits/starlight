@@ -285,7 +285,7 @@
 
     if (context === "verify-email-send") {
       if (code === "auth/too-many-requests") return "Too many requests. Wait a moment before resending.";
-      if (code === "auth/unauthorized-continue-uri" || code === "auth/unauthorized-domain") return "Could not send verification email because the continue URL/domain is not authorized in Firebase Auth.";
+      if (code === "auth/unauthorized-continue-uri" || code === "auth/unauthorized-domain" || code === "auth/invalid-continue-uri") return "Could not send verification email because the continue URL/domain is not authorized in Firebase Auth.";
       if (code === "auth/network-request-failed") return "Network error while sending verification email. Check your connection and try again.";
       return "Could not send verification email. Please try again.";
     }
@@ -2206,11 +2206,14 @@
               refreshTimer();
               return;
             } catch (fallbackError) {
-              setStatus("verify-status", friendlyAuthMessage(fallbackError, "verify-email-send"), false);
+              const fallbackCode = authErrorCode(fallbackError);
+              const fallbackMessage = friendlyAuthMessage(fallbackError, "verify-email-send");
+              setStatus("verify-status", fallbackCode ? `${fallbackMessage} (${fallbackCode})` : fallbackMessage, false);
               return;
             }
           }
-          setStatus("verify-status", friendlyAuthMessage(error, "verify-email-send"), false);
+          const message = friendlyAuthMessage(error, "verify-email-send");
+          setStatus("verify-status", code ? `${message} (${code})` : message, false);
         }
       });
     }
