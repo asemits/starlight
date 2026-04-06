@@ -283,6 +283,18 @@
       return "Could not verify email. Please try again.";
     }
 
+    if (context === "verify-email-send") {
+      if (code === "auth/too-many-requests") return "Too many requests. Wait a moment before resending.";
+      if (code === "auth/unauthorized-continue-uri" || code === "auth/unauthorized-domain") return "Could not send verification email because the continue URL/domain is not authorized in Firebase Auth.";
+      if (code === "auth/network-request-failed") return "Network error while sending verification email. Check your connection and try again.";
+      return "Could not send verification email. Please try again.";
+    }
+
+    if (context === "verify-email-check") {
+      if (code === "auth/network-request-failed") return "Network error while checking verification status. Try again.";
+      return "Could not check verification status. Please try again.";
+    }
+
     if (context === "reset-link") {
       if (code === "auth/invalid-action-code" || code === "auth/expired-action-code") return "This reset link is invalid or expired.";
       if (code === "auth/user-not-found") return "Account does not exist.";
@@ -2184,7 +2196,21 @@
           setStatus("verify-status", "Verification email resent.", true);
           refreshTimer();
         } catch (error) {
-          setStatus("verify-status", friendlyAuthMessage(error, "verify-email"), false);
+          const code = authErrorCode(error);
+          if (code === "auth/unauthorized-continue-uri" || code === "auth/unauthorized-domain") {
+            try {
+              await user.sendEmailVerification();
+              state.verifyDeadline = Date.now() + VERIFICATION_WINDOW_MS;
+              state.resendAllowedAt = Date.now() + VERIFICATION_WINDOW_MS;
+              setStatus("verify-status", "Verification email resent.", true);
+              refreshTimer();
+              return;
+            } catch (fallbackError) {
+              setStatus("verify-status", friendlyAuthMessage(fallbackError, "verify-email-send"), false);
+              return;
+            }
+          }
+          setStatus("verify-status", friendlyAuthMessage(error, "verify-email-send"), false);
         }
       });
     }
@@ -2209,7 +2235,7 @@
           }
           openUsernameModal();
         } catch (error) {
-          setStatus("verify-status", friendlyAuthMessage(error, "verify-email"), false);
+          setStatus("verify-status", friendlyAuthMessage(error, "verify-email-check"), false);
         }
       });
     }
