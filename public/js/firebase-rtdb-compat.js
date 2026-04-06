@@ -1,7 +1,7 @@
 (function () {
-  const OP_KEY = "__starlight_rtdb_op";
+  const OP_KEY = "__nebula_rtdb_op";
   const DOC_ID_PREFIX = "__id__";
-  const DOC_ID_FIELD = Object.freeze({ __starlight_document_id: true });
+  const DOC_ID_FIELD = Object.freeze({ __nebula_document_id: true });
 
   function isObject(value) {
     return value !== null && typeof value === "object";
@@ -341,7 +341,7 @@
   }
 
   function isDocumentIdFieldPath(fieldPath) {
-    return isObject(fieldPath) && fieldPath.__starlight_document_id === true;
+    return isObject(fieldPath) && fieldPath.__nebula_document_id === true;
   }
 
   class CompatDocumentSnapshot {
@@ -1183,7 +1183,7 @@
 
   installFirebaseNamespace();
 
-  window.createStarlightRtdbCompatDb = function createStarlightRtdbCompatDb(databaseInstance) {
+  window.createNebulaRtdbCompatDb = function createNebulaRtdbCompatDb(databaseInstance) {
     installFirebaseNamespace();
     return new CompatDatabase(databaseInstance);
   };

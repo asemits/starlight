@@ -2,7 +2,7 @@
   const DEFAULT_CDN_BASE = "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy@main/";
   const ALLOWED_CDN_BASES = [
     "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy@main/",
-    "https://cdn.jsdelivr.net/gh/asemits/starlight-games@main/"
+    "https://cdn.jsdelivr.net/gh/asemits/nebula-games@main/"
   ];
   const status = document.getElementById("runner-status");
   const params = new URLSearchParams(window.location.search);

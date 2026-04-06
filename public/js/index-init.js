@@ -1,6 +1,6 @@
 (function () {
-  const ANTI_CLOSE_KEY = "starlight-anti-close-enabled";
-  const PENDING_GAME_LAUNCH_KEY = "starlight-pending-game-launch";
+  const ANTI_CLOSE_KEY = "nebula-anti-close-enabled";
+  const PENDING_GAME_LAUNCH_KEY = "nebula-pending-game-launch";
   let skipOnce = false;
 
   function antiCloseEnabled() {
@@ -12,7 +12,7 @@
     return value === "on";
   }
 
-  window.StarlightAntiClose = {
+  window.NebulaAntiClose = {
     enable() {
       localStorage.setItem(ANTI_CLOSE_KEY, "on");
     },
@@ -36,38 +36,38 @@
   });
 
   const appContent = document.getElementById("app-content");
-  const routes = window.StarlightRouteModules || {};
+  const routes = window.NebulaRouteModules || {};
 
   let routeToken = 0;
   async function router() {
     let path = window.location.pathname;
 
-    if (path !== "/games" && window.StarlightGames && typeof window.StarlightGames.hideOverlayInstant === "function") {
+    if (path !== "/games" && window.NebulaGames && typeof window.NebulaGames.hideOverlayInstant === "function") {
       try {
-        window.StarlightGames.hideOverlayInstant();
+        window.NebulaGames.hideOverlayInstant();
       } catch (_error) {
       }
     }
 
-    if (window.StarlightAuthUI) {
-      path = window.StarlightAuthUI.guardedPath(path);
-      window.StarlightAuthUI.syncLockedState(path);
+    if (window.NebulaAuthUI) {
+      path = window.NebulaAuthUI.guardedPath(path);
+      window.NebulaAuthUI.syncLockedState(path);
     }
 
-    if (path !== "/private-chat" && path !== "/chat" && window.StarlightPrivateChat && typeof window.StarlightPrivateChat.unmount === "function") {
-      window.StarlightPrivateChat.unmount();
+    if (path !== "/private-chat" && path !== "/chat" && window.NebulaPrivateChat && typeof window.NebulaPrivateChat.unmount === "function") {
+      window.NebulaPrivateChat.unmount();
     }
 
-    appContent.classList.toggle("starlight-chat-screen", path === "/private-chat" || path === "/chat");
+    appContent.classList.toggle("nebula-chat-screen", path === "/private-chat" || path === "/chat");
 
     const route = routes[path] || routes["404"];
     if (!route || typeof route.render !== "function") {
       return;
     }
 
-    if (path !== "/games" && window.StarlightGames && typeof window.StarlightGames.closeOverlay === "function") {
+    if (path !== "/games" && window.NebulaGames && typeof window.NebulaGames.closeOverlay === "function") {
       try {
-        await window.StarlightGames.closeOverlay();
+        await window.NebulaGames.closeOverlay();
       } catch (_error) {
       }
     }
@@ -111,14 +111,14 @@
           nextUrl = `/games?play=${encodeURIComponent(gamePath)}${sourceBase ? `&base=${encodeURIComponent(sourceBase)}` : ""}`;
         }
       }
-      if (url !== "/games" && window.StarlightGames && typeof window.StarlightGames.hideOverlayInstant === "function") {
+      if (url !== "/games" && window.NebulaGames && typeof window.NebulaGames.hideOverlayInstant === "function") {
         try {
-          window.StarlightGames.hideOverlayInstant();
+          window.NebulaGames.hideOverlayInstant();
         } catch (_error) {
         }
       }
-      if (window.StarlightAuthUI && !window.StarlightAuthUI.isLoggedIn() && url !== "/") {
-        window.StarlightAuthUI.showLockedMessage();
+      if (window.NebulaAuthUI && !window.NebulaAuthUI.isLoggedIn() && url !== "/") {
+        window.NebulaAuthUI.showLockedMessage();
         window.history.replaceState({}, "", "/");
         router();
         return;
@@ -128,17 +128,17 @@
     }
   });
   window.addEventListener("popstate", () => {
-    if (window.location.pathname !== "/games" && window.StarlightGames && typeof window.StarlightGames.hideOverlayInstant === "function") {
+    if (window.location.pathname !== "/games" && window.NebulaGames && typeof window.NebulaGames.hideOverlayInstant === "function") {
       try {
-        window.StarlightGames.hideOverlayInstant();
+        window.NebulaGames.hideOverlayInstant();
       } catch (_error) {
       }
     }
     router();
   });
   window.addEventListener("DOMContentLoaded", () => {
-    if (window.StarlightAuthUI) {
-      window.StarlightAuthUI.init();
+    if (window.NebulaAuthUI) {
+      window.NebulaAuthUI.init();
     }
     router();
   });

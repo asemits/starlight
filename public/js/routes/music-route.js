@@ -1,5 +1,5 @@
 (function () {
-  const modules = window.StarlightRouteModules = window.StarlightRouteModules || {};
+  const modules = window.NebulaRouteModules = window.NebulaRouteModules || {};
   modules["/music"] = {
     render: function renderMusicRoute() {
       return `
@@ -1243,7 +1243,7 @@ header.scrolled {
 
 <!-- HEADER -->
 <header id="site-header">
-    <div class="header-brand"><i class="fa-solid fa-music"></i>STARLIGHT</div>
+    <div class="header-brand"><i class="fa-solid fa-music"></i>NEBULA</div>
     <div class="search-wrap">
         <i class="fa-solid fa-magnifying-glass"></i>
         <input type="text" id="musicInput" class="search-box" placeholder="Search tracks, artists…"

@@ -1,12 +1,12 @@
 (function () {
-  const modules = window.StarlightRouteModules = window.StarlightRouteModules || {};
+  const modules = window.NebulaRouteModules = window.NebulaRouteModules || {};
   modules["/"] = {
     render: function renderHomeRoute() {
       return '<div id="home-root"></div>';
     },
     afterRender: function afterRenderHomeRoute() {
-      if (window.StarlightAuthUI) {
-        window.StarlightAuthUI.renderHome("#home-root");
+      if (window.NebulaAuthUI) {
+        window.NebulaAuthUI.renderHome("#home-root");
       }
     }
   };

@@ -1,12 +1,12 @@
 (function () {
-  const modules = window.StarlightRouteModules = window.StarlightRouteModules || {};
+  const modules = window.NebulaRouteModules = window.NebulaRouteModules || {};
   modules["/weather"] = {
     render: function renderWeatherRoute() {
       return '<div id="weather-root"></div>';
     },
     afterRender: function afterRenderWeatherRoute() {
-      if (window.StarlightWeather) {
-        window.StarlightWeather.mount("#weather-root");
+      if (window.NebulaWeather) {
+        window.NebulaWeather.mount("#weather-root");
       }
     }
   };

@@ -119,7 +119,7 @@ function showDownloadFormatModal(track) {
 }
 
 const PLAYLIST_KEY = 'cl-playlist';
-const RECENT_MUSIC_KEY = 'starlight-music-recent';
+const RECENT_MUSIC_KEY = 'nebula-music-recent';
 
 function getPlaylist() {
     try { return JSON.parse(localStorage.getItem(PLAYLIST_KEY)) || []; }
@@ -424,7 +424,7 @@ function getDownloadFileName(track, format = 'mp3') {
     const selectedFormat = normalizeDownloadFormat(format);
     const artist = sanitizeTrackFileNamePart(track?.artist || '');
     const title = sanitizeTrackFileNamePart(track?.title || '');
-    const base = [artist, title].filter(Boolean).join(' - ') || 'starlight-track';
+    const base = [artist, title].filter(Boolean).join(' - ') || 'nebula-track';
     return `${base.slice(0, 120)}.${selectedFormat}`;
 }
 

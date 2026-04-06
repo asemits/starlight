@@ -1,18 +1,18 @@
 (function () {
-  const modules = window.StarlightRouteModules = window.StarlightRouteModules || {};
+  const modules = window.NebulaRouteModules = window.NebulaRouteModules || {};
 
   function renderChatRoute() {
-    return '<div id="private-chat-root"><div class="starlight-chat-main-empty">Loading encrypted chat...</div></div>';
+    return '<div id="private-chat-root"><div class="nebula-chat-main-empty">Loading encrypted chat...</div></div>';
   }
 
   function mountChatRoute() {
-    if (window.StarlightPrivateChat && typeof window.StarlightPrivateChat.mount === "function") {
-      window.StarlightPrivateChat.mount("#private-chat-root");
+    if (window.NebulaPrivateChat && typeof window.NebulaPrivateChat.mount === "function") {
+      window.NebulaPrivateChat.mount("#private-chat-root");
       return;
     }
     const root = document.querySelector("#private-chat-root");
     if (root) {
-      root.innerHTML = '<div class="starlight-chat-main-empty">Chat module failed to load. Refresh and try again.</div>';
+      root.innerHTML = '<div class="nebula-chat-main-empty">Chat module failed to load. Refresh and try again.</div>';
     }
   }
 

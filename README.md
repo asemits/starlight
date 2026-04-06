@@ -1,3 +1,3 @@
-# starlight
-starlight game site <br>
-https://starlight-28e40.firebaseapp.com/
+# nebula
+nebula game site <br>
+https://nebula-28e40.firebaseapp.com/

@@ -1,5 +1,5 @@
 (function () {
-  const modules = window.StarlightRouteModules = window.StarlightRouteModules || {};
+  const modules = window.NebulaRouteModules = window.NebulaRouteModules || {};
   modules["/apps"] = {
     render: function renderAppsRoute() {
       return `

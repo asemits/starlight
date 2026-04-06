@@ -1,4 +1,4 @@
-const CACHE_PREFIX = "starlight-cache-";
+const CACHE_PREFIX = "nebula-cache-";
 
 self.addEventListener("install", (event) => {
 	event.waitUntil(self.skipWaiting());

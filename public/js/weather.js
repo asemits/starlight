@@ -17,11 +17,11 @@
   }
 
   function ensureStyles() {
-    if (document.getElementById("starlight-weather-styles")) {
+    if (document.getElementById("nebula-weather-styles")) {
       return;
     }
     const style = document.createElement("style");
-    style.id = "starlight-weather-styles";
+    style.id = "nebula-weather-styles";
     style.textContent = `
       .weather-page { color: rgba(255,255,255,0.92); font-family: 'Montserrat', sans-serif; }
       .weather-grid-top { display: grid; grid-template-columns: 1.2fr 0.95fr 1.3fr; gap: 12px; margin-bottom: 12px; }
@@ -349,7 +349,7 @@
     const windUnit = windUnitLabel(system);
 
     const widgetTemp = `${Math.round(current.temperature_2m || 0)}${tempUnit}`;
-    window.dispatchEvent(new CustomEvent("starlight:weather-current", {
+    window.dispatchEvent(new CustomEvent("nebula:weather-current", {
       detail: {
         icon: weatherIconClass(current.weather_code),
         temp: widgetTemp,
@@ -504,7 +504,7 @@
       const system = payload && payload.system ? payload.system : measurementSystem();
       const tempUnit = tempUnitLabel(system);
       const widgetTemp = `${Math.round(current.temperature_2m || 0)}${tempUnit}`;
-      window.dispatchEvent(new CustomEvent("starlight:weather-current", {
+      window.dispatchEvent(new CustomEvent("nebula:weather-current", {
         detail: {
           icon: weatherIconClass(current.weather_code),
           temp: widgetTemp,
@@ -516,6 +516,6 @@
     }
   }
 
-  window.StarlightWeather = { mount, refresh, prefetchWidgetWeather };
+  window.NebulaWeather = { mount, refresh, prefetchWidgetWeather };
   prefetchWidgetWeather();
 })();

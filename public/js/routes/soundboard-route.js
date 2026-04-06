@@ -1,5 +1,5 @@
 (function () {
-  const modules = window.StarlightRouteModules = window.StarlightRouteModules || {};
+  const modules = window.NebulaRouteModules = window.NebulaRouteModules || {};
   modules["/soundboard"] = {
     render: function renderSoundboardRoute() {
       return `

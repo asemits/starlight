@@ -1,13 +1,13 @@
 (function () {
 	const PRIMARY_CDN_BASE = "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy@main/";
-	const SECONDARY_CDN_BASE = "https://cdn.jsdelivr.net/gh/asemits/starlight-games@main/";
+	const SECONDARY_CDN_BASE = "https://cdn.jsdelivr.net/gh/asemits/nebula-games@main/";
 	const CDN_BASES = [PRIMARY_CDN_BASE, SECONDARY_CDN_BASE];
 	const SECONDARY_MANIFEST_PATH = "/secondary-games.json";
 	const PAGE_SIZE = 18;
 	const POPULAR_LIMIT = 10;
 	const POPULAR_REFRESH_MS = 15000;
-	const GAME_LIST_CACHE_KEY = "starlight-games-list-v8";
-	const PENDING_GAME_LAUNCH_KEY = "starlight-pending-game-launch";
+	const GAME_LIST_CACHE_KEY = "nebula-games-list-v8";
+	const PENDING_GAME_LAUNCH_KEY = "nebula-pending-game-launch";
 	const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
 
 	const state = {
@@ -55,23 +55,23 @@
 	}
 
 	async function ensureAuthReady() {
-		if (!window.starlightAuth) {
+		if (!window.nebulaAuth) {
 			return false;
 		}
 
-		if (window.starlightAuth.currentUser) {
+		if (window.nebulaAuth.currentUser) {
 			return true;
 		}
 
-		if (window.starlightAuthReady) {
+		if (window.nebulaAuthReady) {
 			try {
-				await window.starlightAuthReady;
+				await window.nebulaAuthReady;
 			} catch (_error) {
 				return false;
 			}
 		}
 
-		return Boolean(window.starlightAuth.currentUser);
+		return Boolean(window.nebulaAuth.currentUser);
 	}
 
 	function escapeHtml(value) {
@@ -88,14 +88,14 @@
 	}
 
 	function statRefs(path) {
-		if (!window.starlightDb) {
+		if (!window.nebulaDb) {
 			return null;
 		}
-		const uid = window.starlightAuth && window.starlightAuth.currentUser ? window.starlightAuth.currentUser.uid : null;
+		const uid = window.nebulaAuth && window.nebulaAuth.currentUser ? window.nebulaAuth.currentUser.uid : null;
 		if (!uid) {
 			return null;
 		}
-		const db = window.starlightDb;
+		const db = window.nebulaDb;
 		const gameId = pathToDocId(path);
 		return {
 			gameId,
@@ -488,14 +488,14 @@
 		}
 
 		const authReady = await ensureAuthReady();
-		if (!authReady || !window.starlightDb) {
+		if (!authReady || !window.nebulaDb) {
 			state.popularGames = [];
 			state.popularLoadedAt = now;
 			return;
 		}
 
 		try {
-			const snapshot = await window.starlightDb
+			const snapshot = await window.nebulaDb
 				.collection("gameStats")
 				.where("uniqueClicks", ">", 0)
 				.orderBy("uniqueClicks", "desc")
@@ -600,10 +600,10 @@
 		}
 
 		try {
-			await window.starlightDb.runTransaction(async (tx) => {
+			await window.nebulaDb.runTransaction(async (tx) => {
 				const [statsDoc, playerDoc] = await Promise.all([tx.get(refs.statsRef), tx.get(refs.playerRef)]);
 				const now = firebase.firestore.FieldValue.serverTimestamp();
-				const currentUid = window.starlightAuth && window.starlightAuth.currentUser ? window.starlightAuth.currentUser.uid : null;
+				const currentUid = window.nebulaAuth && window.nebulaAuth.currentUser ? window.nebulaAuth.currentUser.uid : null;
 
 				if (!statsDoc.exists) {
 					tx.set(refs.statsRef, {
@@ -652,12 +652,12 @@
 			return;
 		}
 
-		await window.starlightDb.runTransaction(async (tx) => {
+		await window.nebulaDb.runTransaction(async (tx) => {
 			const [statsDoc, playerDoc] = await Promise.all([tx.get(refs.statsRef), tx.get(refs.playerRef)]);
 			const increment = firebase.firestore.FieldValue.increment;
 			const now = firebase.firestore.FieldValue.serverTimestamp();
 			const isFirstClick = !playerDoc.exists;
-			const currentUid = window.starlightAuth && window.starlightAuth.currentUser ? window.starlightAuth.currentUser.uid : null;
+			const currentUid = window.nebulaAuth && window.nebulaAuth.currentUser ? window.nebulaAuth.currentUser.uid : null;
 
 			if (!statsDoc.exists) {
 				tx.set(refs.statsRef, {
@@ -724,12 +724,12 @@
 		}
 
 		try {
-			await window.starlightDb.runTransaction(async (tx) => {
+			await window.nebulaDb.runTransaction(async (tx) => {
 				const [statsDoc, playerDoc] = await Promise.all([tx.get(refs.statsRef), tx.get(refs.playerRef)]);
 				const now = firebase.firestore.FieldValue.serverTimestamp();
 				const oldRating = playerDoc.exists ? Number(playerDoc.data().rating || 0) : 0;
 				const desiredRating = oldRating === Number(rating) ? 0 : Number(rating);
-				const currentUid = window.starlightAuth && window.starlightAuth.currentUser ? window.starlightAuth.currentUser.uid : null;
+				const currentUid = window.nebulaAuth && window.nebulaAuth.currentUser ? window.nebulaAuth.currentUser.uid : null;
 
 				if (!statsDoc.exists) {
 					tx.set(refs.statsRef, {
@@ -780,12 +780,12 @@
 
 		const sessionKey = "session_" + Date.now() + "_" + randomToken(10);
 		try {
-			await window.starlightDb.runTransaction(async (tx) => {
+			await window.nebulaDb.runTransaction(async (tx) => {
 				const [statsDoc, playerDoc] = await Promise.all([tx.get(refs.statsRef), tx.get(refs.playerRef)]);
 				const now = firebase.firestore.FieldValue.serverTimestamp();
 				const increment = firebase.firestore.FieldValue.increment;
 				const hasPresence = playerDoc.exists && playerDoc.data() && playerDoc.data().activeSession;
-				const currentUid = window.starlightAuth && window.starlightAuth.currentUser ? window.starlightAuth.currentUser.uid : null;
+				const currentUid = window.nebulaAuth && window.nebulaAuth.currentUser ? window.nebulaAuth.currentUser.uid : null;
 
 				if (!statsDoc.exists) {
 					tx.set(refs.statsRef, {
@@ -832,7 +832,7 @@
 			}
 			released = true;
 			try {
-				await window.starlightDb.runTransaction(async (tx) => {
+				await window.nebulaDb.runTransaction(async (tx) => {
 					const [statsDoc, playerDoc] = await Promise.all([tx.get(refs.statsRef), tx.get(refs.playerRef)]);
 					const playerData = playerDoc.exists ? playerDoc.data() : null;
 					const now = firebase.firestore.FieldValue.serverTimestamp();
@@ -1880,7 +1880,7 @@
 		}
 	});
 
-	window.StarlightGames = {
+	window.NebulaGames = {
 		mount,
 		render,
 		hideOverlayInstant,

@@ -35,11 +35,11 @@
   };
 
   function auth() {
-    return window.starlightAuth || null;
+    return window.nebulaAuth || null;
   }
 
   function db() {
-    return window.starlightDb || null;
+    return window.nebulaDb || null;
   }
 
   function escapeHtml(value) {
@@ -169,7 +169,7 @@
   }
 
   function localIdentityKey(uid) {
-    return `starlight-chat-identity-v1:${uid}`;
+    return `nebula-chat-identity-v1:${uid}`;
   }
 
   async function generateIdentity() {
@@ -736,7 +736,7 @@
   }
 
   function renderStatus() {
-    const node = state.root ? state.root.querySelector("#starlight-chat-status") : null;
+    const node = state.root ? state.root.querySelector("#nebula-chat-status") : null;
     if (!node) {
       return;
     }
@@ -754,7 +754,7 @@
     if (!state.root) {
       return;
     }
-    const menu = state.root.querySelector("#starlight-chat-context-menu");
+    const menu = state.root.querySelector("#nebula-chat-context-menu");
     if (menu) {
       menu.classList.add("hidden");
       menu.innerHTML = "";
@@ -771,7 +771,7 @@
     if (!state.root) {
       return;
     }
-    const zone = state.root.querySelector("#starlight-chat-reply-chip");
+    const zone = state.root.querySelector("#nebula-chat-reply-chip");
     if (!zone) {
       return;
     }
@@ -782,40 +782,40 @@
     }
     zone.classList.remove("hidden");
     zone.innerHTML = `
-      <div class="starlight-chat-reply-chip-main">
+      <div class="nebula-chat-reply-chip-main">
         <p>Replying to ${escapeHtml(state.pendingReply.senderUsername)}</p>
         <span>${escapeHtml(truncate(state.pendingReply.text, CHAT_PREVIEW_LIMIT))}</span>
       </div>
-      <button type="button" id="starlight-chat-reply-cancel" aria-label="Cancel reply">
+      <button type="button" id="nebula-chat-reply-cancel" aria-label="Cancel reply">
         <i class="fa-solid fa-xmark"></i>
       </button>
     `;
-    const cancel = zone.querySelector("#starlight-chat-reply-cancel");
+    const cancel = zone.querySelector("#nebula-chat-reply-cancel");
     if (cancel) {
       cancel.addEventListener("click", dismissReplyComposer);
     }
   }
 
   function openModal(title, bodyHtml) {
-    let host = document.getElementById("starlight-chat-modal");
+    let host = document.getElementById("nebula-chat-modal");
     if (!host) {
       host = document.createElement("div");
-      host.id = "starlight-chat-modal";
+      host.id = "nebula-chat-modal";
       host.className = "hidden";
       document.body.appendChild(host);
     }
     host.classList.remove("hidden");
     host.innerHTML = `
-      <div class="starlight-chat-modal-layer">
-        <button type="button" class="starlight-chat-modal-backdrop" data-chat-modal-close="1"></button>
-        <div class="starlight-chat-modal-card">
+      <div class="nebula-chat-modal-layer">
+        <button type="button" class="nebula-chat-modal-backdrop" data-chat-modal-close="1"></button>
+        <div class="nebula-chat-modal-card">
           <header>
             <h3>${escapeHtml(title)}</h3>
-            <button type="button" class="starlight-chat-modal-close" data-chat-modal-close="1" aria-label="Close">
+            <button type="button" class="nebula-chat-modal-close" data-chat-modal-close="1" aria-label="Close">
               <i class="fa-solid fa-xmark"></i>
             </button>
           </header>
-          <div class="starlight-chat-modal-body">${bodyHtml}</div>
+          <div class="nebula-chat-modal-body">${bodyHtml}</div>
         </div>
       </div>
     `;
@@ -825,7 +825,7 @@
   }
 
   function closeModal() {
-    const host = document.getElementById("starlight-chat-modal");
+    const host = document.getElementById("nebula-chat-modal");
     if (!host) {
       return;
     }
@@ -859,22 +859,22 @@
     openModal(
       "Delete Message",
       `
-        <p class="starlight-chat-modal-copy">Delete this message?</p>
-        <div class="starlight-chat-modal-actions">
-          <button type="button" id="starlight-chat-delete-confirm" class="starlight-chat-modal-btn danger">Delete</button>
-          <button type="button" data-chat-modal-close="1" class="starlight-chat-modal-btn">Cancel</button>
+        <p class="nebula-chat-modal-copy">Delete this message?</p>
+        <div class="nebula-chat-modal-actions">
+          <button type="button" id="nebula-chat-delete-confirm" class="nebula-chat-modal-btn danger">Delete</button>
+          <button type="button" data-chat-modal-close="1" class="nebula-chat-modal-btn">Cancel</button>
         </div>
       `
     );
 
-    const confirm = document.getElementById("starlight-chat-delete-confirm");
+    const confirm = document.getElementById("nebula-chat-delete-confirm");
     if (confirm) {
       confirm.addEventListener("click", async () => {
         try {
           await performDelete();
           closeModal();
         } catch (error) {
-          const copy = document.querySelector(".starlight-chat-modal-copy");
+          const copy = document.querySelector(".nebula-chat-modal-copy");
           if (copy) {
             copy.textContent = error && error.message ? error.message : "Could not delete message.";
           }
@@ -891,20 +891,20 @@
     openModal(
       "Edit Message",
       `
-        <form id="starlight-chat-edit-form" class="starlight-chat-edit-form">
-          <textarea id="starlight-chat-edit-input" maxlength="4000">${escapeHtml(messageRow.text)}</textarea>
-          <p id="starlight-chat-edit-status" class="starlight-chat-modal-copy"></p>
-          <div class="starlight-chat-modal-actions">
-            <button type="submit" class="starlight-chat-modal-btn">Save</button>
-            <button type="button" data-chat-modal-close="1" class="starlight-chat-modal-btn">Cancel</button>
+        <form id="nebula-chat-edit-form" class="nebula-chat-edit-form">
+          <textarea id="nebula-chat-edit-input" maxlength="4000">${escapeHtml(messageRow.text)}</textarea>
+          <p id="nebula-chat-edit-status" class="nebula-chat-modal-copy"></p>
+          <div class="nebula-chat-modal-actions">
+            <button type="submit" class="nebula-chat-modal-btn">Save</button>
+            <button type="button" data-chat-modal-close="1" class="nebula-chat-modal-btn">Cancel</button>
           </div>
         </form>
       `
     );
 
-    const form = document.getElementById("starlight-chat-edit-form");
-    const input = document.getElementById("starlight-chat-edit-input");
-    const status = document.getElementById("starlight-chat-edit-status");
+    const form = document.getElementById("nebula-chat-edit-form");
+    const input = document.getElementById("nebula-chat-edit-input");
+    const status = document.getElementById("nebula-chat-edit-status");
 
     if (!form || !input) {
       return;
@@ -960,7 +960,7 @@
         text: messageRow.text
       };
       renderReplyChip();
-      const input = state.root ? state.root.querySelector("#starlight-chat-compose-input") : null;
+      const input = state.root ? state.root.querySelector("#nebula-chat-compose-input") : null;
       if (input) {
         input.focus();
       }
@@ -979,7 +979,7 @@
     if (!state.root || !messageRow) {
       return;
     }
-    const menu = state.root.querySelector("#starlight-chat-context-menu");
+    const menu = state.root.querySelector("#nebula-chat-context-menu");
     if (!menu) {
       return;
     }
@@ -1050,13 +1050,13 @@
     if (!state.root) {
       return;
     }
-    const list = state.root.querySelector("#starlight-chat-list");
+    const list = state.root.querySelector("#nebula-chat-list");
     if (!list) {
       return;
     }
 
     if (!state.chats.length) {
-      list.innerHTML = `<li class="starlight-chat-list-empty">No chats yet. Create a DM or GC to start messaging.</li>`;
+      list.innerHTML = `<li class="nebula-chat-list-empty">No chats yet. Create a DM or GC to start messaging.</li>`;
       return;
     }
 
@@ -1068,9 +1068,9 @@
         const activeClass = chat.id === state.selectedChatId ? " is-active" : "";
         return `
           <li>
-            <button type="button" class="starlight-chat-list-item${activeClass}" data-chat-id="${escapeHtml(chat.id)}">
-              <span class="starlight-chat-list-item-type">${escapeHtml(type)}</span>
-              <span class="starlight-chat-list-item-title">${escapeHtml(title)}</span>
+            <button type="button" class="nebula-chat-list-item${activeClass}" data-chat-id="${escapeHtml(chat.id)}">
+              <span class="nebula-chat-list-item-type">${escapeHtml(type)}</span>
+              <span class="nebula-chat-list-item-title">${escapeHtml(title)}</span>
             </button>
           </li>
         `;
@@ -1089,13 +1089,13 @@
     if (!state.root) {
       return;
     }
-    const main = state.root.querySelector("#starlight-chat-main");
+    const main = state.root.querySelector("#nebula-chat-main");
     if (!main) {
       return;
     }
 
     if (!state.selectedChat) {
-      main.innerHTML = `<div class="starlight-chat-main-empty">Pick a conversation from the left to view encrypted messages.</div>`;
+      main.innerHTML = `<div class="nebula-chat-main-empty">Pick a conversation from the left to view encrypted messages.</div>`;
       return;
     }
 
@@ -1103,24 +1103,24 @@
     const heading = chatTitle(state.selectedChat, myUid);
 
     main.innerHTML = `
-      <section class="starlight-chat-conversation">
-        <header class="starlight-chat-conversation-head">
+      <section class="nebula-chat-conversation">
+        <header class="nebula-chat-conversation-head">
           <h2>${escapeHtml(heading)}</h2>
           <p>${escapeHtml(state.selectedChat.type === "gc" ? "Group chat" : "Direct message")}</p>
         </header>
-        <div id="starlight-chat-messages" class="starlight-chat-messages"></div>
-        <div class="starlight-chat-compose-wrap">
-          <div id="starlight-chat-reply-chip" class="starlight-chat-reply-chip hidden"></div>
-          <form id="starlight-chat-compose-form" class="starlight-chat-compose">
-            <input id="starlight-chat-compose-input" type="text" maxlength="4000" placeholder="Send an encrypted message" autocomplete="off" />
+        <div id="nebula-chat-messages" class="nebula-chat-messages"></div>
+        <div class="nebula-chat-compose-wrap">
+          <div id="nebula-chat-reply-chip" class="nebula-chat-reply-chip hidden"></div>
+          <form id="nebula-chat-compose-form" class="nebula-chat-compose">
+            <input id="nebula-chat-compose-input" type="text" maxlength="4000" placeholder="Send an encrypted message" autocomplete="off" />
             <button type="submit">Send</button>
           </form>
         </div>
       </section>
     `;
 
-    const form = main.querySelector("#starlight-chat-compose-form");
-    const input = main.querySelector("#starlight-chat-compose-input");
+    const form = main.querySelector("#nebula-chat-compose-form");
+    const input = main.querySelector("#nebula-chat-compose-input");
 
     if (form && input) {
       form.addEventListener("submit", async (event) => {
@@ -1180,13 +1180,13 @@
       return;
     }
 
-    const container = state.root.querySelector("#starlight-chat-messages");
+    const container = state.root.querySelector("#nebula-chat-messages");
     if (!container) {
       return;
     }
 
     if (!state.messageRows.length) {
-      container.innerHTML = `<div class="starlight-chat-main-empty">No messages yet.</div>`;
+      container.innerHTML = `<div class="nebula-chat-main-empty">No messages yet.</div>`;
       return;
     }
 
@@ -1206,12 +1206,12 @@
         const edited = row.editedAtMs ? " (edited)" : "";
         const reply = replyMap.get(row.id);
         const replyHtml = reply
-          ? `<div class="starlight-chat-inline-reply"><strong>${escapeHtml(reply.senderUsername)}</strong><span>${escapeHtml(truncate(reply.text, CHAT_PREVIEW_LIMIT))}</span></div>`
+          ? `<div class="nebula-chat-inline-reply"><strong>${escapeHtml(reply.senderUsername)}</strong><span>${escapeHtml(truncate(reply.text, CHAT_PREVIEW_LIMIT))}</span></div>`
           : "";
 
         return `
-          <article class="starlight-chat-bubble${mineClass}" data-message-id="${escapeHtml(row.id)}">
-            ${showMeta ? `<div class="starlight-chat-bubble-meta"><strong>${escapeHtml(row.senderUsername)}</strong><span>${escapeHtml(formatTime(row.chainAtMs) + edited)}</span></div>` : ""}
+          <article class="nebula-chat-bubble${mineClass}" data-message-id="${escapeHtml(row.id)}">
+            ${showMeta ? `<div class="nebula-chat-bubble-meta"><strong>${escapeHtml(row.senderUsername)}</strong><span>${escapeHtml(formatTime(row.chainAtMs) + edited)}</span></div>` : ""}
             ${replyHtml}
             <p>${escapeHtml(row.text)}</p>
           </article>
@@ -1359,8 +1359,8 @@
     if (!state.root) {
       return;
     }
-    const input = state.root.querySelector("#starlight-chat-create-dm-input");
-    const container = state.root.querySelector("#starlight-chat-create-dm-suggestions");
+    const input = state.root.querySelector("#nebula-chat-create-dm-input");
+    const container = state.root.querySelector("#nebula-chat-create-dm-suggestions");
     if (!input || !container) {
       return;
     }
@@ -1386,8 +1386,8 @@
     if (!state.root) {
       return;
     }
-    const input = state.root.querySelector("#starlight-chat-create-gc-input");
-    const container = state.root.querySelector("#starlight-chat-create-gc-suggestions");
+    const input = state.root.querySelector("#nebula-chat-create-gc-input");
+    const container = state.root.querySelector("#nebula-chat-create-gc-suggestions");
     if (!input || !container) {
       return;
     }
@@ -1412,9 +1412,9 @@
   }
 
   function renderFriendsModalContent() {
-    const friendsNode = document.getElementById("starlight-chat-friends-list");
-    const incomingNode = document.getElementById("starlight-chat-friends-incoming");
-    const outgoingNode = document.getElementById("starlight-chat-friends-outgoing");
+    const friendsNode = document.getElementById("nebula-chat-friends-list");
+    const incomingNode = document.getElementById("nebula-chat-friends-incoming");
+    const outgoingNode = document.getElementById("nebula-chat-friends-outgoing");
     if (friendsNode) {
       friendsNode.innerHTML = state.friends.length
         ? state.friends
@@ -1422,7 +1422,7 @@
             .sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")))
             .map((friend) => `<li>${escapeHtml(friend.username)}</li>`)
             .join("")
-        : '<li class="starlight-chat-friends-empty">No friends yet.</li>';
+        : '<li class="nebula-chat-friends-empty">No friends yet.</li>';
     }
     if (incomingNode) {
       incomingNode.innerHTML = state.incomingFriendRequests.length
@@ -1437,7 +1437,7 @@
               </li>
             `)
             .join("")
-        : '<li class="starlight-chat-friends-empty">No incoming requests.</li>';
+        : '<li class="nebula-chat-friends-empty">No incoming requests.</li>';
       incomingNode.querySelectorAll("button[data-friend-accept]").forEach((node) => {
         node.addEventListener("click", async () => {
           const id = String(node.getAttribute("data-friend-accept") || "");
@@ -1461,7 +1461,7 @@
               </li>
             `)
             .join("")
-        : '<li class="starlight-chat-friends-empty">No outgoing requests.</li>';
+        : '<li class="nebula-chat-friends-empty">No outgoing requests.</li>';
       outgoingNode.querySelectorAll("button[data-friend-cancel]").forEach((node) => {
         node.addEventListener("click", async () => {
           const id = String(node.getAttribute("data-friend-cancel") || "");
@@ -1572,33 +1572,33 @@
     openModal(
       "Friends and Requests",
       `
-        <div class="starlight-chat-friends-modal">
+        <div class="nebula-chat-friends-modal">
           <section>
             <h4>Friends</h4>
-            <ul id="starlight-chat-friends-list" class="starlight-chat-friends-list"></ul>
+            <ul id="nebula-chat-friends-list" class="nebula-chat-friends-list"></ul>
           </section>
           <section>
             <h4>Add Friend</h4>
-            <form id="starlight-chat-add-friend-form" class="starlight-chat-inline-form">
-              <input id="starlight-chat-add-friend-input" type="text" placeholder="Username" maxlength="24" autocomplete="off" />
+            <form id="nebula-chat-add-friend-form" class="nebula-chat-inline-form">
+              <input id="nebula-chat-add-friend-input" type="text" placeholder="Username" maxlength="24" autocomplete="off" />
               <button type="submit">Send</button>
             </form>
           </section>
           <section>
             <h4>Incoming Requests</h4>
-            <ul id="starlight-chat-friends-incoming" class="starlight-chat-friends-list"></ul>
+            <ul id="nebula-chat-friends-incoming" class="nebula-chat-friends-list"></ul>
           </section>
           <section>
             <h4>Outgoing Requests</h4>
-            <ul id="starlight-chat-friends-outgoing" class="starlight-chat-friends-list"></ul>
+            <ul id="nebula-chat-friends-outgoing" class="nebula-chat-friends-list"></ul>
           </section>
         </div>
       `
     );
 
     renderFriendsModalContent();
-    const form = document.getElementById("starlight-chat-add-friend-form");
-    const input = document.getElementById("starlight-chat-add-friend-input");
+    const form = document.getElementById("nebula-chat-add-friend-form");
+    const input = document.getElementById("nebula-chat-add-friend-input");
     if (form && input) {
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -1680,9 +1680,9 @@
       return;
     }
 
-    const dmForm = state.root.querySelector("#starlight-chat-create-dm-form");
-    const dmInput = state.root.querySelector("#starlight-chat-create-dm-input");
-    const dmSuggestions = state.root.querySelector("#starlight-chat-create-dm-suggestions");
+    const dmForm = state.root.querySelector("#nebula-chat-create-dm-form");
+    const dmInput = state.root.querySelector("#nebula-chat-create-dm-input");
+    const dmSuggestions = state.root.querySelector("#nebula-chat-create-dm-suggestions");
     if (dmForm && dmInput) {
       dmInput.addEventListener("focus", () => {
         renderDmSuggestions();
@@ -1724,9 +1724,9 @@
       });
     }
 
-    const gcForm = state.root.querySelector("#starlight-chat-create-gc-form");
-    const gcInput = state.root.querySelector("#starlight-chat-create-gc-input");
-    const gcSuggestions = state.root.querySelector("#starlight-chat-create-gc-suggestions");
+    const gcForm = state.root.querySelector("#nebula-chat-create-gc-form");
+    const gcInput = state.root.querySelector("#nebula-chat-create-gc-input");
+    const gcSuggestions = state.root.querySelector("#nebula-chat-create-gc-suggestions");
     if (gcForm && gcInput) {
       gcInput.addEventListener("focus", () => {
         renderGcSuggestions();
@@ -1760,7 +1760,7 @@
       });
     }
 
-    const friendsBtn = state.root.querySelector("#starlight-chat-friends-btn");
+    const friendsBtn = state.root.querySelector("#nebula-chat-friends-btn");
     if (friendsBtn) {
       friendsBtn.addEventListener("click", () => {
         openFriendsModal();
@@ -1775,15 +1775,15 @@
     if (!state.mounted || !state.root) {
       return;
     }
-    const dmSuggestions = state.root.querySelector("#starlight-chat-create-dm-suggestions");
-    const gcSuggestions = state.root.querySelector("#starlight-chat-create-gc-suggestions");
+    const dmSuggestions = state.root.querySelector("#nebula-chat-create-dm-suggestions");
+    const gcSuggestions = state.root.querySelector("#nebula-chat-create-gc-suggestions");
     if (dmSuggestions && (!event.target || !dmSuggestions.contains(event.target))) {
       dmSuggestions.classList.add("hidden");
     }
     if (gcSuggestions && (!event.target || !gcSuggestions.contains(event.target))) {
       gcSuggestions.classList.add("hidden");
     }
-    const menu = state.root.querySelector("#starlight-chat-context-menu");
+    const menu = state.root.querySelector("#nebula-chat-context-menu");
     if (!menu || menu.classList.contains("hidden")) {
       return;
     }
@@ -1809,35 +1809,35 @@
 
   function template() {
     return `
-      <div class="starlight-private-chat-page starlight-private-chat-page-fullscreen">
-        <section class="starlight-private-chat-shell starlight-private-chat-shell-fullscreen">
-          <aside class="starlight-chat-sidebar">
-            <div class="starlight-chat-create-block">
+      <div class="nebula-private-chat-page nebula-private-chat-page-fullscreen">
+        <section class="nebula-private-chat-shell nebula-private-chat-shell-fullscreen">
+          <aside class="nebula-chat-sidebar">
+            <div class="nebula-chat-create-block">
               <label>New DM</label>
-              <form id="starlight-chat-create-dm-form" class="starlight-chat-inline-form">
-                <input id="starlight-chat-create-dm-input" type="text" placeholder="Username" maxlength="24" autocomplete="off" />
+              <form id="nebula-chat-create-dm-form" class="nebula-chat-inline-form">
+                <input id="nebula-chat-create-dm-input" type="text" placeholder="Username" maxlength="24" autocomplete="off" />
                 <button type="submit">Open</button>
               </form>
-              <div id="starlight-chat-create-dm-suggestions" class="starlight-chat-suggestions hidden"></div>
+              <div id="nebula-chat-create-dm-suggestions" class="nebula-chat-suggestions hidden"></div>
             </div>
-            <div class="starlight-chat-create-block">
+            <div class="nebula-chat-create-block">
               <label>New GC</label>
-              <form id="starlight-chat-create-gc-form" class="starlight-chat-inline-form">
-                <input id="starlight-chat-create-gc-input" type="text" placeholder="alice, bob, charlie" maxlength="220" autocomplete="off" />
+              <form id="nebula-chat-create-gc-form" class="nebula-chat-inline-form">
+                <input id="nebula-chat-create-gc-input" type="text" placeholder="alice, bob, charlie" maxlength="220" autocomplete="off" />
                 <button type="submit">Create</button>
               </form>
-              <div id="starlight-chat-create-gc-suggestions" class="starlight-chat-suggestions hidden"></div>
+              <div id="nebula-chat-create-gc-suggestions" class="nebula-chat-suggestions hidden"></div>
             </div>
-            <p id="starlight-chat-status" class="starlight-chat-status"></p>
-            <section class="starlight-chat-list-wrap">
+            <p id="nebula-chat-status" class="nebula-chat-status"></p>
+            <section class="nebula-chat-list-wrap">
               <h2>Direct Messages and Group Chats</h2>
-              <ul id="starlight-chat-list" class="starlight-chat-list"></ul>
+              <ul id="nebula-chat-list" class="nebula-chat-list"></ul>
             </section>
-            <button type="button" id="starlight-chat-friends-btn" class="starlight-chat-friends-btn">Friends and Requests</button>
+            <button type="button" id="nebula-chat-friends-btn" class="nebula-chat-friends-btn">Friends and Requests</button>
           </aside>
-          <main id="starlight-chat-main" class="starlight-chat-main"></main>
+          <main id="nebula-chat-main" class="nebula-chat-main"></main>
         </section>
-        <div id="starlight-chat-context-menu" class="starlight-chat-context-menu hidden"></div>
+        <div id="nebula-chat-context-menu" class="nebula-chat-context-menu hidden"></div>
       </div>
     `;
   }
@@ -1847,8 +1847,8 @@
       return;
     }
     state.root.innerHTML = `
-      <div class="starlight-private-chat-page">
-        <div class="starlight-chat-main-empty">Log in to use encrypted private chat.</div>
+      <div class="nebula-private-chat-page">
+        <div class="nebula-chat-main-empty">Log in to use encrypted private chat.</div>
       </div>
     `;
   }
@@ -1878,11 +1878,11 @@
     }
 
     state.mounted = true;
-    state.root.innerHTML = `<div class="starlight-chat-main-empty">Loading encrypted chat...</div>`;
+    state.root.innerHTML = `<div class="nebula-chat-main-empty">Loading encrypted chat...</div>`;
 
     const instance = auth();
     if (!instance) {
-      state.root.innerHTML = `<div class="starlight-chat-main-empty">Authentication is unavailable.</div>`;
+      state.root.innerHTML = `<div class="nebula-chat-main-empty">Authentication is unavailable.</div>`;
       return;
     }
 
@@ -1936,7 +1936,7 @@
       try {
         await bootForUser(user || null);
       } catch (error) {
-        state.root.innerHTML = `<div class="starlight-chat-main-empty">${escapeHtml(error && error.message ? error.message : "Could not initialize chat.")}</div>`;
+        state.root.innerHTML = `<div class="nebula-chat-main-empty">${escapeHtml(error && error.message ? error.message : "Could not initialize chat.")}</div>`;
       }
     });
   }
@@ -1992,7 +1992,7 @@
     state.statusType = "";
   }
 
-  window.StarlightPrivateChat = {
+  window.NebulaPrivateChat = {
     mount,
     unmount
   };

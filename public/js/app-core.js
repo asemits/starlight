@@ -1,13 +1,21 @@
 (function () {
+  function decodeFirebaseValue(obfuscated) {
+    let output = "";
+    for (let i = 0; i < obfuscated.length; i += 1) {
+      output += String.fromCharCode(obfuscated[i] ^ 73);
+    }
+    return output;
+  }
+
   const firebaseConfig = {
-    apiKey: "AIzaSyAaOp3LYoMGbByON7W7pGQYV_oXJlmU_Hw",
-    authDomain: "starlight-28e40.firebaseapp.com",
-    databaseURL: "https://starlight-28e40-default-rtdb.firebaseio.com",
-    projectId: "starlight-28e40",
-    storageBucket: "starlight-28e40.firebasestorage.app",
-    messagingSenderId: "206859310211",
-    appId: "1:206859310211:web:3450cfa9fae7f6360a77b6",
-    measurementId: "G-G52TDH6GRY"
+    apiKey: decodeFirebaseValue([8, 0, 51, 40, 26, 48, 8, 40, 6, 57, 122, 5, 16, 38, 4, 14, 43, 11, 48, 6, 7, 126, 30, 126, 57, 14, 24, 16, 31, 22, 38, 17, 3, 37, 36, 28, 22, 1, 62]),
+    authDomain: decodeFirebaseValue([39, 44, 43, 60, 37, 40, 100, 121, 112, 58, 37, 123, 103, 47, 32, 59, 44, 43, 40, 58, 44, 40, 57, 57, 103, 42, 38, 36]),
+    databaseURL: decodeFirebaseValue([33, 61, 61, 57, 58, 115, 102, 102, 58, 61, 40, 59, 37, 32, 46, 33, 61, 100, 123, 113, 44, 125, 121, 100, 45, 44, 47, 40, 60, 37, 61, 100, 59, 61, 45, 43, 103, 47, 32, 59, 44, 43, 40, 58, 44, 32, 38, 103, 42, 38, 36]),
+    projectId: decodeFirebaseValue([58, 61, 40, 59, 37, 32, 46, 33, 61, 100, 123, 113, 44, 125, 121]),
+    storageBucket: decodeFirebaseValue([58, 61, 40, 59, 37, 32, 46, 33, 61, 100, 123, 113, 44, 125, 121, 103, 47, 32, 59, 44, 43, 40, 58, 44, 58, 61, 38, 59, 40, 46, 44, 103, 40, 57, 57]),
+    messagingSenderId: decodeFirebaseValue([123, 121, 127, 113, 124, 112, 122, 120, 121, 123, 120, 120]),
+    appId: decodeFirebaseValue([120, 115, 123, 121, 127, 113, 124, 112, 122, 120, 121, 123, 120, 120, 115, 62, 44, 43, 115, 122, 125, 124, 121, 42, 47, 40, 112, 47, 40, 44, 126, 47, 127, 122, 127, 121, 40, 126, 126, 43, 127]),
+    measurementId: decodeFirebaseValue([14, 100, 14, 124, 123, 29, 13, 1, 127, 14, 27, 16])
   };
 
   const SHORTCUT_KEY = "tab-shortcut-combo";
@@ -16,7 +24,7 @@
   const WRAP_MODE_KEY = "site-wrap-mode";
   const WRAP_ENABLED_KEY = "site-wrap-enabled";
   const WRAP_LAST_URL_KEY = "site-wrap-last-url";
-  const ANTI_CLOSE_KEY = "starlight-anti-close-enabled";
+  const ANTI_CLOSE_KEY = "nebula-anti-close-enabled";
   const WIDGET_ENABLED_KEY = "info-widget-enabled";
   const WIDGET_TIME_MODE_KEY = "info-widget-time-mode";
   const WIDGET_FORMAT_KEY = "info-widget-format";
@@ -29,8 +37,8 @@
   const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
   const DASHBOARD_SHOW_STATS_KEY = "dashboard-show-stats";
   const DASHBOARD_SHOW_RECENT_MUSIC_KEY = "dashboard-show-recent-music";
-  const MEASUREMENT_SYSTEM_KEY = "starlight-measurement-system";
-  const WIDGET_WEATHER_CACHE_KEY = "starlight-widget-weather-current";
+  const MEASUREMENT_SYSTEM_KEY = "nebula-measurement-system";
+  const WIDGET_WEATHER_CACHE_KEY = "nebula-widget-weather-current";
 
   function normalizeTarget(input) {
     const raw = String(input || "").trim();
@@ -46,17 +54,17 @@
   function withWrappedParam(urlText) {
     try {
       const url = new URL(urlText, window.location.origin);
-      url.searchParams.set("starlightWrapped", "1");
+      url.searchParams.set("nebulaWrapped", "1");
       return url.toString();
     } catch (_error) {
-      return window.location.origin + "/?starlightWrapped=1";
+      return window.location.origin + "/?nebulaWrapped=1";
     }
   }
 
   function cleanWrappedParam(urlText) {
     try {
       const url = new URL(urlText, window.location.origin);
-      url.searchParams.delete("starlightWrapped");
+      url.searchParams.delete("nebulaWrapped");
       return url.toString();
     } catch (_error) {
       return window.location.origin + "/";
@@ -74,20 +82,20 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Starlight</title>
+<title>Nebula</title>
 <style>
 html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
 iframe { width: 100%; height: 100%; border: 0; display: block; }
 </style>
 </head>
 <body>
-<iframe id="starlightFrame" src="${escaped}" allow="fullscreen"></iframe>
+<iframe id="nebulaFrame" src="${escaped}" allow="fullscreen"></iframe>
 <script>
 (function () {
-  var frame = document.getElementById('starlightFrame');
+  var frame = document.getElementById('nebulaFrame');
   window.addEventListener('message', function (event) {
     var data = event && event.data ? event.data : null;
-    if (!data || data.type !== 'starlight-unwrapper') {
+    if (!data || data.type !== 'nebula-unwrapper') {
       return;
     }
     var nextUrl = data.target || (frame ? frame.src : '/');
@@ -132,7 +140,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   }
 
   function isWrappedInnerPage() {
-    return new URLSearchParams(window.location.search).get("starlightWrapped") === "1";
+    return new URLSearchParams(window.location.search).get("nebulaWrapped") === "1";
   }
 
   let sidebarSafeAreaResizeObserver = null;
@@ -229,9 +237,9 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   window.changeMeasurementSystem = function changeMeasurementSystem(value) {
     const system = value === "metric" ? "metric" : "imperial";
     localStorage.setItem(MEASUREMENT_SYSTEM_KEY, system);
-    window.dispatchEvent(new CustomEvent("starlight:measurement-changed", { detail: { system } }));
-    if (window.location.pathname === "/weather" && window.StarlightWeather && typeof window.StarlightWeather.refresh === "function") {
-      window.StarlightWeather.refresh();
+    window.dispatchEvent(new CustomEvent("nebula:measurement-changed", { detail: { system } }));
+    if (window.location.pathname === "/weather" && window.NebulaWeather && typeof window.NebulaWeather.refresh === "function") {
+      window.NebulaWeather.refresh();
     }
   };
 
@@ -268,8 +276,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   window.changeGamesPaginationMode = function changeGamesPaginationMode(newMode) {
     localStorage.setItem("games-pagination-mode", newMode);
-    if (window.location.pathname === "/games" && window.StarlightGames) {
-      window.StarlightGames.render();
+    if (window.location.pathname === "/games" && window.NebulaGames) {
+      window.NebulaGames.render();
     }
   };
 
@@ -279,8 +287,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     if (window.updateGlobalParticlesSettings) {
       window.updateGlobalParticlesSettings();
     }
-    if (window.location.pathname === "/games" && window.StarlightGames) {
-      window.StarlightGames.render();
+    if (window.location.pathname === "/games" && window.NebulaGames) {
+      window.NebulaGames.render();
     }
   };
 
@@ -290,8 +298,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     if (window.updateGlobalParticlesSettings) {
       window.updateGlobalParticlesSettings();
     }
-    if (window.location.pathname === "/games" && window.StarlightGames) {
-      window.StarlightGames.render();
+    if (window.location.pathname === "/games" && window.NebulaGames) {
+      window.NebulaGames.render();
     }
   };
 
@@ -301,8 +309,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     if (window.updateGlobalParticlesSettings) {
       window.updateGlobalParticlesSettings();
     }
-    if (window.location.pathname === "/games" && window.StarlightGames) {
-      window.StarlightGames.render();
+    if (window.location.pathname === "/games" && window.NebulaGames) {
+      window.NebulaGames.render();
     }
   };
 
@@ -327,8 +335,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     if (window.updateGlobalParticlesSettings) {
       window.updateGlobalParticlesSettings();
     }
-    if (window.location.pathname === "/games" && window.StarlightGames) {
-      window.StarlightGames.render();
+    if (window.location.pathname === "/games" && window.NebulaGames) {
+      window.NebulaGames.render();
     }
   };
 
@@ -338,8 +346,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     if (window.updateGlobalParticlesSettings) {
       window.updateGlobalParticlesSettings();
     }
-    if (window.location.pathname === "/games" && window.StarlightGames) {
-      window.StarlightGames.render();
+    if (window.location.pathname === "/games" && window.NebulaGames) {
+      window.NebulaGames.render();
     }
   };
 
@@ -349,8 +357,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     if (window.updateGlobalParticlesSettings) {
       window.updateGlobalParticlesSettings();
     }
-    if (window.location.pathname === "/games" && window.StarlightGames) {
-      window.StarlightGames.render();
+    if (window.location.pathname === "/games" && window.NebulaGames) {
+      window.NebulaGames.render();
     }
   };
 
@@ -549,8 +557,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     const nextRaw = normalizeTarget(localStorage.getItem(SHORTCUT_TARGET_KEY) || "/");
     const nextUrl = new URL(nextRaw, window.location.origin).toString();
     window.open(nextUrl, "_blank", "noopener");
-    if (window.StarlightAntiClose && typeof window.StarlightAntiClose.bypassNextClose === "function") {
-      window.StarlightAntiClose.bypassNextClose();
+    if (window.NebulaAntiClose && typeof window.NebulaAntiClose.bypassNextClose === "function") {
+      window.NebulaAntiClose.bypassNextClose();
     }
     window.close();
     if (!window.closed) {
@@ -600,12 +608,12 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   window.changeAntiCloseEnabled = function changeAntiCloseEnabled(value) {
     const enabled = value === "off" ? "off" : "on";
     localStorage.setItem(ANTI_CLOSE_KEY, enabled);
-    if (window.StarlightAntiClose) {
-      if (enabled === "on" && typeof window.StarlightAntiClose.enable === "function") {
-        window.StarlightAntiClose.enable();
+    if (window.NebulaAntiClose) {
+      if (enabled === "on" && typeof window.NebulaAntiClose.enable === "function") {
+        window.NebulaAntiClose.enable();
       }
-      if (enabled === "off" && typeof window.StarlightAntiClose.disable === "function") {
-        window.StarlightAntiClose.disable();
+      if (enabled === "off" && typeof window.NebulaAntiClose.disable === "function") {
+        window.NebulaAntiClose.disable();
       }
     }
   };
@@ -629,7 +637,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
     if (enabled === "off" && window.top !== window.self) {
       const target = cleanWrappedParam(localStorage.getItem(WRAP_LAST_URL_KEY) || window.location.href);
-      window.top.postMessage({ type: "starlight-unwrapper", target }, "*");
+      window.top.postMessage({ type: "nebula-unwrapper", target }, "*");
       return;
     }
 
@@ -701,7 +709,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   window.resetInfoWidgetPosition = function resetInfoWidgetPosition() {
     localStorage.removeItem(WIDGET_POS_X_KEY);
     localStorage.removeItem(WIDGET_POS_Y_KEY);
-    const widget = document.getElementById("starlight-info-widget");
+    const widget = document.getElementById("nebula-info-widget");
     if (widget) {
       widget.style.left = "24px";
       widget.style.top = "90px";
@@ -722,21 +730,21 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   if (window.firebase) {
     const firebaseApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
-    window.starlightAuth = firebaseApp.auth();
-    window.starlightRtdb = firebaseApp.database();
-    window.starlightDb = window.createStarlightRtdbCompatDb
-      ? window.createStarlightRtdbCompatDb(window.starlightRtdb)
+    window.nebulaAuth = firebaseApp.auth();
+    window.nebulaRtdb = firebaseApp.database();
+    window.nebulaDb = window.createNebulaRtdbCompatDb
+      ? window.createNebulaRtdbCompatDb(window.nebulaRtdb)
       : null;
 
-    window.starlightAuthReady = new Promise((resolve) => {
-      const unsubscribe = window.starlightAuth.onAuthStateChanged((user) => {
+    window.nebulaAuthReady = new Promise((resolve) => {
+      const unsubscribe = window.nebulaAuth.onAuthStateChanged((user) => {
         unsubscribe();
         resolve(user || null);
       });
     });
 
-    window.isStarlightAuthenticated = function isStarlightAuthenticated() {
-      const user = window.starlightAuth && window.starlightAuth.currentUser;
+    window.isNebulaAuthenticated = function isNebulaAuthenticated() {
+      const user = window.nebulaAuth && window.nebulaAuth.currentUser;
       return Boolean(user && !user.isAnonymous);
     };
   }
@@ -893,7 +901,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   }
 
   function renderInfoWidgetNow() {
-    const node = document.getElementById("starlight-info-widget");
+    const node = document.getElementById("nebula-info-widget");
     if (!node) {
       return;
     }
@@ -949,7 +957,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   }
 
   function mountInfoWidget() {
-    const existing = document.getElementById("starlight-info-widget");
+    const existing = document.getElementById("nebula-info-widget");
     if (window.getInfoWidgetEnabled() !== "on") {
       if (existing) {
         existing.remove();
@@ -964,23 +972,23 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     let widget = existing;
     if (!widget) {
       widget = document.createElement("section");
-      widget.id = "starlight-info-widget";
+      widget.id = "nebula-info-widget";
       widget.innerHTML = `
-        <header class="starlight-widget-handle" data-widget-handle>
-          <i class="fa-solid fa-grip-lines starlight-widget-grip"></i>
+        <header class="nebula-widget-handle" data-widget-handle>
+          <i class="fa-solid fa-grip-lines nebula-widget-grip"></i>
         </header>
-        <div class="starlight-widget-body">
-          <div class="starlight-widget-row starlight-widget-weather-row" data-widget-section="weather">
+        <div class="nebula-widget-body">
+          <div class="nebula-widget-row nebula-widget-weather-row" data-widget-section="weather">
             <i class="fa-solid fa-cloud" data-widget-weather-icon></i>
-            <p class="starlight-widget-weather-temp" data-widget-weather-temp>--</p>
+            <p class="nebula-widget-weather-temp" data-widget-weather-temp>--</p>
           </div>
-          <div class="starlight-widget-row" data-widget-section="datetime">
+          <div class="nebula-widget-row" data-widget-section="datetime">
             <i class="fa-regular fa-clock"></i>
-            <p class="starlight-widget-date" data-widget-date></p>
+            <p class="nebula-widget-date" data-widget-date></p>
           </div>
-          <div class="starlight-widget-row" data-widget-section="battery">
+          <div class="nebula-widget-row" data-widget-section="battery">
             <i class="fa-solid fa-battery-half" data-widget-battery-icon></i>
-            <p class="starlight-widget-battery" data-widget-battery></p>
+            <p class="nebula-widget-battery" data-widget-battery></p>
           </div>
         </div>
       `;
@@ -1219,7 +1227,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     launchWrapped(window.getWrapMode(), window.location.href, true);
   }
 
-  window.addEventListener("starlight:weather-current", (event) => {
+  window.addEventListener("nebula:weather-current", (event) => {
     const detail = event && event.detail ? event.detail : null;
     if (!detail) {
       return;
@@ -1238,14 +1246,14 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     renderInfoWidgetNow();
   });
 
-  window.addEventListener("starlight:measurement-changed", () => {
+  window.addEventListener("nebula:measurement-changed", () => {
     renderInfoWidgetNow();
   });
 
   readWidgetWeatherFromCache();
 
-  if (window.StarlightWeather && typeof window.StarlightWeather.prefetchWidgetWeather === "function") {
-    window.StarlightWeather.prefetchWidgetWeather();
+  if (window.NebulaWeather && typeof window.NebulaWeather.prefetchWidgetWeather === "function") {
+    window.NebulaWeather.prefetchWidgetWeather();
   }
 
   mountInfoWidget();
