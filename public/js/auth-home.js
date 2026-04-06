@@ -6,8 +6,48 @@
   const DASHBOARD_SHOW_RECENT_KEY = "dashboard-show-recent";
   const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
   const DASHBOARD_SHOW_STATS_KEY = "dashboard-show-stats";
+  const DASHBOARD_SHOW_RECENT_MUSIC_KEY = "dashboard-show-recent-music";
   const DASHBOARD_RECENT_COUNT_KEY = "dashboard-last-recent-count";
   const DASHBOARD_FAVORITES_COUNT_KEY = "dashboard-last-favorites-count";
+  const SYNC_PREF_STATS_KEY = "starlight-sync-stats";
+  const SYNC_PREF_GAME_PROGRESS_KEY = "starlight-sync-game-progress";
+  const SYNC_PREF_SETTINGS_KEY = "starlight-sync-settings";
+  const SYNC_PREF_FAVORITES_KEY = "starlight-sync-favorites";
+  const SYNC_PREF_RECENT_GAMES_KEY = "starlight-sync-recent-games";
+  const SYNC_PREF_RECENT_MUSIC_KEY = "starlight-sync-recent-music";
+  const SYNC_PREF_MUSIC_PLAYLISTS_KEY = "starlight-sync-music-playlists";
+  const MUSIC_RECENT_KEY = "starlight-music-recent";
+  const MUSIC_PLAYLIST_KEY = "cl-playlist";
+  const SYNC_SETTINGS_KEYS = [
+    "sidebar-pos",
+    "games-pagination-mode",
+    "games-particles-enabled",
+    "games-particles-bonds",
+    "games-particles-color",
+    "games-particles-shape",
+    "games-particles-frequency",
+    "games-particles-size",
+    "tab-shortcut-combo",
+    "tab-shortcut-target",
+    "tab-shortcut-enabled",
+    "site-wrap-mode",
+    "site-wrap-enabled",
+    "site-wrap-last-url",
+    "starlight-anti-close-enabled",
+    "info-widget-enabled",
+    "info-widget-time-mode",
+    "info-widget-format",
+    "info-widget-pos-x",
+    "info-widget-pos-y",
+    "info-widget-show-weather",
+    "info-widget-show-datetime",
+    "info-widget-show-battery",
+    "dashboard-show-recent",
+    "dashboard-show-favorites",
+    "dashboard-show-stats",
+    "dashboard-show-recent-music",
+    "starlight-measurement-system"
+  ];
   const TOS_REQUIRED_MS = 30 * 1000;
   const USER_DOC_COLLECTION = "users";
   const USERNAME_COLLECTION = "usernames";
@@ -128,7 +168,8 @@
     const keyMap = {
       recent: DASHBOARD_SHOW_RECENT_KEY,
       favorites: DASHBOARD_SHOW_FAVORITES_KEY,
-      stats: DASHBOARD_SHOW_STATS_KEY
+      stats: DASHBOARD_SHOW_STATS_KEY,
+      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY
     };
     const key = keyMap[String(section || "")];
     if (!key) {
@@ -871,43 +912,371 @@
   }
 
   function collectSyncSettingsSnapshot() {
-    const keys = [
-      "sidebar-pos",
-      "games-pagination-mode",
-      "games-particles-enabled",
-      "games-particles-bonds",
-      "games-particles-color",
-      "games-particles-shape",
-      "games-particles-frequency",
-      "games-particles-size",
-      "tab-shortcut-combo",
-      "tab-shortcut-target",
-      "tab-shortcut-enabled",
-      "site-wrap-mode",
-      "site-wrap-enabled",
-      "site-wrap-last-url",
-      "starlight-anti-close-enabled",
-      "info-widget-enabled",
-      "info-widget-time-mode",
-      "info-widget-format",
-      "info-widget-pos-x",
-      "info-widget-pos-y",
-      "info-widget-show-weather",
-      "info-widget-show-datetime",
-      "info-widget-show-battery",
-      "dashboard-show-recent",
-      "dashboard-show-favorites",
-      "dashboard-show-stats",
-      "starlight-measurement-system"
-    ];
     const snapshot = {};
-    keys.forEach((key) => {
+    SYNC_SETTINGS_KEYS.forEach((key) => {
       const value = localStorage.getItem(key);
       if (value !== null) {
         snapshot[key] = String(value).slice(0, 2048);
       }
     });
     return snapshot;
+  }
+
+  function defaultSyncSelections() {
+    return {
+      stats: true,
+      gameProgress: true,
+      settings: true,
+      favorites: true,
+      recentGames: true,
+      recentMusic: true,
+      musicPlaylists: true
+    };
+  }
+
+  function syncSelectionStorageKey(category) {
+    const keyMap = {
+      stats: SYNC_PREF_STATS_KEY,
+      gameProgress: SYNC_PREF_GAME_PROGRESS_KEY,
+      settings: SYNC_PREF_SETTINGS_KEY,
+      favorites: SYNC_PREF_FAVORITES_KEY,
+      recentGames: SYNC_PREF_RECENT_GAMES_KEY,
+      recentMusic: SYNC_PREF_RECENT_MUSIC_KEY,
+      musicPlaylists: SYNC_PREF_MUSIC_PLAYLISTS_KEY
+    };
+    return keyMap[String(category || "")] || "";
+  }
+
+  function getSyncSelectionsSnapshot() {
+    const defaults = defaultSyncSelections();
+    return {
+      stats: localStorage.getItem(SYNC_PREF_STATS_KEY) === "off" ? false : defaults.stats,
+      gameProgress: localStorage.getItem(SYNC_PREF_GAME_PROGRESS_KEY) === "off" ? false : defaults.gameProgress,
+      settings: localStorage.getItem(SYNC_PREF_SETTINGS_KEY) === "off" ? false : defaults.settings,
+      favorites: localStorage.getItem(SYNC_PREF_FAVORITES_KEY) === "off" ? false : defaults.favorites,
+      recentGames: localStorage.getItem(SYNC_PREF_RECENT_GAMES_KEY) === "off" ? false : defaults.recentGames,
+      recentMusic: localStorage.getItem(SYNC_PREF_RECENT_MUSIC_KEY) === "off" ? false : defaults.recentMusic,
+      musicPlaylists: localStorage.getItem(SYNC_PREF_MUSIC_PLAYLISTS_KEY) === "off" ? false : defaults.musicPlaylists
+    };
+  }
+
+  function setSyncSelectionPreference(category, enabled) {
+    const key = syncSelectionStorageKey(category);
+    if (!key) {
+      return;
+    }
+    localStorage.setItem(key, enabled ? "on" : "off");
+  }
+
+  function parseStoredArray(key, limit) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(parsed) ? parsed.slice(0, limit) : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function sanitizeTrackItem(item) {
+    if (!item || typeof item !== "object") {
+      return null;
+    }
+    const apiUrl = String(item.apiUrl || "").trim();
+    const title = String(item.title || "").trim();
+    if (!apiUrl || !title) {
+      return null;
+    }
+    return {
+      apiUrl: apiUrl.slice(0, 2048),
+      title: title.slice(0, 256),
+      artist: String(item.artist || "").trim().slice(0, 256),
+      img: String(item.img || "").trim().slice(0, 2048)
+    };
+  }
+
+  function collectRecentMusicSnapshot() {
+    return parseStoredArray(MUSIC_RECENT_KEY, 80)
+      .map(sanitizeTrackItem)
+      .filter(Boolean);
+  }
+
+  function collectMusicPlaylistSnapshot() {
+    return parseStoredArray(MUSIC_PLAYLIST_KEY, 200)
+      .map(sanitizeTrackItem)
+      .filter(Boolean);
+  }
+
+  function collectSyncStatsSnapshot(gameProgress) {
+    const items = Array.isArray(gameProgress && gameProgress.items) ? gameProgress.items : [];
+    return items.map((item) => ({
+      gamePath: String(item.gamePath || ""),
+      sourceBase: String(item.sourceBase || ""),
+      gameName: String(item.gameName || ""),
+      gameImage: String(item.gameImage || ""),
+      clickCount: Number(item.clickCount || 0),
+      rating: Number(item.rating || 0),
+      lastRatedAtMs: Number(item.lastRatedAtMs || 0)
+    })).filter((item) => item.gamePath).slice(0, 120);
+  }
+
+  function collectSyncFavoritesSnapshot(gameProgress) {
+    const items = Array.isArray(gameProgress && gameProgress.items) ? gameProgress.items : [];
+    return items
+      .filter((item) => Boolean(item.isFavorite))
+      .map((item) => ({
+        gamePath: String(item.gamePath || ""),
+        sourceBase: String(item.sourceBase || ""),
+        gameName: String(item.gameName || ""),
+        gameImage: String(item.gameImage || ""),
+        isFavorite: true
+      }))
+      .filter((item) => item.gamePath)
+      .slice(0, 120);
+  }
+
+  function collectSyncRecentGamesSnapshot(gameProgress) {
+    const items = Array.isArray(gameProgress && gameProgress.items) ? gameProgress.items : [];
+    return items
+      .filter((item) => Number(item.clickCount || 0) > 0)
+      .sort((a, b) => Number(b.lastPlayedAtMs || 0) - Number(a.lastPlayedAtMs || 0))
+      .map((item) => ({
+        gamePath: String(item.gamePath || ""),
+        sourceBase: String(item.sourceBase || ""),
+        gameName: String(item.gameName || ""),
+        gameImage: String(item.gameImage || ""),
+        clickCount: Number(item.clickCount || 0),
+        lastPlayedAtMs: Number(item.lastPlayedAtMs || 0)
+      }))
+      .filter((item) => item.gamePath)
+      .slice(0, 120);
+  }
+
+  function normalizeProgressItem(item) {
+    if (!item || typeof item !== "object") {
+      return null;
+    }
+    const gamePath = String(item.gamePath || "").trim();
+    if (!gamePath) {
+      return null;
+    }
+    const normalized = {
+      gamePath,
+      sourceBase: String(item.sourceBase || "").trim(),
+      gameName: String(item.gameName || "").trim().slice(0, 160),
+      gameImage: String(item.gameImage || "").trim().slice(0, 2048)
+    };
+    if (Number.isFinite(Number(item.clickCount))) {
+      normalized.clickCount = Math.max(0, Number(item.clickCount));
+    }
+    if (Number.isFinite(Number(item.rating))) {
+      const rating = Number(item.rating);
+      normalized.rating = rating === 1 || rating === -1 ? rating : 0;
+    }
+    if (typeof item.isFavorite === "boolean") {
+      normalized.isFavorite = item.isFavorite;
+    }
+    if (Number.isFinite(Number(item.lastPlayedAtMs)) && Number(item.lastPlayedAtMs) > 0) {
+      normalized.lastPlayedAtMs = Number(item.lastPlayedAtMs);
+    }
+    if (Number.isFinite(Number(item.lastRatedAtMs)) && Number(item.lastRatedAtMs) > 0) {
+      normalized.lastRatedAtMs = Number(item.lastRatedAtMs);
+    }
+    return normalized;
+  }
+
+  function mergeProgressList(base, incoming) {
+    const map = new Map();
+    const upsert = (item) => {
+      const normalized = normalizeProgressItem(item);
+      if (!normalized) {
+        return;
+      }
+      const key = `${normalized.gamePath}::${normalized.sourceBase}`;
+      const existing = map.get(key) || { gamePath: normalized.gamePath, sourceBase: normalized.sourceBase };
+      if (normalized.gameName && !existing.gameName) {
+        existing.gameName = normalized.gameName;
+      }
+      if (normalized.gameImage && !existing.gameImage) {
+        existing.gameImage = normalized.gameImage;
+      }
+      if (Number.isFinite(normalized.clickCount)) {
+        existing.clickCount = Math.max(Number(existing.clickCount || 0), normalized.clickCount);
+      }
+      if (Number.isFinite(normalized.rating)) {
+        existing.rating = normalized.rating;
+      }
+      if (typeof normalized.isFavorite === "boolean") {
+        existing.isFavorite = normalized.isFavorite;
+      }
+      if (Number.isFinite(normalized.lastPlayedAtMs)) {
+        existing.lastPlayedAtMs = Math.max(Number(existing.lastPlayedAtMs || 0), normalized.lastPlayedAtMs);
+      }
+      if (Number.isFinite(normalized.lastRatedAtMs)) {
+        existing.lastRatedAtMs = Math.max(Number(existing.lastRatedAtMs || 0), normalized.lastRatedAtMs);
+      }
+      map.set(key, existing);
+    };
+
+    (Array.isArray(base) ? base : []).forEach(upsert);
+    (Array.isArray(incoming) ? incoming : []).forEach(upsert);
+
+    return Array.from(map.values()).slice(0, 120);
+  }
+
+  function applySyncSettingsSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== "object") {
+      return;
+    }
+    SYNC_SETTINGS_KEYS.forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(snapshot, key)) {
+        return;
+      }
+      const value = snapshot[key];
+      if (value === null || value === undefined) {
+        return;
+      }
+      localStorage.setItem(key, String(value).slice(0, 2048));
+    });
+  }
+
+  function pathToDocId(path) {
+    return btoa(unescape(encodeURIComponent(String(path || "")))).replace(/=+$/g, "");
+  }
+
+  function dateFromMillis(value) {
+    const ms = Number(value || 0);
+    if (!Number.isFinite(ms) || ms <= 0) {
+      return null;
+    }
+    return new Date(ms);
+  }
+
+  async function restoreGameProgressToFirestore(items, user) {
+    const firestore = db();
+    if (!firestore || !user || !Array.isArray(items) || !items.length) {
+      return;
+    }
+
+    const sanitized = items.map((item) => normalizeProgressItem(item)).filter(Boolean);
+    if (!sanitized.length) {
+      return;
+    }
+
+    const chunkSize = 150;
+    for (let i = 0; i < sanitized.length; i += chunkSize) {
+      const chunk = sanitized.slice(i, i + chunkSize);
+      const batch = firestore.batch();
+
+      chunk.forEach((item) => {
+        const gameId = pathToDocId(item.gamePath);
+        if (!gameId) {
+          return;
+        }
+
+        const statsRef = firestore.collection("gameStats").doc(gameId);
+        const playerRef = statsRef.collection("players").doc(user.uid);
+        const now = firebase.firestore.FieldValue.serverTimestamp();
+
+        batch.set(statsRef, {
+          path: item.gamePath,
+          sourceBase: item.sourceBase || "",
+          name: item.gameName || item.gamePath,
+          image: item.gameImage || "",
+          updatedAt: now
+        }, { merge: true });
+
+        const playerPatch = {
+          uid: user.uid,
+          gamePath: item.gamePath,
+          sourceBase: item.sourceBase || "",
+          gameName: item.gameName || "",
+          gameImage: item.gameImage || ""
+        };
+
+        if (Number.isFinite(item.clickCount)) {
+          playerPatch.clickCount = Math.max(0, Number(item.clickCount));
+        }
+        if (Number.isFinite(item.rating)) {
+          playerPatch.rating = item.rating === 1 || item.rating === -1 ? item.rating : 0;
+        }
+        if (typeof item.isFavorite === "boolean") {
+          playerPatch.isFavorite = item.isFavorite;
+        }
+
+        const lastPlayedAt = dateFromMillis(item.lastPlayedAtMs);
+        const lastRatedAt = dateFromMillis(item.lastRatedAtMs);
+        if (lastPlayedAt) {
+          playerPatch.lastPlayedAt = lastPlayedAt;
+        }
+        if (lastRatedAt) {
+          playerPatch.lastRatedAt = lastRatedAt;
+        }
+
+        batch.set(playerRef, playerPatch, { merge: true });
+      });
+
+      await batch.commit();
+    }
+  }
+
+  function buildRestoredProgressItems(data, selections) {
+    let items = [];
+    if (selections.gameProgress && data && data.gameProgress && Array.isArray(data.gameProgress.items)) {
+      items = mergeProgressList(items, data.gameProgress.items);
+    }
+    if (selections.stats && data && Array.isArray(data.syncStats)) {
+      items = mergeProgressList(items, data.syncStats);
+    }
+    if (selections.favorites && data && Array.isArray(data.syncFavorites)) {
+      items = mergeProgressList(items, data.syncFavorites.map((item) => ({ ...item, isFavorite: true })));
+    }
+    if (selections.recentGames && data && Array.isArray(data.syncRecentGames)) {
+      items = mergeProgressList(items, data.syncRecentGames);
+    }
+    return items;
+  }
+
+  async function restoreUserDataFromCloud(silent) {
+    const user = currentUser();
+    const firestore = db();
+    if (!user || !firestore) {
+      return false;
+    }
+
+    try {
+      const snap = await firestore.collection(USER_DOC_COLLECTION).doc(user.uid).get();
+      if (!snap.exists) {
+        return false;
+      }
+      const data = snap.data() || {};
+      const selections = getSyncSelectionsSnapshot();
+
+      if (selections.settings && data.settings && typeof data.settings === "object") {
+        applySyncSettingsSnapshot(data.settings);
+      }
+
+      if (selections.recentMusic && Array.isArray(data.syncRecentMusic)) {
+        const cleanedRecentMusic = data.syncRecentMusic.map(sanitizeTrackItem).filter(Boolean).slice(0, 80);
+        localStorage.setItem(MUSIC_RECENT_KEY, JSON.stringify(cleanedRecentMusic));
+      }
+
+      if (selections.musicPlaylists && Array.isArray(data.syncMusicPlaylists)) {
+        const cleanedPlaylists = data.syncMusicPlaylists.map(sanitizeTrackItem).filter(Boolean).slice(0, 200);
+        localStorage.setItem(MUSIC_PLAYLIST_KEY, JSON.stringify(cleanedPlaylists));
+      }
+
+      const restoredItems = buildRestoredProgressItems(data, selections);
+      if (restoredItems.length) {
+        await restoreGameProgressToFirestore(restoredItems, user);
+      }
+
+      return true;
+    } catch (error) {
+      if (!silent) {
+        setStatus("settings-sync-status", error && error.message ? error.message : "Could not restore synced data.", false);
+      }
+      return false;
+    }
   }
 
   async function collectGameProgressSnapshot() {
@@ -977,8 +1346,15 @@
 
     const isManual = mode === "manual";
     const userRef = firestore.collection(USER_DOC_COLLECTION).doc(user.uid);
-    const snapshot = collectSyncSettingsSnapshot();
-    const gameProgress = await collectGameProgressSnapshot();
+    const selections = getSyncSelectionsSnapshot();
+    const needsGameProgress = selections.gameProgress || selections.stats || selections.favorites || selections.recentGames;
+    const snapshot = selections.settings ? collectSyncSettingsSnapshot() : null;
+    const gameProgress = needsGameProgress ? await collectGameProgressSnapshot() : { updatedAtMs: Date.now(), items: [] };
+    const statsSnapshot = selections.stats ? collectSyncStatsSnapshot(gameProgress) : [];
+    const favoritesSnapshot = selections.favorites ? collectSyncFavoritesSnapshot(gameProgress) : [];
+    const recentGamesSnapshot = selections.recentGames ? collectSyncRecentGamesSnapshot(gameProgress) : [];
+    const recentMusicSnapshot = selections.recentMusic ? collectRecentMusicSnapshot() : [];
+    const musicPlaylistSnapshot = selections.musicPlaylists ? collectMusicPlaylistSnapshot() : [];
 
     try {
       await firestore.runTransaction(async (tx) => {
@@ -999,8 +1375,14 @@
         const payload = {
           uid: user.uid,
           providers: (user.providerData || []).map((item) => item.providerId).filter(Boolean),
-          settings: snapshot,
-          gameProgress,
+          syncSelections: selections,
+          settings: snapshot || firebase.firestore.FieldValue.delete(),
+          gameProgress: selections.gameProgress ? gameProgress : firebase.firestore.FieldValue.delete(),
+          syncStats: selections.stats ? statsSnapshot : firebase.firestore.FieldValue.delete(),
+          syncFavorites: selections.favorites ? favoritesSnapshot : firebase.firestore.FieldValue.delete(),
+          syncRecentGames: selections.recentGames ? recentGamesSnapshot : firebase.firestore.FieldValue.delete(),
+          syncRecentMusic: selections.recentMusic ? recentMusicSnapshot : firebase.firestore.FieldValue.delete(),
+          syncMusicPlaylists: selections.musicPlaylists ? musicPlaylistSnapshot : firebase.firestore.FieldValue.delete(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         if (isManual) {
@@ -1070,6 +1452,7 @@
       const showRecent = dashboardSectionEnabled("recent");
       const showFavorites = dashboardSectionEnabled("favorites");
       const showStats = dashboardSectionEnabled("stats");
+      const showRecentMusic = dashboardSectionEnabled("recent-music");
       root.innerHTML = `
         <section class="starlight-home-shell starlight-dashboard-shell">
           <header class="starlight-home-hero">
@@ -1098,6 +1481,13 @@
               <h2>Stats</h2>
             </div>
             <div id="dashboard-stats" class="starlight-dashboard-stats"></div>
+          </section>` : ""}
+
+          ${showRecentMusic ? `<section class="starlight-dashboard-section">
+            <div class="starlight-dashboard-head">
+              <h2>Recently Played Music</h2>
+            </div>
+            <div id="dashboard-recent-music" class="starlight-dashboard-grid"></div>
           </section>` : ""}
         </section>
       `;
@@ -1140,6 +1530,7 @@
     const recentNode = document.getElementById("dashboard-recent");
     const favoritesNode = document.getElementById("dashboard-favorites");
     const statsNode = document.getElementById("dashboard-stats");
+    const recentMusicNode = document.getElementById("dashboard-recent-music");
     if (!firestore || !user) {
       return;
     }
@@ -1147,8 +1538,36 @@
     const showRecent = dashboardSectionEnabled("recent");
     const showFavorites = dashboardSectionEnabled("favorites");
     const showStats = dashboardSectionEnabled("stats");
-    if ((showRecent && !recentNode) || (showFavorites && !favoritesNode) || (showStats && !statsNode)) {
+    const showRecentMusic = dashboardSectionEnabled("recent-music");
+    if ((showRecent && !recentNode) || (showFavorites && !favoritesNode) || (showStats && !statsNode) || (showRecentMusic && !recentMusicNode)) {
       return;
+    }
+
+    if (showRecentMusic && recentMusicNode) {
+      const recentMusicItems = collectRecentMusicSnapshot().slice(0, 6);
+      if (!recentMusicItems.length) {
+        recentMusicNode.innerHTML = '<p class="starlight-dashboard-empty">No recently played music yet.</p>';
+      } else {
+        recentMusicNode.innerHTML = recentMusicItems.map((track) => {
+          const imageMarkup = track.img
+            ? `
+            <div class="starlight-dashboard-thumb-backdrop" style="background-image:url('${escapeHtml(track.img)}');"></div>
+            <img src="${escapeHtml(track.img)}" alt="${escapeHtml(track.title)}" loading="lazy" decoding="async">
+          `
+            : '<div class="starlight-dashboard-fallback"><i class="fa-solid fa-music"></i></div>';
+          return `
+          <a href="/music" class="nav-link starlight-dashboard-item">
+            <div class="starlight-dashboard-thumb">
+              ${imageMarkup}
+              <div class="starlight-dashboard-meta">
+                <h3>${escapeHtml(track.title)}</h3>
+                <p>${escapeHtml(track.artist || "Unknown artist")}</p>
+              </div>
+            </div>
+          </a>
+        `;
+        }).join("");
+      }
     }
 
     if (showRecent && recentNode) {
@@ -2167,6 +2586,7 @@
     const lastSyncMs = Math.max(lastManualSyncMs, lastAutoSyncMs);
     const lastSyncText = lastSyncMs ? new Date(lastSyncMs).toLocaleString() : "Never";
     const googleLinked = isGoogleLinked(user);
+    const syncSelections = getSyncSelectionsSnapshot();
 
     const staleOpenAccountButton = document.getElementById("settings-open-account");
     if (staleOpenAccountButton) {
@@ -2213,6 +2633,57 @@
         <p id="settings-last-sync" class="text-sm text-gray-300 mb-1">Last sync: ${escapeHtml(lastSyncText)}</p>
         <p id="settings-next-auto-sync" class="text-sm text-gray-300 mb-1">Next auto sync: ${escapeHtml(nextAutoSyncText)}</p>
         <p id="settings-next-manual-sync" class="text-sm text-gray-300 mb-3">Next manual sync: ${escapeHtml(nextManualSyncText)}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block mb-2 text-sm text-gray-300">Stats</label>
+            <select id="settings-sync-toggle-stats" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${syncSelections.stats ? "selected" : ""}>Sync</option>
+              <option value="off" ${syncSelections.stats ? "" : "selected"}>Do not sync</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-2 text-sm text-gray-300">Game Progress</label>
+            <select id="settings-sync-toggle-game-progress" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${syncSelections.gameProgress ? "selected" : ""}>Sync</option>
+              <option value="off" ${syncSelections.gameProgress ? "" : "selected"}>Do not sync</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-2 text-sm text-gray-300">Settings</label>
+            <select id="settings-sync-toggle-settings" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${syncSelections.settings ? "selected" : ""}>Sync</option>
+              <option value="off" ${syncSelections.settings ? "" : "selected"}>Do not sync</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-2 text-sm text-gray-300">Favorites</label>
+            <select id="settings-sync-toggle-favorites" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${syncSelections.favorites ? "selected" : ""}>Sync</option>
+              <option value="off" ${syncSelections.favorites ? "" : "selected"}>Do not sync</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-2 text-sm text-gray-300">Recently Played Games</label>
+            <select id="settings-sync-toggle-recent-games" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${syncSelections.recentGames ? "selected" : ""}>Sync</option>
+              <option value="off" ${syncSelections.recentGames ? "" : "selected"}>Do not sync</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-2 text-sm text-gray-300">Recently Played Music</label>
+            <select id="settings-sync-toggle-recent-music" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${syncSelections.recentMusic ? "selected" : ""}>Sync</option>
+              <option value="off" ${syncSelections.recentMusic ? "" : "selected"}>Do not sync</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block mb-2 text-sm text-gray-300">Music Playlists</label>
+            <select id="settings-sync-toggle-music-playlists" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+              <option value="on" ${syncSelections.musicPlaylists ? "selected" : ""}>Sync</option>
+              <option value="off" ${syncSelections.musicPlaylists ? "" : "selected"}>Do not sync</option>
+            </select>
+          </div>
+        </div>
         <button id="settings-sync-now" type="button" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Sync Now</button>
         <p id="settings-sync-status" class="text-sm mt-3"></p>
       </article>
@@ -2268,6 +2739,27 @@
       });
     }
 
+    const syncToggleIds = {
+      stats: "settings-sync-toggle-stats",
+      gameProgress: "settings-sync-toggle-game-progress",
+      settings: "settings-sync-toggle-settings",
+      favorites: "settings-sync-toggle-favorites",
+      recentGames: "settings-sync-toggle-recent-games",
+      recentMusic: "settings-sync-toggle-recent-music",
+      musicPlaylists: "settings-sync-toggle-music-playlists"
+    };
+
+    Object.keys(syncToggleIds).forEach((category) => {
+      const node = document.getElementById(syncToggleIds[category]);
+      if (!node) {
+        return;
+      }
+      node.addEventListener("change", () => {
+        setSyncSelectionPreference(category, node.value !== "off");
+        setStatus("settings-sync-status", "Sync options updated. Run Sync Now to upload changes.", true);
+      });
+    });
+
     if (!canChangeNow && nextAllowedMs) {
       setStatus("settings-username-status", `Wait until ${new Date(nextAllowedMs).toLocaleString()} to change your username again.`, false);
     }
@@ -2305,13 +2797,14 @@
     document.body.appendChild(host);
   }
 
-  function onAuthChanged(user) {
+  async function onAuthChanged(user) {
     state.user = user || null;
     state.authReady = true;
     updateHomeNavLabel();
     if (user) {
+      await restoreUserDataFromCloud(true);
       startAutoSyncLoop();
-      syncUserData("auto", true);
+      await syncUserData("auto", true);
     } else {
       stopAutoSyncLoop();
     }
@@ -2341,7 +2834,7 @@
         } catch (_error) {
         }
       }
-      onAuthChanged(user || null);
+      await onAuthChanged(user || null);
     });
   }
 

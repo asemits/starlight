@@ -119,11 +119,33 @@ function showDownloadFormatModal(track) {
 }
 
 const PLAYLIST_KEY = 'cl-playlist';
+const RECENT_MUSIC_KEY = 'starlight-music-recent';
 
 function getPlaylist() {
     try { return JSON.parse(localStorage.getItem(PLAYLIST_KEY)) || []; }
     catch { return []; }
 }
+
+function saveRecentMusic(track) {
+    if (!track || !track.apiUrl || !track.title) return;
+    let recent = [];
+    try {
+        const parsed = JSON.parse(localStorage.getItem(RECENT_MUSIC_KEY) || '[]');
+        recent = Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+        recent = [];
+    }
+    const cleanTrack = {
+        apiUrl: String(track.apiUrl || '').slice(0, 2048),
+        title: String(track.title || '').slice(0, 256),
+        artist: String(track.artist || '').slice(0, 256),
+        img: String(track.img || '').slice(0, 2048)
+    };
+    const deduped = recent.filter((item) => item && item.apiUrl !== cleanTrack.apiUrl);
+    deduped.unshift(cleanTrack);
+    localStorage.setItem(RECENT_MUSIC_KEY, JSON.stringify(deduped.slice(0, 80)));
+}
+
 function savePlaylist(pl) {
     localStorage.setItem(PLAYLIST_KEY, JSON.stringify(pl));
     renderPlaylist();
@@ -622,6 +644,7 @@ function updateMediaSession() {
 
 async function playTrack(apiUrl, title, artist, img) {
     currentTrackData = { apiUrl, title, artist, img };
+    saveRecentMusic(currentTrackData);
     document.getElementById('now-playing-title').textContent = title;
     document.getElementById('now-playing-artist').textContent = artist;
     document.getElementById('status-msg').textContent = "Connecting…";

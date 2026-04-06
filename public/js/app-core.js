@@ -28,6 +28,7 @@
   const DASHBOARD_SHOW_RECENT_KEY = "dashboard-show-recent";
   const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
   const DASHBOARD_SHOW_STATS_KEY = "dashboard-show-stats";
+  const DASHBOARD_SHOW_RECENT_MUSIC_KEY = "dashboard-show-recent-music";
   const MEASUREMENT_SYSTEM_KEY = "starlight-measurement-system";
   const WIDGET_WEATHER_CACHE_KEY = "starlight-widget-weather-current";
 
@@ -238,7 +239,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     const keyMap = {
       recent: DASHBOARD_SHOW_RECENT_KEY,
       favorites: DASHBOARD_SHOW_FAVORITES_KEY,
-      stats: DASHBOARD_SHOW_STATS_KEY
+      stats: DASHBOARD_SHOW_STATS_KEY,
+      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY
     };
     const key = keyMap[String(section || "")];
     if (!key) {
@@ -251,7 +253,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     const keyMap = {
       recent: DASHBOARD_SHOW_RECENT_KEY,
       favorites: DASHBOARD_SHOW_FAVORITES_KEY,
-      stats: DASHBOARD_SHOW_STATS_KEY
+      stats: DASHBOARD_SHOW_STATS_KEY,
+      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY
     };
     const key = keyMap[String(section || "")];
     if (!key) {
@@ -389,6 +392,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       window.changeDashboardSectionVisibility("stats", "on");
       return;
     }
+    if (cardId === "layout-dashboard-recent-music") {
+      window.changeDashboardSectionVisibility("recent-music", "on");
+      return;
+    }
     if (cardId === "games-pagination") {
       window.changeGamesPaginationMode("numbered");
       return;
@@ -460,7 +467,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   window.resetSettingsCategory = function resetSettingsCategory(category) {
     const map = {
-      layout: ["layout-sidebar", "layout-measurement", "layout-dashboard-recent", "layout-dashboard-favorites", "layout-dashboard-stats", "games-pagination"],
+      layout: ["layout-sidebar", "layout-measurement", "layout-dashboard-recent", "layout-dashboard-favorites", "layout-dashboard-stats", "layout-dashboard-recent-music", "games-pagination"],
       games: ["games-pagination"],
       particles: ["particles-enabled", "particles-bonds", "particles-color", "particles-shape", "particles-frequency", "particles-size"],
       shortcut: ["shortcut-main", "shortcut-anticlose"],
