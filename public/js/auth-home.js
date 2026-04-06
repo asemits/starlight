@@ -2057,8 +2057,8 @@
         }
 
         try {
-          await instance.createUserWithEmailAndPassword(email, password);
-          const user = currentUser();
+          const credential = await instance.createUserWithEmailAndPassword(email, password);
+          const user = (credential && credential.user) || currentUser();
           if (!user) {
             setStatus("signup-form-status", "Could not create account.", false);
             return;
