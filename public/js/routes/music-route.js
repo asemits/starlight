@@ -495,6 +495,16 @@ header.scrolled {
   border-color: rgba(255,255,255,0.18);
   box-shadow: 0 34px 70px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.08);
 }
+.track-card.is-card-dragging {
+  opacity:0.48;
+  transform:scale(0.98);
+}
+.track-card.card-drop-left {
+  box-shadow: inset 3px 0 0 rgba(255,255,255,0.85), 0 24px 60px rgba(0,0,0,0.6);
+}
+.track-card.card-drop-right {
+  box-shadow: inset -3px 0 0 rgba(255,255,255,0.85), 0 24px 60px rgba(0,0,0,0.6);
+}
 .track-card:hover::before { opacity:1; }
 
 .track-card::after {
@@ -542,6 +552,52 @@ header.scrolled {
 }
 .track-card:hover .card-play-overlay { background:rgba(0,0,0,0.35); }
 .track-card:hover .card-play-btn     { opacity:1; transform:scale(1); }
+
+.card-quick-actions {
+  position:absolute;
+  top:10px;
+  right:10px;
+  z-index:5;
+  display:grid;
+  gap:6px;
+  opacity:0;
+  transform:translateY(-4px);
+  transition:opacity 0.25s ease, transform 0.25s ease;
+}
+.track-card:hover .card-quick-actions {
+  opacity:1;
+  transform:translateY(0);
+}
+.card-quick-btn {
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  border:0.5px solid rgba(255,255,255,0.2);
+  background:rgba(5,5,5,0.65);
+  color:rgba(255,255,255,0.85);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  font-size:11px;
+  transition:all 0.2s ease;
+  backdrop-filter:blur(8px);
+}
+.card-quick-btn:hover {
+  color:#fff;
+  border-color:rgba(255,255,255,0.45);
+  background:rgba(255,255,255,0.1);
+}
+.card-quick-btn.is-active {
+  color:#fff;
+  border-color:rgba(255,255,255,0.5);
+  background:rgba(255,255,255,0.16);
+}
+.card-quick-btn.remove:hover {
+  color:#ff9b9b;
+  border-color:rgba(255,128,128,0.5);
+  background:rgba(255,128,128,0.12);
+}
 
 .track-overlay {
   position:absolute; bottom:0; left:0; right:0;
@@ -881,6 +937,26 @@ header.scrolled {
   animation: rowIn 0.3s ease both;
 }
 .track-row:hover { background:rgba(255,255,255,0.025); }
+.track-row.is-dragging {
+  opacity:0.45;
+}
+.track-row.drop-target::after,
+.track-row.drop-target-after::after {
+  content:'';
+  position:absolute;
+  left:18px;
+  right:18px;
+  height:2px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.75);
+  box-shadow:0 0 10px rgba(255,255,255,0.35);
+}
+.track-row.drop-target::after {
+  top:0;
+}
+.track-row.drop-target-after::after {
+  bottom:0;
+}
 .track-row.playing { background:rgba(255,255,255,0.04); }
 .track-row.playing::before {
   content:''; position:absolute; left:0; top:0; bottom:0;
@@ -940,6 +1016,16 @@ header.scrolled {
 }
 .row-icon-btn:hover { color:#fff; border-color:var(--border-h); background:rgba(255,255,255,0.05); }
 .row-icon-btn.remove:hover { color:#ff8080; border-color:rgba(255,128,128,0.3); background:rgba(255,128,128,0.05); }
+
+@media (pointer: coarse) {
+  .track-row-actions {
+    opacity:1;
+  }
+  .card-quick-actions {
+    opacity:1;
+    transform:translateY(0);
+  }
+}
 
 .panel-empty {
   display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -1387,8 +1473,11 @@ header.scrolled {
         <div class="panel-header">
             <div>
                 <div class="panel-header-title">MY PLAYLIST</div>
-                <div class="panel-header-sub">Saved across sessions · localStorage</div>
+          <div class="panel-header-sub">Saved across sessions · localStorage</div>
             </div>
+        <button class="panel-action-btn" onclick="addCurrentToPlaylist()" title="Add now playing">
+          <i class="fa-solid fa-plus"></i>
+        </button>
             <button class="panel-action-btn danger" onclick="clearPlaylist()" title="Clear playlist">
                 <i class="fa-solid fa-trash"></i>
             </button>
@@ -1411,6 +1500,9 @@ header.scrolled {
                 <div class="panel-header-title">QUEUE</div>
                 <div class="panel-header-sub">Session only · clears on tab close</div>
             </div>
+        <button class="panel-action-btn" onclick="addCurrentToQueue()" title="Add now playing">
+          <i class="fa-solid fa-plus"></i>
+        </button>
             <button class="panel-action-btn danger" onclick="clearQueue()" title="Clear queue">
                 <i class="fa-solid fa-xmark"></i>
             </button>

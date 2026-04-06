@@ -1,10 +1,19 @@
 const PROXY_URL = "https://script.google.com/macros/s/AKfycbx8oqYPseZoVohUBfMTdw-CkxSUsg7KPHoywtwi-ltfg_sweNFJoO_fiyLFIk_02CVsMA/exec";
 function getAudio() { return document.getElementById('mainAudio'); }
 let currentTrackData = null;
-let favorites = JSON.parse(localStorage.getItem('cl-favs')) || [];
+let favorites = [];
 const DOWNLOAD_FORMATS = ['mp3', 'wav', 'm4a', 'flac'];
 let ffmpegInstance = null;
 let ffmpegLoadPromise = null;
+let suppressPanelRowClick = false;
+let suppressFavoriteCardClick = false;
+const dragReorderState = {
+    source: '',
+    fromIndex: -1
+};
+const favoriteCardDragState = {
+    fromIndex: -1
+};
 
 function getSecureRandomInt(max) {
     if (!Number.isInteger(max) || max <= 0) return 0;
@@ -118,7 +127,9 @@ function showDownloadFormatModal(track) {
     });
 }
 
+const FAVORITES_KEY = 'cl-favs';
 const PLAYLIST_KEY = 'cl-playlist';
+const QUEUE_KEY = 'cl-queue';
 const RECENT_MUSIC_KEY = 'nebula-music-recent';
 const MUSIC_VOLUME_KEY = 'nebula-music-volume';
 const PENDING_MUSIC_TRACK_KEY = 'nebula-pending-music-track';
@@ -135,6 +146,94 @@ function sanitizeTrackPayload(track) {
         img: String(track.img || '').trim().slice(0, 2048)
     };
 }
+
+function sanitizeTrackList(list, limit = 200) {
+    return (Array.isArray(list) ? list : [])
+        .map(sanitizeTrackPayload)
+        .filter(Boolean)
+        .slice(0, limit);
+}
+
+function parseStoredTrackList(storage, key, limit = 200) {
+    try {
+        const parsed = JSON.parse(storage.getItem(key) || '[]');
+        return sanitizeTrackList(parsed, limit);
+    } catch {
+        return [];
+    }
+}
+
+function getFavorites() {
+    return parseStoredTrackList(localStorage, FAVORITES_KEY, 200);
+}
+
+function saveFavorites(nextFavorites) {
+    favorites = sanitizeTrackList(nextFavorites, 200);
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+    updateFavUI();
+    return favorites;
+}
+
+function isFavoriteTrack(track) {
+    const cleanTrack = sanitizeTrackPayload(track);
+    if (!cleanTrack) return false;
+    return favorites.some((item) => item.apiUrl === cleanTrack.apiUrl);
+}
+
+function toggleFavoriteTrack(track, options = {}) {
+    const cleanTrack = sanitizeTrackPayload(track);
+    if (!cleanTrack) return false;
+
+    const current = getFavorites();
+    const existingIndex = current.findIndex((item) => item.apiUrl === cleanTrack.apiUrl);
+    if (existingIndex > -1) {
+        current.splice(existingIndex, 1);
+        saveFavorites(current);
+        if (!options.silent) {
+            showToast('Removed from Favorites', 'fa-heart');
+        }
+        return false;
+    }
+
+    current.push(cleanTrack);
+    saveFavorites(current);
+    if (!options.silent) {
+        showToast('Added to Favorites', 'fa-heart');
+    }
+    return true;
+}
+
+function removeFavoriteTrackAt(idx) {
+    const index = Number(idx);
+    if (!Number.isInteger(index) || index < 0) {
+        return;
+    }
+    const current = getFavorites();
+    if (!current[index]) {
+        return;
+    }
+    current.splice(index, 1);
+    saveFavorites(current);
+    showToast('Removed from My List', 'fa-trash');
+}
+
+function moveFavoriteTrack(idx, delta) {
+    const from = Number(idx);
+    const direction = Number(delta);
+    if (!Number.isInteger(from) || !Number.isInteger(direction)) {
+        return;
+    }
+    const current = getFavorites();
+    const to = from + direction;
+    if (!current[from] || to < 0 || to >= current.length) {
+        return;
+    }
+    const [item] = current.splice(from, 1);
+    current.splice(to, 0, item);
+    saveFavorites(current);
+}
+
+favorites = getFavorites();
 
 function readMusicVolume() {
     const raw = Number.parseFloat(localStorage.getItem(MUSIC_VOLUME_KEY) || '1');
@@ -194,9 +293,238 @@ function consumePendingMusicTrack() {
     }
 }
 
+function suppressPanelRowClicksBriefly() {
+    suppressPanelRowClick = true;
+    window.setTimeout(() => {
+        suppressPanelRowClick = false;
+    }, 180);
+}
+
+function suppressFavoriteCardClicksBriefly() {
+    suppressFavoriteCardClick = true;
+    window.setTimeout(() => {
+        suppressFavoriteCardClick = false;
+    }, 180);
+}
+
+function clearFavoriteCardDropTargets() {
+    document.querySelectorAll('#favorites-container .track-card.card-drop-left, #favorites-container .track-card.card-drop-right, #favorites-container .track-card.is-card-dragging').forEach((node) => {
+        node.classList.remove('card-drop-left', 'card-drop-right', 'is-card-dragging');
+    });
+}
+
+function clearTrackRowDropTargets() {
+    document.querySelectorAll('.track-row.drop-target, .track-row.drop-target-after, .track-row.is-dragging').forEach((node) => {
+        node.classList.remove('drop-target', 'drop-target-after', 'is-dragging');
+    });
+}
+
+function reorderTrackListByInsert(list, fromIndex, insertIndex) {
+    const sourceList = Array.isArray(list) ? list : [];
+    if (!sourceList.length) {
+        return null;
+    }
+    if (!Number.isInteger(fromIndex) || !Number.isInteger(insertIndex)) {
+        return null;
+    }
+    if (fromIndex < 0 || fromIndex >= sourceList.length) {
+        return null;
+    }
+
+    const next = sourceList.slice();
+    const [item] = next.splice(fromIndex, 1);
+    let target = insertIndex;
+    if (fromIndex < insertIndex) {
+        target -= 1;
+    }
+    target = Math.max(0, Math.min(next.length, target));
+
+    if (target === fromIndex) {
+        return null;
+    }
+
+    next.splice(target, 0, item);
+    return next;
+}
+
+function applyPanelDragReorder(source, fromIndex, insertIndex) {
+    if (source === 'playlist') {
+        const nextPlaylist = reorderTrackListByInsert(getPlaylist(), fromIndex, insertIndex);
+        if (!nextPlaylist) {
+            return false;
+        }
+        savePlaylist(nextPlaylist);
+        return true;
+    }
+
+    if (source === 'queue') {
+        const nextQueue = reorderTrackListByInsert(getQueue(), fromIndex, insertIndex);
+        if (!nextQueue) {
+            return false;
+        }
+        setQueue(nextQueue);
+        return true;
+    }
+
+    return false;
+}
+
+function reorderFavoritesByInsert(fromIndex, insertIndex) {
+    const next = reorderTrackListByInsert(getFavorites(), fromIndex, insertIndex);
+    if (!next) {
+        return false;
+    }
+    saveFavorites(next);
+    return true;
+}
+
+function bindTrackRowDragReorder(row, source, idx) {
+    const rowIndex = Number(idx);
+    if (!row || !Number.isInteger(rowIndex) || rowIndex < 0) {
+        return;
+    }
+
+    row.setAttribute('draggable', 'true');
+
+    row.addEventListener('dragstart', (event) => {
+        dragReorderState.source = source;
+        dragReorderState.fromIndex = rowIndex;
+        row.classList.add('is-dragging');
+
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', `${source}:${rowIndex}`);
+        }
+    });
+
+    row.addEventListener('dragover', (event) => {
+        if (dragReorderState.source !== source || dragReorderState.fromIndex < 0) {
+            return;
+        }
+        event.preventDefault();
+
+        const rect = row.getBoundingClientRect();
+        const after = event.clientY > rect.top + rect.height / 2;
+        const insertIndex = rowIndex + (after ? 1 : 0);
+        const hasMove = reorderTrackListByInsert(
+            source === 'playlist' ? getPlaylist() : getQueue(),
+            dragReorderState.fromIndex,
+            insertIndex
+        );
+
+        row.classList.remove('drop-target', 'drop-target-after');
+        if (hasMove) {
+            row.classList.add(after ? 'drop-target-after' : 'drop-target');
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = 'move';
+            }
+        }
+    });
+
+    row.addEventListener('dragleave', (event) => {
+        const related = event.relatedTarget;
+        if (related && row.contains(related)) {
+            return;
+        }
+        row.classList.remove('drop-target', 'drop-target-after');
+    });
+
+    row.addEventListener('drop', (event) => {
+        if (dragReorderState.source !== source || dragReorderState.fromIndex < 0) {
+            return;
+        }
+        event.preventDefault();
+
+        const rect = row.getBoundingClientRect();
+        const after = event.clientY > rect.top + rect.height / 2;
+        const insertIndex = rowIndex + (after ? 1 : 0);
+        const moved = applyPanelDragReorder(source, dragReorderState.fromIndex, insertIndex);
+        if (moved) {
+            suppressPanelRowClicksBriefly();
+        }
+        clearTrackRowDropTargets();
+        dragReorderState.source = '';
+        dragReorderState.fromIndex = -1;
+    });
+
+    row.addEventListener('dragend', () => {
+        clearTrackRowDropTargets();
+        dragReorderState.source = '';
+        dragReorderState.fromIndex = -1;
+    });
+}
+
+function bindFavoriteCardReorder(card, idx) {
+    const index = Number(idx);
+    if (!card || !Number.isInteger(index) || index < 0) {
+        return;
+    }
+
+    card.setAttribute('draggable', 'true');
+
+    card.addEventListener('dragstart', (event) => {
+        favoriteCardDragState.fromIndex = index;
+        card.classList.add('is-card-dragging');
+
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', `favorites:${index}`);
+        }
+    });
+
+    card.addEventListener('dragover', (event) => {
+        if (favoriteCardDragState.fromIndex < 0) {
+            return;
+        }
+        event.preventDefault();
+
+        const rect = card.getBoundingClientRect();
+        const after = event.clientX > rect.left + rect.width / 2;
+        const insertIndex = index + (after ? 1 : 0);
+        const hasMove = reorderTrackListByInsert(getFavorites(), favoriteCardDragState.fromIndex, insertIndex);
+
+        card.classList.remove('card-drop-left', 'card-drop-right');
+        if (hasMove) {
+            card.classList.add(after ? 'card-drop-right' : 'card-drop-left');
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = 'move';
+            }
+        }
+    });
+
+    card.addEventListener('dragleave', (event) => {
+        const related = event.relatedTarget;
+        if (related && card.contains(related)) {
+            return;
+        }
+        card.classList.remove('card-drop-left', 'card-drop-right');
+    });
+
+    card.addEventListener('drop', (event) => {
+        if (favoriteCardDragState.fromIndex < 0) {
+            return;
+        }
+        event.preventDefault();
+
+        const rect = card.getBoundingClientRect();
+        const after = event.clientX > rect.left + rect.width / 2;
+        const insertIndex = index + (after ? 1 : 0);
+        const moved = reorderFavoritesByInsert(favoriteCardDragState.fromIndex, insertIndex);
+        if (moved) {
+            suppressFavoriteCardClicksBriefly();
+        }
+        clearFavoriteCardDropTargets();
+        favoriteCardDragState.fromIndex = -1;
+    });
+
+    card.addEventListener('dragend', () => {
+        clearFavoriteCardDropTargets();
+        favoriteCardDragState.fromIndex = -1;
+    });
+}
+
 function getPlaylist() {
-    try { return JSON.parse(localStorage.getItem(PLAYLIST_KEY)) || []; }
-    catch { return []; }
+    return parseStoredTrackList(localStorage, PLAYLIST_KEY, 200);
 }
 
 function saveRecentMusic(track) {
@@ -220,23 +548,68 @@ function saveRecentMusic(track) {
 }
 
 function savePlaylist(pl) {
-    localStorage.setItem(PLAYLIST_KEY, JSON.stringify(pl));
+    const cleaned = sanitizeTrackList(pl, 200);
+    localStorage.setItem(PLAYLIST_KEY, JSON.stringify(cleaned));
     renderPlaylist();
     updateBadges();
 }
 function addToPlaylist(track) {
+    const cleanTrack = sanitizeTrackPayload(track);
+    if (!cleanTrack) {
+        return;
+    }
     const pl = getPlaylist();
-    if (pl.some(t => t.apiUrl === track.apiUrl)) {
+    if (pl.some(t => t.apiUrl === cleanTrack.apiUrl)) {
         showToast('Already in playlist', 'fa-circle-info');
         return;
     }
-    pl.push(track);
+    pl.push(cleanTrack);
     savePlaylist(pl);
     showToast(`Added to Playlist`, 'fa-list');
 }
+function addCurrentToPlaylist() {
+    if (!currentTrackData) {
+        showToast('Play a track first', 'fa-circle-info');
+        return;
+    }
+    addToPlaylist(currentTrackData);
+    openPanel('playlist');
+}
 function removeFromPlaylist(apiUrl) {
-    savePlaylist(getPlaylist().filter(t => t.apiUrl !== apiUrl));
+    const cleanApiUrl = String(apiUrl || '').trim();
+    if (!cleanApiUrl) {
+        return;
+    }
+    savePlaylist(getPlaylist().filter(t => t.apiUrl !== cleanApiUrl));
     showToast('Removed from Playlist', 'fa-trash');
+}
+function removeFromPlaylistAt(idx) {
+    const index = Number(idx);
+    if (!Number.isInteger(index) || index < 0) {
+        return;
+    }
+    const pl = getPlaylist();
+    if (!pl[index]) {
+        return;
+    }
+    pl.splice(index, 1);
+    savePlaylist(pl);
+    showToast('Removed from Playlist', 'fa-trash');
+}
+function movePlaylistTrack(idx, delta) {
+    const from = Number(idx);
+    const direction = Number(delta);
+    if (!Number.isInteger(from) || !Number.isInteger(direction)) {
+        return;
+    }
+    const pl = getPlaylist();
+    const to = from + direction;
+    if (!pl[from] || to < 0 || to >= pl.length) {
+        return;
+    }
+    const [item] = pl.splice(from, 1);
+    pl.splice(to, 0, item);
+    savePlaylist(pl);
 }
 function clearPlaylist() {
     showConfirmModal({
@@ -289,7 +662,9 @@ function renderPlaylist() {
     body.innerHTML = '';
     pl.forEach((t, i) => {
         const row = buildTrackRow(t, i, 'playlist');
+        bindTrackRowDragReorder(row, 'playlist', i);
         row.addEventListener('click', (e) => {
+            if (suppressPanelRowClick) return;
             if (e.target.closest('.row-icon-btn')) return;
             setQueue(pl.slice(i));
             playNextInQueue();
@@ -298,26 +673,58 @@ function renderPlaylist() {
     });
 }
 
-const QUEUE_KEY = 'cl-queue';
-
 function getQueue() {
-    try { return JSON.parse(sessionStorage.getItem(QUEUE_KEY)) || []; }
-    catch { return []; }
+    return parseStoredTrackList(sessionStorage, QUEUE_KEY, 300);
 }
 function setQueue(arr) {
-    sessionStorage.setItem(QUEUE_KEY, JSON.stringify(arr));
+    const cleaned = sanitizeTrackList(arr, 300);
+    sessionStorage.setItem(QUEUE_KEY, JSON.stringify(cleaned));
     renderQueue();
     updateBadges();
 }
 function addToQueue(track) {
+    const cleanTrack = sanitizeTrackPayload(track);
+    if (!cleanTrack) {
+        return;
+    }
     const q = getQueue();
-    q.push(track);
+    q.push(cleanTrack);
     setQueue(q);
     showToast('Added to Queue', 'fa-layer-group');
 }
+function addCurrentToQueue() {
+    if (!currentTrackData) {
+        showToast('Play a track first', 'fa-circle-info');
+        return;
+    }
+    addToQueue(currentTrackData);
+    openPanel('queue');
+}
 function removeFromQueue(idx) {
+    const index = Number(idx);
+    if (!Number.isInteger(index) || index < 0) {
+        return;
+    }
     const q = getQueue();
-    q.splice(idx, 1);
+    if (!q[index]) {
+        return;
+    }
+    q.splice(index, 1);
+    setQueue(q);
+}
+function moveQueueTrack(idx, delta) {
+    const from = Number(idx);
+    const direction = Number(delta);
+    if (!Number.isInteger(from) || !Number.isInteger(direction)) {
+        return;
+    }
+    const q = getQueue();
+    const to = from + direction;
+    if (!q[from] || to < 0 || to >= q.length) {
+        return;
+    }
+    const [item] = q.splice(from, 1);
+    q.splice(to, 0, item);
     setQueue(q);
 }
 function clearQueue() {
@@ -360,7 +767,9 @@ function renderQueue() {
 
     q.forEach((t, i) => {
         const row = buildTrackRow(t, i, 'queue');
+        bindTrackRowDragReorder(row, 'queue', i);
         row.addEventListener('click', (e) => {
+            if (suppressPanelRowClick) return;
             if (e.target.closest('.row-icon-btn')) return;
             const qq = getQueue();
             const [item] = qq.splice(i, 1);
@@ -390,11 +799,15 @@ function buildTrackRow(track, idx, source) {
         ? `<div class="track-row-actions">
                 <button class="row-icon-btn" onclick="downloadTrack(${trackPayload})" title="Download as..."><i class="fa-solid fa-download"></i></button>
                 <button class="row-icon-btn" onclick="addToQueue(${trackPayload})" title="Add to Queue"><i class="fa-solid fa-layer-group"></i></button>
-                <button class="row-icon-btn remove" onclick="removeFromPlaylist('${track.apiUrl}')" title="Remove"><i class="fa-solid fa-xmark"></i></button>
+            <button class="row-icon-btn" onclick="movePlaylistTrack(${idx}, -1)" title="Move up"><i class="fa-solid fa-arrow-up"></i></button>
+            <button class="row-icon-btn" onclick="movePlaylistTrack(${idx}, 1)" title="Move down"><i class="fa-solid fa-arrow-down"></i></button>
+            <button class="row-icon-btn remove" onclick="removeFromPlaylistAt(${idx})" title="Remove"><i class="fa-solid fa-xmark"></i></button>
            </div>`
         : `<div class="track-row-actions">
                 <button class="row-icon-btn" onclick="downloadTrack(${trackPayload})" title="Download as..."><i class="fa-solid fa-download"></i></button>
                 <button class="row-icon-btn" onclick="addToPlaylist(${trackPayload})" title="Save to Playlist"><i class="fa-solid fa-list"></i></button>
+            <button class="row-icon-btn" onclick="moveQueueTrack(${idx}, -1)" title="Move up"><i class="fa-solid fa-arrow-up"></i></button>
+            <button class="row-icon-btn" onclick="moveQueueTrack(${idx}, 1)" title="Move down"><i class="fa-solid fa-arrow-down"></i></button>
                 <button class="row-icon-btn remove" onclick="removeFromQueue(${idx})" title="Remove"><i class="fa-solid fa-xmark"></i></button>
            </div>`;
 
@@ -813,32 +1226,66 @@ function toggleLoop() {
 
 function toggleFavorite() {
     if (!currentTrackData) return;
-    const i = favorites.findIndex(f => f.apiUrl === currentTrackData.apiUrl);
-    if (i > -1) favorites.splice(i,1); else favorites.push(currentTrackData);
-    localStorage.setItem('cl-favs', JSON.stringify(favorites));
-    updateFavUI();
+    toggleFavoriteTrack(currentTrackData, { silent: true });
 }
 function updateFavUI() {
+    favorites = getFavorites();
     const c = document.getElementById('favorites-container');
-    document.getElementById('fav-btn').classList.toggle('active',
-        currentTrackData && favorites.some(f => f.apiUrl === currentTrackData.apiUrl));
+    const favBtn = document.getElementById('fav-btn');
+    const favRow = document.getElementById('fav-row');
+
+    if (favBtn) {
+        favBtn.classList.toggle('active', currentTrackData && favorites.some(f => f.apiUrl === currentTrackData.apiUrl));
+    }
+
+    if (!c || !favRow) {
+        return;
+    }
+
     if (favorites.length > 0) {
-        document.getElementById('fav-row').style.display = 'block';
+        favRow.style.display = 'block';
         c.innerHTML = '';
-        favorites.forEach(t => c.appendChild(createCard(t)));
-    } else { document.getElementById('fav-row').style.display = 'none'; }
+        favorites.forEach((t, i) => c.appendChild(createCard(t, { source: 'favorites', index: i })));
+    } else { favRow.style.display = 'none'; }
 }
 
-function createCard(track) {
+function createCard(track, options = {}) {
     const card = document.createElement('div');
     card.className = 'track-card';
     const imgId = createSecureId('img');
+    const source = String(options.source || '');
+    const trackIndex = Number(options.index);
+    const isFavoritesCard = source === 'favorites' && Number.isInteger(trackIndex) && trackIndex >= 0;
+    const isFavorite = isFavoriteTrack(track);
 
-    card.onclick = () => playTrack(track.apiUrl, track.title, track.artist, track.img);
+    if (isFavoritesCard) {
+        card.classList.add('is-favorites-card');
+    }
+
+    card.onclick = () => {
+        if (isFavoritesCard && suppressFavoriteCardClick) {
+            return;
+        }
+        playTrack(track.apiUrl, track.title, track.artist, track.img);
+    };
     card.addEventListener('contextmenu', e => {
         e.preventDefault();
         showCardContext(e, track);
     });
+
+    const quickActionsHtml = isFavoritesCard
+        ? `<div class="card-quick-actions is-favorites-actions">
+            <button type="button" class="card-quick-btn" data-card-action="queue" title="Add to queue" aria-label="Add to queue"><i class="fa-solid fa-layer-group"></i></button>
+            <button type="button" class="card-quick-btn" data-card-action="playlist" title="Add to playlist" aria-label="Add to playlist"><i class="fa-solid fa-list"></i></button>
+            <button type="button" class="card-quick-btn" data-card-action="fav-left" title="Move left" aria-label="Move left"><i class="fa-solid fa-arrow-left"></i></button>
+            <button type="button" class="card-quick-btn" data-card-action="fav-right" title="Move right" aria-label="Move right"><i class="fa-solid fa-arrow-right"></i></button>
+            <button type="button" class="card-quick-btn remove" data-card-action="fav-remove" title="Remove from My List" aria-label="Remove from My List"><i class="fa-solid fa-trash"></i></button>
+        </div>`
+        : `<div class="card-quick-actions">
+            <button type="button" class="card-quick-btn" data-card-action="queue" title="Add to queue" aria-label="Add to queue"><i class="fa-solid fa-layer-group"></i></button>
+            <button type="button" class="card-quick-btn" data-card-action="playlist" title="Add to playlist" aria-label="Add to playlist"><i class="fa-solid fa-list"></i></button>
+            <button type="button" class="card-quick-btn ${isFavorite ? 'is-active' : ''}" data-card-action="favorite" title="Toggle favorite" aria-label="Toggle favorite"><i class="fa-solid fa-heart"></i></button>
+        </div>`;
 
     card.innerHTML = `
         <div class="card-img-wrap">
@@ -848,10 +1295,48 @@ function createCard(track) {
         <div class="card-play-overlay">
             <div class="card-play-btn"><i class="fa-solid fa-play"></i></div>
         </div>
+        ${quickActionsHtml}
         <div class="track-overlay">
             <div class="track-title">${track.title}</div>
             <div class="track-artist">${track.artist}</div>
         </div>`;
+
+    card.querySelectorAll('.card-quick-btn').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const action = String(button.getAttribute('data-card-action') || '');
+            if (action === 'queue') {
+                addToQueue(track);
+                return;
+            }
+            if (action === 'playlist') {
+                addToPlaylist(track);
+                return;
+            }
+            if (action === 'fav-left') {
+                moveFavoriteTrack(trackIndex, -1);
+                return;
+            }
+            if (action === 'fav-right') {
+                moveFavoriteTrack(trackIndex, 1);
+                return;
+            }
+            if (action === 'fav-remove') {
+                removeFavoriteTrackAt(trackIndex);
+                return;
+            }
+            if (action === 'favorite') {
+                toggleFavoriteTrack(track);
+                button.classList.toggle('is-active', isFavoriteTrack(track));
+            }
+        });
+    });
+
+    if (isFavoritesCard) {
+        bindFavoriteCardReorder(card, trackIndex);
+    }
+
     getTunneledBlob(track.img, 'image').then(blobUrl => {
         const el = document.getElementById(imgId);
         if (el && blobUrl) {
@@ -877,12 +1362,13 @@ function showCardContext(e, track) {
         font-family:'Fira Code',monospace; font-size:11px;
         animation:cardReveal 0.2s ease both;
     `;
+    const favoriteLabel = isFavoriteTrack(track) ? 'Remove from Favorites' : 'Add to Favorites';
     const items = [
         { icon:'fa-play',           label:'Play Now',          fn: () => playTrack(track.apiUrl, track.title, track.artist, track.img) },
         { icon:'fa-download',       label:'Download As...',    fn: () => downloadTrack(track) },
         { icon:'fa-layer-group',    label:'Add to Queue',      fn: () => addToQueue(track) },
         { icon:'fa-list',           label:'Add to Playlist',   fn: () => addToPlaylist(track) },
-        { icon:'fa-heart',          label:'Add to Favorites',  fn: () => { if(!currentTrackData||currentTrackData.apiUrl!==track.apiUrl){ currentTrackData=track; } if(!favorites.some(f=>f.apiUrl===track.apiUrl)){favorites.push(track);localStorage.setItem('cl-favs',JSON.stringify(favorites));updateFavUI();showToast('Added to Favorites','fa-heart');} else showToast('Already in Favorites','fa-circle-info'); } },
+        { icon:'fa-heart',          label:favoriteLabel,       fn: () => toggleFavoriteTrack(track) },
     ];
     items.forEach(item => {
         const btn = document.createElement('button');

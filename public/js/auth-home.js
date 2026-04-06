@@ -19,6 +19,7 @@
   const SYNC_PREF_MUSIC_PLAYLISTS_KEY = "nebula-sync-music-playlists";
   const MUSIC_RECENT_KEY = "nebula-music-recent";
   const MUSIC_PLAYLIST_KEY = "cl-playlist";
+  const MUSIC_FAVORITES_KEY = "cl-favs";
   const PENDING_MUSIC_TRACK_KEY = "nebula-pending-music-track";
   const MUSIC_VOLUME_KEY = "nebula-music-volume";
   const SOUNDBOARD_VOLUME_KEY = "nebula-soundboard-volume";
@@ -1057,6 +1058,12 @@
       .filter(Boolean);
   }
 
+  function collectMusicFavoritesSnapshot() {
+    return parseStoredArray(MUSIC_FAVORITES_KEY, 200)
+      .map(sanitizeTrackItem)
+      .filter(Boolean);
+  }
+
   function collectSyncStatsSnapshot(gameProgress) {
     const items = Array.isArray(gameProgress && gameProgress.items) ? gameProgress.items : [];
     return items.map((item) => ({
@@ -1316,6 +1323,11 @@
         localStorage.setItem(MUSIC_PLAYLIST_KEY, JSON.stringify(cleanedPlaylists));
       }
 
+      if (selections.musicPlaylists && Array.isArray(data.syncMusicFavorites)) {
+        const cleanedFavorites = data.syncMusicFavorites.map(sanitizeTrackItem).filter(Boolean).slice(0, 200);
+        localStorage.setItem(MUSIC_FAVORITES_KEY, JSON.stringify(cleanedFavorites));
+      }
+
       const restoredItems = buildRestoredProgressItems(data, selections);
       if (restoredItems.length) {
         await restoreGameProgressToFirestore(restoredItems, user);
@@ -1406,6 +1418,7 @@
     const recentGamesSnapshot = selections.recentGames ? collectSyncRecentGamesSnapshot(gameProgress) : [];
     const recentMusicSnapshot = selections.recentMusic ? collectRecentMusicSnapshot() : [];
     const musicPlaylistSnapshot = selections.musicPlaylists ? collectMusicPlaylistSnapshot() : [];
+    const musicFavoritesSnapshot = selections.musicPlaylists ? collectMusicFavoritesSnapshot() : [];
 
     try {
       await firestore.runTransaction(async (tx) => {
@@ -1434,6 +1447,7 @@
           syncRecentGames: selections.recentGames ? recentGamesSnapshot : firebase.firestore.FieldValue.delete(),
           syncRecentMusic: selections.recentMusic ? recentMusicSnapshot : firebase.firestore.FieldValue.delete(),
           syncMusicPlaylists: selections.musicPlaylists ? musicPlaylistSnapshot : firebase.firestore.FieldValue.delete(),
+          syncMusicFavorites: selections.musicPlaylists ? musicFavoritesSnapshot : firebase.firestore.FieldValue.delete(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         if (isManual) {
@@ -2808,7 +2822,7 @@
             </select>
           </div>
           <div class="sm:col-span-2">
-            <label class="block mb-2 text-sm text-gray-300">Music Playlists</label>
+            <label class="block mb-2 text-sm text-gray-300">Music Playlists + My List</label>
             <select id="settings-sync-toggle-music-playlists" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
               <option value="on" ${syncSelections.musicPlaylists ? "selected" : ""}>Sync</option>
               <option value="off" ${syncSelections.musicPlaylists ? "" : "selected"}>Do not sync</option>
