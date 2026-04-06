@@ -1949,7 +1949,7 @@
       }
       const ready = timerDone && scrolledToEnd;
       continueBtn.disabled = !ready;
-      continueBtn.textContent = ready ? "I Accept" : "Read Terms to Continue";
+      continueBtn.textContent = ready ? "I Agree" : "I Agree";
     }
 
     if (tosScroll) {
