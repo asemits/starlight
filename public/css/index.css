@@ -1473,6 +1473,50 @@
   align-items: center;
 }
 
+.nebula-chat-link-preview {
+  margin: 8px 10px 0;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  padding: 10px;
+}
+
+.nebula-chat-link-preview.hidden {
+  display: none;
+}
+
+.nebula-chat-link-preview-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.nebula-chat-link-preview-card img,
+.nebula-chat-link-preview-card video {
+  width: 100%;
+  max-height: 240px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.nebula-chat-link-preview-body {
+  display: grid;
+  gap: 6px;
+}
+
+.nebula-chat-link-preview-body strong {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.nebula-chat-link-preview-body p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--ink-faint);
+}
+
 .nebula-chat-reply-chip.hidden {
   display: none;
 }

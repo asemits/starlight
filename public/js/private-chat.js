@@ -22,6 +22,7 @@
     messagesUnsub: null,
     authUnsub: null,
     pendingReply: null,
+    linkPreview: null,
     activeMenuMessageId: "",
     statusText: "",
     statusType: "",
@@ -131,6 +132,133 @@
     return String(value || "").trim().toLowerCase();
   }
 
+  function extractFirstUrl(value) {
+    const text = String(value || "");
+    const match = text.match(/https?:\/\/[^\s"'<>()]+/i);
+    if (!match) {
+      return "";
+    }
+    try {
+      return new URL(match[0].trim()).href;
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function isImageUrl(url) {
+    return /\.(jpe?g|png|gif|webp|bmp|svg|avif)(?:[?#].*)?$/i.test(String(url));
+  }
+
+  function isVideoUrl(url) {
+    return /\.(mp4|webm|ogg|mov|m4v)(?:[?#].*)?$/i.test(String(url));
+  }
+
+  async function fetchLinkPreview(url) {
+    const normalized = extractFirstUrl(url);
+    if (!normalized) {
+      return null;
+    }
+
+    if (isImageUrl(normalized)) {
+      return { type: "image", url: normalized, title: "", description: "", image: normalized, video: "" };
+    }
+    if (isVideoUrl(normalized)) {
+      return { type: "video", url: normalized, title: "", description: "", image: "", video: normalized };
+    }
+
+    try {
+      const response = await fetch(normalized, { method: "GET", credentials: "omit" });
+      if (!response.ok) {
+        return null;
+      }
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("text/html")) {
+        return null;
+      }
+
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const title = (doc.querySelector("meta[property='og:title']")?.content || doc.querySelector("meta[name='twitter:title']")?.content || doc.querySelector("title")?.textContent || "").trim();
+      const description = (doc.querySelector("meta[property='og:description']")?.content || doc.querySelector("meta[name='description']")?.content || doc.querySelector("meta[name='twitter:description']")?.content || "").trim();
+      const image = (doc.querySelector("meta[property='og:image']")?.content || doc.querySelector("meta[name='twitter:image']")?.content || doc.querySelector("link[rel='image_src']")?.href || "").trim();
+      const video = (doc.querySelector("meta[property='og:video']")?.content || doc.querySelector("meta[name='twitter:player']")?.content || doc.querySelector("video source")?.src || doc.querySelector("video")?.src || "").trim();
+      const type = video ? "video" : image ? "image" : "link";
+      return {
+        type,
+        url: normalized,
+        title,
+        description,
+        image: image || "",
+        video: video || ""
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function renderLinkPreview() {
+    if (!state.root) {
+      return;
+    }
+    const previewZone = state.root.querySelector("#nebula-chat-link-preview");
+    if (!previewZone) {
+      return;
+    }
+    const preview = state.linkPreview;
+    if (!preview) {
+      previewZone.classList.add("hidden");
+      previewZone.innerHTML = "";
+      return;
+    }
+    let content = "";
+    if (preview.type === "image" && preview.image) {
+      content = `<img src="${escapeHtml(preview.image)}" alt="${escapeHtml(preview.title || "Link preview image")}" />`;
+    } else if (preview.type === "video" && preview.video) {
+      content = `<video src="${escapeHtml(preview.video)}" controls preload="metadata"></video>`;
+    } else {
+      content = `
+        <div class="nebula-chat-link-preview-body">
+          <strong>${escapeHtml(preview.title || preview.url)}</strong>
+          <p>${escapeHtml(preview.description || preview.url)}</p>
+        </div>
+      `;
+    }
+    previewZone.classList.remove("hidden");
+    previewZone.innerHTML = `
+      <a href="${escapeHtml(preview.url)}" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
+        ${content}
+      </a>
+    `;
+  }
+
+  function updateLinkPreviewForInput(value) {
+    const url = extractFirstUrl(value);
+    if (!url) {
+      state.linkPreview = null;
+      renderLinkPreview();
+      return;
+    }
+    if (state.linkPreview && state.linkPreview.url === url) {
+      return;
+    }
+    state.linkPreview = null;
+    renderLinkPreview();
+    fetchLinkPreview(url).then((preview) => {
+      if (preview && extractFirstUrl(String(value || "")) === url) {
+        state.linkPreview = preview;
+        renderLinkPreview();
+      }
+    }).catch(() => {
+      state.linkPreview = null;
+      renderLinkPreview();
+    });
+  }
+
+  function clearLinkPreview() {
+    state.linkPreview = null;
+    renderLinkPreview();
+  }
+
   function truncate(value, maxLen) {
     const text = String(value || "").trim();
     if (!text || text.length <= maxLen) {
@@ -138,6 +266,278 @@
     }
     return `${text.slice(0, Math.max(0, maxLen - 1))}\u2026`;
   }
+  function extractFirstUrl(value) {
+    const text = String(value || "");
+    const match = text.match(/https?:\/\/[^\s"'<>\(\)]+/i);
+    if (!match) {
+      return "";
+    }
+    try {
+      return new URL(match[0].trim()).href;
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function isImageUrl(url) {
+    return /\.(jpe?g|png|gif|webp|bmp|svg|avif)(?:[?#].*)?$/i.test(String(url));
+  }
+
+  function isVideoUrl(url) {
+    return /\.(mp4|webm|ogg|mov|m4v)(?:[?#].*)?$/i.test(String(url));
+  }
+
+  async function fetchLinkPreview(url) {
+    const normalized = extractFirstUrl(url);
+    if (!normalized) {
+      return null;
+    }
+
+    if (isImageUrl(normalized)) {
+      return { type: "image", url: normalized, title: "", description: "", image: normalized, video: "" };
+    }
+    if (isVideoUrl(normalized)) {
+      return { type: "video", url: normalized, title: "", description: "", image: "", video: normalized };
+    }
+
+    try {
+      const response = await fetch(normalized, {
+        method: "GET",
+        credentials: "omit"
+      });
+      if (!response.ok) {
+        return null;
+      }
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("text/html")) {
+        return null;
+      }
+
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const title = (doc.querySelector("meta[property='og:title']")?.content || doc.querySelector("meta[name='twitter:title']")?.content || doc.querySelector("title")?.textContent || "").trim();
+      const description = (doc.querySelector("meta[property='og:description']")?.content || doc.querySelector("meta[name='description']")?.content || doc.querySelector("meta[name='twitter:description']")?.content || "").trim();
+      const image = (doc.querySelector("meta[property='og:image']")?.content || doc.querySelector("meta[name='twitter:image']")?.content || doc.querySelector("link[rel='image_src']")?.href || "").trim();
+      const video = (doc.querySelector("meta[property='og:video']")?.content || doc.querySelector("meta[name='twitter:player']")?.content || doc.querySelector("video source")?.src || doc.querySelector("video")?.src || "").trim();
+      const type = video ? "video" : image ? "image" : "link";
+      return {
+        type,
+        url: normalized,
+        title,
+        description,
+        image: image || "",
+        video: video || ""
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function renderLinkPreview() {
+    if (!state.root) {
+      return;
+    }
+
+    const previewZone = state.root.querySelector("#nebula-chat-link-preview");
+    if (!previewZone) {
+      return;
+    }
+
+    const preview = state.linkPreview;
+    if (!preview) {
+      previewZone.classList.add("hidden");
+      previewZone.innerHTML = "";
+      return;
+    }
+
+    let content = "";
+    if (preview.type === "image" && preview.image) {
+      content = <img src="" alt="" />;
+    } else if (preview.type === "video" && preview.video) {
+      content = <video src="" controls preload="metadata"></video>;
+    } else {
+      content = 
+        <div class="nebula-chat-link-preview-body">
+          <strong></strong>
+          <p></p>
+        </div>
+      ;
+    }
+
+    previewZone.classList.remove("hidden");
+    previewZone.innerHTML = 
+      <a href="" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
+        
+      </a>
+    ;
+  }
+
+  function updateLinkPreviewForInput(value) {
+    const url = extractFirstUrl(value);
+    if (!url) {
+      state.linkPreview = null;
+      renderLinkPreview();
+      return;
+    }
+
+    if (state.linkPreview && state.linkPreview.url === url) {
+      return;
+    }
+
+    state.linkPreview = null;
+    renderLinkPreview();
+    fetchLinkPreview(url).then((preview) => {
+      if (preview && extractFirstUrl(String(value || "")) === url) {
+        state.linkPreview = preview;
+        renderLinkPreview();
+      }
+    }).catch(() => {
+      state.linkPreview = null;
+      renderLinkPreview();
+    });
+  }
+
+  function clearLinkPreview() {
+    state.linkPreview = null;
+    renderLinkPreview();
+  }
+
+  function extractFirstUrl(value) {
+    const text = String(value || "");
+    const match = text.match(/https?:\/\/[^\s"'<>\(\)]+/i);
+    if (!match) {
+      return "";
+    }
+    try {
+      return new URL(match[0].trim()).href;
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function isImageUrl(url) {
+    return /\.(jpe?g|png|gif|webp|bmp|svg|avif)(?:[?#].*)?$/i.test(String(url));
+  }
+
+  function isVideoUrl(url) {
+    return /\.(mp4|webm|ogg|mov|m4v)(?:[?#].*)?$/i.test(String(url));
+  }
+
+  async function fetchLinkPreview(url) {
+    const normalized = extractFirstUrl(url);
+    if (!normalized) {
+      return null;
+    }
+
+    if (isImageUrl(normalized)) {
+      return { type: "image", url: normalized, title: "", description: "", image: normalized, video: "" };
+    }
+    if (isVideoUrl(normalized)) {
+      return { type: "video", url: normalized, title: "", description: "", image: "", video: normalized };
+    }
+
+    try {
+      const response = await fetch(normalized, {
+        method: "GET",
+        credentials: "omit"
+      });
+      if (!response.ok) {
+        return null;
+      }
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("text/html")) {
+        return null;
+      }
+
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const title = (doc.querySelector("meta[property='og:title']")?.content || doc.querySelector("meta[name='twitter:title']")?.content || doc.querySelector("title")?.textContent || "").trim();
+      const description = (doc.querySelector("meta[property='og:description']")?.content || doc.querySelector("meta[name='description']")?.content || doc.querySelector("meta[name='twitter:description']")?.content || "").trim();
+      const image = (doc.querySelector("meta[property='og:image']")?.content || doc.querySelector("meta[name='twitter:image']")?.content || doc.querySelector("link[rel='image_src']")?.href || "").trim();
+      const video = (doc.querySelector("meta[property='og:video']")?.content || doc.querySelector("meta[name='twitter:player']")?.content || doc.querySelector("video source")?.src || doc.querySelector("video")?.src || "").trim();
+      const type = video ? "video" : image ? "image" : "link";
+      return {
+        type,
+        url: normalized,
+        title,
+        description,
+        image: image || "",
+        video: video || ""
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function renderLinkPreview() {
+    if (!state.root) {
+      return;
+    }
+
+    const previewZone = state.root.querySelector("#nebula-chat-link-preview");
+    if (!previewZone) {
+      return;
+    }
+
+    const preview = state.linkPreview;
+    if (!preview) {
+      previewZone.classList.add("hidden");
+      previewZone.innerHTML = "";
+      return;
+    }
+
+    let content = "";
+    if (preview.type === "image" && preview.image) {
+      content = <img src="" alt="" />;
+    } else if (preview.type === "video" && preview.video) {
+      content = <video src="" controls preload="metadata"></video>;
+    } else {
+      content = 
+        <div class="nebula-chat-link-preview-body">
+          <strong></strong>
+          <p></p>
+        </div>
+      ;
+    }
+
+    previewZone.classList.remove("hidden");
+    previewZone.innerHTML = 
+      <a href="" target="_blank" rel="noreferrer noopener" class="nebula-chat-link-preview-card">
+        
+      </a>
+    ;
+  }
+
+  function updateLinkPreviewForInput(value) {
+    const url = extractFirstUrl(value);
+    if (!url) {
+      state.linkPreview = null;
+      renderLinkPreview();
+      return;
+    }
+
+    if (state.linkPreview && state.linkPreview.url === url) {
+      return;
+    }
+
+    state.linkPreview = null;
+    renderLinkPreview();
+    fetchLinkPreview(url).then((preview) => {
+      if (preview && extractFirstUrl(String(value || "")) === url) {
+        state.linkPreview = preview;
+        renderLinkPreview();
+      }
+    }).catch(() => {
+      state.linkPreview = null;
+      renderLinkPreview();
+    });
+  }
+
+  function clearLinkPreview() {
+    state.linkPreview = null;
+    renderLinkPreview();
+  }
+
 
   function pairKeyForUids(uidA, uidB) {
     const a = String(uidA || "").trim();
@@ -962,8 +1362,10 @@
 
       const text = decryptFailed ? "Unable to decrypt this message." : String(payload.text || "");
       const replyToMessageId = decryptFailed ? "" : String(payload.replyToMessageId || "");
+      const preview = decryptFailed ? null : payload.linkPreview || null;
 
       rows.push({
+        preview,
         id: doc.id,
         senderId: String(data.senderId || ""),
         senderUsername: String(data.senderUsername || "Unknown"),
@@ -1307,6 +1709,7 @@
     state.selectedChat = state.chats.find((chat) => chat.id === next) || null;
     state.messageRows = [];
     state.pendingReply = null;
+    state.linkPreview = null;
     renderMainArea();
     renderChatList();
     subscribeMessages(next);
@@ -1385,6 +1788,7 @@
         <div id="nebula-chat-messages" class="nebula-chat-messages"></div>
         <div class="nebula-chat-compose-wrap">
           <div id="nebula-chat-reply-chip" class="nebula-chat-reply-chip hidden"></div>
+          <div id="nebula-chat-link-preview" class="nebula-chat-link-preview hidden"></div>
           <form id="nebula-chat-compose-form" class="nebula-chat-compose">
             <input id="nebula-chat-compose-input" type="text" maxlength="4000" placeholder="Send an encrypted message" autocomplete="off" />
             <button type="submit">Send</button>
@@ -1397,6 +1801,15 @@
     const input = main.querySelector("#nebula-chat-compose-input");
 
     if (form && input) {
+      input.addEventListener("input", () => {
+        updateLinkPreviewForInput(String(input.value || ""));
+      });
+
+      input.addEventListener("paste", (event) => {
+        const pasted = event.clipboardData && event.clipboardData.getData ? event.clipboardData.getData("text/plain") : "";
+        updateLinkPreviewForInput(String(pasted || ""));
+      });
+
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const text = String(input.value || "").trim();
@@ -1422,7 +1835,8 @@
 
         const payload = {
           text,
-          replyToMessageId: state.pendingReply && state.pendingReply.id ? state.pendingReply.id : ""
+          replyToMessageId: state.pendingReply && state.pendingReply.id ? state.pendingReply.id : "",
+          linkPreview: state.linkPreview ? { ...state.linkPreview } : null
         };
 
         input.disabled = true;
@@ -1452,6 +1866,7 @@
 
           input.value = "";
           dismissReplyComposer();
+          clearLinkPreview();
         } catch (error) {
           setStatus(error && error.message ? error.message : "Could not send message.", "error");
         } finally {
@@ -1462,6 +1877,7 @@
     }
 
     renderReplyChip();
+    renderLinkPreview();
     renderMessages();
   }
 
@@ -1498,11 +1914,22 @@
         const replyHtml = reply
           ? `<div class="nebula-chat-inline-reply"><strong>${escapeHtml(reply.senderUsername)}</strong><span>${escapeHtml(truncate(reply.text, CHAT_PREVIEW_LIMIT))}</span></div>`
           : "";
+        const preview = row.preview || null;
+        const previewHtml = preview
+          ? `<div class="nebula-chat-link-preview-card">
+               <a href="${escapeHtml(preview.url)}" target="_blank" rel="noreferrer noopener">
+                 ${preview.type === "image" && preview.image ? `<img src="${escapeHtml(preview.image)}" alt="${escapeHtml(preview.title || preview.url)}" />` : ""}
+                 ${preview.type === "video" && preview.video ? `<video src="${escapeHtml(preview.video)}" controls preload="metadata"></video>` : ""}
+                 ${preview.type === "link" ? `<div class="nebula-chat-link-preview-body"><strong>${escapeHtml(preview.title || preview.url)}</strong><p>${escapeHtml(preview.description || preview.url)}</p></div>` : ""}
+               </a>
+             </div>`
+          : "";
 
         return `
           <article class="nebula-chat-bubble${mineClass}" data-message-id="${escapeHtml(row.id)}">
             ${showMeta ? `<div class="nebula-chat-bubble-meta"><strong>${escapeHtml(row.senderUsername)}</strong><span>${escapeHtml(formatTime(row.chainAtMs) + edited)}</span></div>` : ""}
             ${replyHtml}
+            ${previewHtml}
             <p>${escapeHtml(row.text)}</p>
           </article>
         `;
@@ -2381,6 +2808,7 @@
       state.selectedChatId = "";
       state.messageRows = [];
       state.pendingReply = null;
+      state.linkPreview = null;
       state.chatAesKeys.clear();
       state.memberCache.clear();
       state.friends = [];
@@ -2442,6 +2870,7 @@
     state.selectedChat = null;
     state.messageRows = [];
     state.pendingReply = null;
+    state.linkPreview = null;
     state.chatAesKeys.clear();
     state.memberCache.clear();
     state.friends = [];
