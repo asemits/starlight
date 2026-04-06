@@ -1,13 +1,14 @@
 {
   "projects": {
-    "default": "starlight-28e40"
+    "default": "nebula-28e40"
   },
   "targets": {
-    "starlight-28e40": {
+    "nebula-28e40": {
       "hosting": {
-        "main": ["starlight-28e40"],
-        "site1": ["starlight-2wl28"],
-        "site2": ["starlight-32el2"]
+        "main": ["nebula-09sl2"],
+        "site1": ["nebula-19s2l"],
+        "site2": ["nebula-20e83"],
+        "site3": ["nebula-s287el"]
       }
     }
   }
