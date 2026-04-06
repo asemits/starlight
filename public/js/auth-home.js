@@ -1955,7 +1955,7 @@
     if (tosScroll) {
       scrolledToEnd = reachedBottom(tosScroll);
       tosScroll.addEventListener("scroll", () => {
-        scrolledToEnd = reachedBottom(tosScroll);
+        scrolledToEnd = scrolledToEnd || reachedBottom(tosScroll);
         updateContinueState();
       });
     }
