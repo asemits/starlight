@@ -414,7 +414,7 @@
 			`${primary}${encoded}.jpg`,
 			`${secondary}${encoded}.png`,
 			`${secondary}${encoded}.jpg`,
-			"/logos/logo.png"
+			"/static/logo.png"
 		].join("|");
 	}
 
@@ -867,7 +867,7 @@
 		const canFavorite = favoritesEnabled();
 		const favoriteActionAllowed = canFavorite || stats.isFavorite;
 		const fallbacks = thumbFallback(game.path, game.sourceBase);
-		const initialSrc = game.image || fallbacks.split("|")[0] || "/logos/logo.png";
+		const initialSrc = game.image || fallbacks.split("|")[0] || "/static/logo.png";
 		return `
 			<article class="game-card game-open-trigger" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}">
 				<div class="game-card-inner">
@@ -893,7 +893,7 @@
 	function popularCardMarkup(game, rank) {
 		const stats = statsForPath(game.path);
 		const fallbacks = thumbFallback(game.path, game.sourceBase);
-		const initialSrc = game.image || fallbacks.split("|")[0] || "/logos/logo.png";
+		const initialSrc = game.image || fallbacks.split("|")[0] || "/static/logo.png";
 		return `
 			<article class="game-pop-card game-open-trigger" data-path="${escapeHtml(game.path)}" data-base="${escapeHtml(normalizeSourceBase(game.sourceBase))}">
 				<div class="game-pop-rank">#${rank + 1}</div>
@@ -934,7 +934,7 @@
 	}
 
 	function heroImageChain(game) {
-		const logo = normalizeImageUrl("/logos/logo.png", game.sourceBase);
+		const logo = normalizeImageUrl("/static/logo.png", game.sourceBase);
 		const candidates = [
 			game.image || "",
 			...thumbFallback(game.path, game.sourceBase).split("|"),
@@ -966,7 +966,7 @@
 
 		const stats = statsForPath(heroGame.path);
 		const heroChain = heroImageChain(heroGame);
-		const heroInitialSrc = heroChain[0] || "/logos/logo.png";
+		const heroInitialSrc = heroChain[0] || "/static/logo.png";
 		const heroFallbacks = heroChain.slice(1).join("|");
 		heroWrap.innerHTML = `
 			<article class="games-hero-card game-open-trigger" data-path="${escapeHtml(heroGame.path)}" data-base="${escapeHtml(normalizeSourceBase(heroGame.sourceBase))}">

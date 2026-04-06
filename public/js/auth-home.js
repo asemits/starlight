@@ -1939,7 +1939,7 @@
         const ok = document.getElementById("starlight-popup-ok");
         if (ok) {
           ok.addEventListener("click", () => {
-            openSignupFormModal();
+            openSignupTosModal();
           });
         }
       });

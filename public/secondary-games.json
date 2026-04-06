@@ -72,7 +72,7 @@
   {
     "title": "EaglercraftX 1.8.8",
     "url": "EaglercraftX_1.8_u53_Offline_Signed.html",
-    "image": "/logos/logo.png"
+    "image": "/static/logo.png"
   },
   {
     "title": "FNF vs Bob v2.0 (Bob’s Onslaught)",
@@ -677,7 +677,7 @@
   {
     "title": "COD Zombies",
     "url": "clcodzombies.html",
-    "image": "/logos/logo.png"
+    "image": "/static/logo.png"
   },
   {
     "title": "Cookie Clicker Cool",
@@ -1127,7 +1127,7 @@
   {
     "title": "Grand Theft Auto Advance",
     "url": "clgrandtheftautoadvance.html",
-    "image": "/logos/logo.png"
+    "image": "/static/logo.png"
   },
   {
     "title": "Granny 22",
@@ -1267,7 +1267,7 @@
   {
     "title": "Moto X3M (1)",
     "url": "clmotox3mm(1).html",
-    "image": "/logos/logo.png"
+    "image": "/static/logo.png"
   },
   {
     "title": "Moto X3M",
@@ -1447,7 +1447,7 @@
   {
     "title": "Slow Road",
     "url": "clslowroad.html",
-    "image": "/logos/logo.png"
+    "image": "/static/logo.png"
   },
   {
     "title": "SMB Game Over",
@@ -1562,12 +1562,12 @@
   {
     "title": "Superhot (1)",
     "url": "clsuperhot(1).html",
-    "image": "/logos/logo.png"
+    "image": "/static/logo.png"
   },
   {
     "title": "Superhot (2)",
     "url": "clsuperhot(2).html",
-    "image": "/logos/logo.png"
+    "image": "/static/logo.png"
   },
   {
     "title": "Superhotline Miami",
@@ -1632,7 +1632,7 @@
   {
     "title": "There Is No File",
     "url": "clthereisnofile.html",
-    "image": "/logos/logo.png"
+    "image": "/static/logo.png"
   },
   {
     "title": "Time Shooter 2",
@@ -1652,7 +1652,7 @@
   {
     "title": "Trace",
     "url": "cltrace.html",
-    "image": "/logos/logo.png"
+    "image": "/static/logo.png"
   },
   {
     "title": "Truck Sim",
