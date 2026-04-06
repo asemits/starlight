@@ -5,10 +5,10 @@
   "targets": {
     "starlight-28e40": {
       "hosting": {
-        "main": ["nebula-09sl2"],
-        "site1": ["nebula-19s2l"],
-        "site2": ["nebula-20e83"],
-        "site3": ["nebula-s287el"]
+        "main": ["freenotesite2309"],
+        "site1": ["clock28"],
+        "site2": ["mathsite288"],
+        "site3": ["geohomework"]
       }
     }
   }
