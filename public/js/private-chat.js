@@ -2217,7 +2217,14 @@
         if (handleComposeMentionKeydown(event, input, mentionContainer)) {
           return;
         }
-        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        if (
+          event.key === "Enter"
+          && !event.shiftKey
+          && !event.ctrlKey
+          && !event.metaKey
+          && !event.altKey
+          && !event.isComposing
+        ) {
           event.preventDefault();
           if (typeof form.requestSubmit === "function") {
             form.requestSubmit();
