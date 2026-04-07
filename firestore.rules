@@ -240,6 +240,21 @@ service cloud.firestore {
       allow delete: if isOwner(uid) && docId == 'main';
     }
 
+    match /users/{uid}/aiDailyUsage/{dayKey} {
+      allow read: if isOwner(uid);
+      allow create, update, delete: if false;
+    }
+
+    match /users/{uid}/aiConversations/{conversationId} {
+      allow read: if isOwner(uid);
+      allow create, update, delete: if false;
+    }
+
+    match /users/{uid}/aiConversations/{conversationId}/messages/{messageId} {
+      allow read: if isOwner(uid);
+      allow create, update, delete: if false;
+    }
+
     match /friendRequests/{requestId} {
       allow read: if isSignedIn()
         && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);

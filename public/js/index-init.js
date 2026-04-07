@@ -58,8 +58,13 @@
       window.NebulaPrivateChat.unmount();
     }
 
+    if (path !== "/ai-chat" && path !== "/ai" && window.NebulaAIChat && typeof window.NebulaAIChat.unmount === "function") {
+      window.NebulaAIChat.unmount();
+    }
+
     appContent.classList.toggle("nebula-chat-screen", path === "/private-chat" || path === "/chat");
     appContent.classList.toggle("nebula-proxy-screen", path === "/proxy");
+    appContent.classList.toggle("nebula-ai-screen", path === "/ai-chat" || path === "/ai");
 
     const route = routes[path] || routes["404"];
     if (!route || typeof route.render !== "function") {

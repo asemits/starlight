@@ -37,12 +37,16 @@
   const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
   const DASHBOARD_SHOW_STATS_KEY = "dashboard-show-stats";
   const DASHBOARD_SHOW_RECENT_MUSIC_KEY = "dashboard-show-recent-music";
+  const DASHBOARD_SHOW_RECENT_AI_KEY = "dashboard-show-recent-ai";
   const MEASUREMENT_SYSTEM_KEY = "nebula-measurement-system";
   const WIDGET_WEATHER_CACHE_KEY = "nebula-widget-weather-current";
   const NOTIFY_INAPP_KEY = "nebula-notify-inapp";
   const NOTIFY_OS_KEY = "nebula-notify-os";
   const NOTIFY_MESSAGES_KEY = "nebula-notify-messages";
   const NOTIFY_FRIEND_REQUESTS_KEY = "nebula-notify-friend-requests";
+  const AI_CUSTOM_INSTRUCTIONS_KEY = "nebula-ai-custom-instructions";
+  const AI_CLOUD_SYNC_KEY = "nebula-sync-ai-conversations";
+  const AI_SERVER_BASE_KEY = "nebula-ai-server-base";
 
   function escapeHtml(value) {
     return String(value || "")
@@ -493,7 +497,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       recent: DASHBOARD_SHOW_RECENT_KEY,
       favorites: DASHBOARD_SHOW_FAVORITES_KEY,
       stats: DASHBOARD_SHOW_STATS_KEY,
-      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY
+      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY,
+      "recent-ai": DASHBOARD_SHOW_RECENT_AI_KEY
     };
     const key = keyMap[String(section || "")];
     if (!key) {
@@ -507,7 +512,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       recent: DASHBOARD_SHOW_RECENT_KEY,
       favorites: DASHBOARD_SHOW_FAVORITES_KEY,
       stats: DASHBOARD_SHOW_STATS_KEY,
-      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY
+      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY,
+      "recent-ai": DASHBOARD_SHOW_RECENT_AI_KEY
     };
     const key = keyMap[String(section || "")];
     if (!key) {
@@ -517,6 +523,43 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     if (window.location.pathname === "/" && typeof window.router === "function") {
       window.router();
     }
+  };
+
+  function normalizeAiServerBase(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return window.location.origin;
+    }
+    try {
+      const parsed = new URL(raw, window.location.origin);
+      return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/g, "") || window.location.origin;
+    } catch (_error) {
+      return window.location.origin;
+    }
+  }
+
+  window.getAiCustomInstructions = function getAiCustomInstructions() {
+    return String(localStorage.getItem(AI_CUSTOM_INSTRUCTIONS_KEY) || "");
+  };
+
+  window.setAiCustomInstructions = function setAiCustomInstructions(value) {
+    localStorage.setItem(AI_CUSTOM_INSTRUCTIONS_KEY, String(value || "").slice(0, 4000));
+  };
+
+  window.getAiConversationSync = function getAiConversationSync() {
+    return localStorage.getItem(AI_CLOUD_SYNC_KEY) === "off" ? "off" : "on";
+  };
+
+  window.setAiConversationSync = function setAiConversationSync(value) {
+    localStorage.setItem(AI_CLOUD_SYNC_KEY, value === "off" ? "off" : "on");
+  };
+
+  window.getAiServerBase = function getAiServerBase() {
+    return normalizeAiServerBase(localStorage.getItem(AI_SERVER_BASE_KEY) || "");
+  };
+
+  window.setAiServerBase = function setAiServerBase(value) {
+    localStorage.setItem(AI_SERVER_BASE_KEY, normalizeAiServerBase(value));
   };
 
   window.changeGamesPaginationMode = function changeGamesPaginationMode(newMode) {
@@ -649,6 +692,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       window.changeDashboardSectionVisibility("recent-music", "on");
       return;
     }
+    if (cardId === "layout-dashboard-recent-ai") {
+      window.changeDashboardSectionVisibility("recent-ai", "on");
+      return;
+    }
     if (cardId === "games-pagination") {
       window.changeGamesPaginationMode("numbered");
       return;
@@ -710,6 +757,18 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       window.changeInfoWidgetSectionVisibility("weather", "on");
       window.changeInfoWidgetSectionVisibility("datetime", "on");
       window.changeInfoWidgetSectionVisibility("battery", "on");
+      return;
+    }
+    if (cardId === "ai-custom-instructions") {
+      window.setAiCustomInstructions("");
+      return;
+    }
+    if (cardId === "ai-cloud-sync") {
+      window.setAiConversationSync("on");
+      return;
+    }
+    if (cardId === "ai-server-base") {
+      window.setAiServerBase(window.location.origin);
     }
   }
 
@@ -720,12 +779,13 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   window.resetSettingsCategory = function resetSettingsCategory(category) {
     const map = {
-      layout: ["layout-sidebar", "layout-measurement", "layout-dashboard-recent", "layout-dashboard-favorites", "layout-dashboard-stats", "layout-dashboard-recent-music", "games-pagination"],
+      layout: ["layout-sidebar", "layout-measurement", "layout-dashboard-recent", "layout-dashboard-favorites", "layout-dashboard-stats", "layout-dashboard-recent-music", "layout-dashboard-recent-ai", "games-pagination"],
       games: ["games-pagination"],
       particles: ["particles-enabled", "particles-bonds", "particles-color", "particles-shape", "particles-frequency", "particles-size"],
       shortcut: ["shortcut-main", "shortcut-anticlose"],
       cloak: ["cloak-main", "cloak-open"],
-      widget: ["widget-main", "widget-format", "widget-content"]
+      widget: ["widget-main", "widget-format", "widget-content"],
+      ai: ["ai-custom-instructions", "ai-cloud-sync", "ai-server-base"]
     };
     const keys = map[String(category || "")] || [];
     keys.forEach((key) => resetSettingsCard(key));

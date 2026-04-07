@@ -8,8 +8,10 @@
   const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
   const DASHBOARD_SHOW_STATS_KEY = "dashboard-show-stats";
   const DASHBOARD_SHOW_RECENT_MUSIC_KEY = "dashboard-show-recent-music";
+  const DASHBOARD_SHOW_RECENT_AI_KEY = "dashboard-show-recent-ai";
   const DASHBOARD_RECENT_COUNT_KEY = "dashboard-last-recent-count";
   const DASHBOARD_FAVORITES_COUNT_KEY = "dashboard-last-favorites-count";
+  const DASHBOARD_RECENT_AI_COUNT_KEY = "dashboard-last-recent-ai-count";
   const SYNC_PREF_STATS_KEY = "nebula-sync-stats";
   const SYNC_PREF_GAME_PROGRESS_KEY = "nebula-sync-game-progress";
   const SYNC_PREF_SETTINGS_KEY = "nebula-sync-settings";
@@ -17,6 +19,10 @@
   const SYNC_PREF_RECENT_GAMES_KEY = "nebula-sync-recent-games";
   const SYNC_PREF_RECENT_MUSIC_KEY = "nebula-sync-recent-music";
   const SYNC_PREF_MUSIC_PLAYLISTS_KEY = "nebula-sync-music-playlists";
+  const AI_STORE_KEY = "nebula-ai-store-v1";
+  const AI_CLOUD_SYNC_KEY = "nebula-sync-ai-conversations";
+  const AI_CUSTOM_INSTRUCTIONS_KEY = "nebula-ai-custom-instructions";
+  const AI_SERVER_BASE_KEY = "nebula-ai-server-base";
   const MUSIC_RECENT_KEY = "nebula-music-recent";
   const MUSIC_PLAYLIST_KEY = "cl-playlist";
   const MUSIC_FAVORITES_KEY = "cl-favs";
@@ -55,6 +61,10 @@
     "dashboard-show-favorites",
     "dashboard-show-stats",
     "dashboard-show-recent-music",
+    "dashboard-show-recent-ai",
+    AI_CLOUD_SYNC_KEY,
+    AI_CUSTOM_INSTRUCTIONS_KEY,
+    AI_SERVER_BASE_KEY,
     "nebula-measurement-system",
     MUSIC_VOLUME_KEY,
     SOUNDBOARD_VOLUME_KEY,
@@ -182,7 +192,8 @@
       recent: DASHBOARD_SHOW_RECENT_KEY,
       favorites: DASHBOARD_SHOW_FAVORITES_KEY,
       stats: DASHBOARD_SHOW_STATS_KEY,
-      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY
+      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY,
+      "recent-ai": DASHBOARD_SHOW_RECENT_AI_KEY
     };
     const key = keyMap[String(section || "")];
     if (!key) {
@@ -1064,6 +1075,60 @@
       .filter(Boolean);
   }
 
+  function collectRecentAiConversationSnapshot(limit) {
+    const max = Math.max(1, Math.min(20, Number(limit || 6)));
+    try {
+      const parsed = JSON.parse(localStorage.getItem(AI_STORE_KEY) || "{}");
+      const conversations = Array.isArray(parsed && parsed.conversations) ? parsed.conversations : [];
+      return conversations
+        .map((item) => {
+          const id = String(item && item.id ? item.id : "").trim();
+          if (!id) {
+            return null;
+          }
+          const title = String(item && item.title ? item.title : "New conversation").trim().slice(0, 120) || "New conversation";
+          const updatedAt = Number(item && item.updatedAt ? item.updatedAt : item && item.createdAt ? item.createdAt : 0);
+          const messageCount = Number(item && item.messageCount ? item.messageCount : 0);
+          const preview = String(item && item.lastPreview ? item.lastPreview : "").trim().slice(0, 220);
+          return {
+            id,
+            title,
+            updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0,
+            messageCount: Number.isFinite(messageCount) ? Math.max(0, messageCount) : 0,
+            lastPreview: preview
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, max);
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function removeRecentAiConversation(conversationId) {
+    const targetId = String(conversationId || "").trim();
+    if (!targetId) {
+      return;
+    }
+    try {
+      const parsed = JSON.parse(localStorage.getItem(AI_STORE_KEY) || "{}");
+      const conversations = Array.isArray(parsed && parsed.conversations) ? parsed.conversations : [];
+      const next = conversations.filter((item) => String(item && item.id ? item.id : "") !== targetId);
+      const nextActiveId = String(parsed && parsed.activeConversationId ? parsed.activeConversationId : "") === targetId
+        ? ""
+        : String(parsed && parsed.activeConversationId ? parsed.activeConversationId : "");
+      localStorage.setItem(AI_STORE_KEY, JSON.stringify({
+        activeConversationId: nextActiveId,
+        conversations: next
+      }));
+    } catch (_error) {
+    }
+    if (window.NebulaAIChat && typeof window.NebulaAIChat.clearConversation === "function") {
+      window.NebulaAIChat.clearConversation(targetId);
+    }
+  }
+
   function collectSyncStatsSnapshot(gameProgress) {
     const items = Array.isArray(gameProgress && gameProgress.items) ? gameProgress.items : [];
     return items.map((item) => ({
@@ -1518,6 +1583,7 @@
       const showFavorites = dashboardSectionEnabled("favorites");
       const showStats = dashboardSectionEnabled("stats");
       const showRecentMusic = dashboardSectionEnabled("recent-music");
+      const showRecentAi = dashboardSectionEnabled("recent-ai");
       root.innerHTML = `
         <section class="nebula-home-shell nebula-dashboard-shell">
           <header class="nebula-home-hero">
@@ -1554,6 +1620,14 @@
               <button id="dashboard-clear-recent-music" type="button" class="nebula-btn nebula-btn-muted">Clear Recent Music</button>
             </div>
             <div id="dashboard-recent-music" class="nebula-dashboard-grid"></div>
+          </section>` : ""}
+
+          ${showRecentAi ? `<section class="nebula-dashboard-section">
+            <div class="nebula-dashboard-head">
+              <h2>Recent AI Conversations</h2>
+              <a href="/ai-chat" class="nebula-dashboard-link nav-link">Open AI Chat</a>
+            </div>
+            <div id="dashboard-recent-ai" class="nebula-dashboard-grid"></div>
           </section>` : ""}
         </section>
       `;
@@ -1597,6 +1671,7 @@
     const favoritesNode = document.getElementById("dashboard-favorites");
     const statsNode = document.getElementById("dashboard-stats");
     const recentMusicNode = document.getElementById("dashboard-recent-music");
+    const recentAiNode = document.getElementById("dashboard-recent-ai");
     if (!firestore || !user) {
       return;
     }
@@ -1605,8 +1680,53 @@
     const showFavorites = dashboardSectionEnabled("favorites");
     const showStats = dashboardSectionEnabled("stats");
     const showRecentMusic = dashboardSectionEnabled("recent-music");
-    if ((showRecent && !recentNode) || (showFavorites && !favoritesNode) || (showStats && !statsNode) || (showRecentMusic && !recentMusicNode)) {
+    const showRecentAi = dashboardSectionEnabled("recent-ai");
+    if ((showRecent && !recentNode) || (showFavorites && !favoritesNode) || (showStats && !statsNode) || (showRecentMusic && !recentMusicNode) || (showRecentAi && !recentAiNode)) {
       return;
+    }
+
+    if (showRecentAi && recentAiNode) {
+      function renderRecentAiConversations(items) {
+        const safeItems = Array.isArray(items) ? items : [];
+        localStorage.setItem(DASHBOARD_RECENT_AI_COUNT_KEY, String(safeItems.length));
+        if (!safeItems.length) {
+          recentAiNode.innerHTML = '<p class="nebula-dashboard-empty">No recent AI conversations yet.</p>';
+          return;
+        }
+        recentAiNode.innerHTML = safeItems.map((item) => {
+          const dateText = item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "";
+          const subtitle = item.lastPreview || "No preview available.";
+          return `
+            <a href="/ai-chat?conversation=${encodeURIComponent(item.id)}" class="nav-link nebula-dashboard-item nebula-dashboard-ai-item">
+              <div class="nebula-dashboard-thumb nebula-dashboard-thumb-ai">
+                <div class="nebula-dashboard-fallback"><i class="fa-solid fa-robot"></i></div>
+                <div class="nebula-dashboard-meta">
+                  <h3>${escapeHtml(item.title)}</h3>
+                  <p>${escapeHtml(subtitle)}</p>
+                  <p>${escapeHtml(dateText)}</p>
+                </div>
+                <button type="button" class="nebula-dashboard-remove-favorite" data-remove-recent-ai="1" data-conversation-id="${escapeHtml(item.id)}" aria-label="Remove AI conversation from recent list"><i class="fa-solid fa-trash"></i></button>
+              </div>
+            </a>
+          `;
+        }).join("");
+
+        recentAiNode.querySelectorAll("[data-remove-recent-ai='1']").forEach((button) => {
+          button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const conversationId = String(button.getAttribute("data-conversation-id") || "").trim();
+            if (!conversationId) {
+              return;
+            }
+            removeRecentAiConversation(conversationId);
+            renderRecentAiConversations(collectRecentAiConversationSnapshot(6));
+          });
+        });
+      }
+
+      const recentAi = collectRecentAiConversationSnapshot(6);
+      renderRecentAiConversations(recentAi);
     }
 
     if (showRecentMusic && recentMusicNode) {

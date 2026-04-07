@@ -3,3 +3,6 @@ npm-debug.log*
 firebase-debug.log*
 firebase-debug.*.log*
 .firebase/
+ai-server/node_modules/
+ai-server/.env
+ai-server/
