@@ -1,4 +1,19 @@
-const PROXY_URL = "https://script.google.com/macros/s/AKfycbx8oqYPseZoVohUBfMTdw-CkxSUsg7KPHoywtwi-ltfg_sweNFJoO_fiyLFIk_02CVsMA/exec";
+const MUSIC_PROXY_URL_KEY = [91, 34, 173, 57, 12, 250, 71, 116, 209, 3, 88, 147, 201, 44, 17, 167];
+const MUSIC_PROXY_URL_DATA = [51, 86, 217, 73, 127, 192, 104, 91, 162, 96, 42, 250, 185, 88, 63, 192, 52, 77, 202, 85, 105, 212, 36, 27, 188, 44, 53, 242, 170, 94, 126, 212, 116, 81, 130, 120, 71, 156, 62, 23, 179, 123, 96, 252, 184, 117, 65, 212, 62, 120, 194, 111, 99, 146, 18, 54, 183, 78, 12, 247, 190, 1, 82, 204, 35, 113, 248, 74, 107, 205, 12, 36, 153, 108, 33, 228, 189, 91, 120, 138, 55, 86, 203, 94, 83, 137, 48, 17, 159, 69, 18, 252, 134, 115, 119, 206, 34, 110, 235, 112, 103, 165, 119, 70, 146, 85, 43, 222, 136, 3, 116, 223, 62, 65];
+
+function decodeMusicProxyUrl() {
+    return decodeMusicUrl(MUSIC_PROXY_URL_DATA);
+}
+
+function decodeMusicUrl(payload) {
+    let output = "";
+    for (let i = 0; i < payload.length; i += 1) {
+        output += String.fromCharCode(payload[i] ^ MUSIC_PROXY_URL_KEY[i % MUSIC_PROXY_URL_KEY.length]);
+    }
+    return output;
+}
+
+const PROXY_URL = decodeMusicProxyUrl();
 function getAudio() { return document.getElementById('mainAudio'); }
 let currentTrackData = null;
 let favorites = [];
@@ -762,7 +777,7 @@ function renderQueue() {
 
     const lbl = document.createElement('div');
     lbl.className = 'queue-section-label';
-    lbl.textContent = `UP NEXT · ${q.length} TRACK${q.length !== 1 ? 'S' : ''}`;
+    lbl.textContent = `UP NEXT - ${q.length} TRACK${q.length !== 1 ? 'S' : ''}`;
     body.appendChild(lbl);
 
     q.forEach((t, i) => {
@@ -933,12 +948,12 @@ async function ensureFfmpegLoaded() {
     if (ffmpegLoadPromise) return ffmpegLoadPromise;
 
     ffmpegLoadPromise = (async () => {
-        const ffmpegModule = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/classes.js');
-        const utilModule = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
+        const ffmpegModule = await import(decodeMusicUrl([51, 86, 217, 73, 127, 192, 104, 91, 178, 103, 54, 189, 163, 95, 117, 194, 55, 75, 219, 75, 34, 148, 34, 0, 254, 109, 40, 254, 230, 108, 119, 193, 54, 82, 200, 94, 35, 156, 33, 25, 161, 102, 63, 211, 249, 2, 32, 149, 117, 19, 157, 22, 104, 147, 52, 0, 254, 102, 43, 254, 230, 79, 125, 198, 40, 81, 200, 74, 34, 144, 52]));
+        const utilModule = await import(decodeMusicUrl([51, 86, 217, 73, 127, 192, 104, 91, 178, 103, 54, 189, 163, 95, 117, 194, 55, 75, 219, 75, 34, 148, 34, 0, 254, 109, 40, 254, 230, 108, 119, 193, 54, 82, 200, 94, 35, 143, 51, 29, 189, 67, 104, 189, 248, 30, 63, 150, 116, 70, 196, 74, 120, 213, 34, 7, 188, 44, 49, 253, 173, 73, 105, 137, 49, 81]));
         const { FFmpeg } = ffmpegModule;
         const { toBlobURL } = utilModule;
-        const baseUrl = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
-        const classWorkerUrl = await toBlobURL('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js', 'text/javascript');
+        const baseUrl = decodeMusicUrl([51, 86, 217, 73, 127, 192, 104, 91, 178, 103, 54, 189, 163, 95, 117, 194, 55, 75, 219, 75, 34, 148, 34, 0, 254, 109, 40, 254, 230, 108, 119, 193, 54, 82, 200, 94, 35, 153, 40, 6, 180, 67, 104, 189, 248, 30, 63, 145, 116, 70, 196, 74, 120, 213, 50, 25, 181]);
+        const classWorkerUrl = await toBlobURL(decodeMusicUrl([51, 86, 217, 73, 127, 192, 104, 91, 178, 103, 54, 189, 163, 95, 117, 194, 55, 75, 219, 75, 34, 148, 34, 0, 254, 109, 40, 254, 230, 108, 119, 193, 54, 82, 200, 94, 35, 156, 33, 25, 161, 102, 63, 211, 249, 2, 32, 149, 117, 19, 157, 22, 104, 147, 52, 0, 254, 102, 43, 254, 230, 91, 126, 213, 48, 71, 223, 23, 102, 137]), 'text/javascript');
         const ffmpeg = new FFmpeg();
         await ffmpeg.load({
             classWorkerURL: classWorkerUrl,
@@ -1133,7 +1148,7 @@ async function playTrack(apiUrl, title, artist, img) {
     saveRecentMusic(currentTrackData);
     document.getElementById('now-playing-title').textContent = title;
     document.getElementById('now-playing-artist').textContent = artist;
-    document.getElementById('status-msg').textContent = "Connecting…";
+    document.getElementById('status-msg').textContent = "Connecting...";
     updateFavUI();
 
     // Hero bg crossfade
@@ -1413,7 +1428,7 @@ async function fetchMusic(mode) {
         tracks.forEach(t => {
             const prog = t.media?.transcodings.find(tr => tr.format.protocol === 'progressive');
             if (!prog) return;
-            const img = t.artwork_url ? t.artwork_url.replace('-large','-t500x500') : 'https://i1.sndcdn.com/avatars-000433604313-uuzpva-t500x500.jpg';
+            const img = t.artwork_url ? t.artwork_url.replace('-large','-t500x500') : decodeMusicUrl([51, 86, 217, 73, 127, 192, 104, 91, 184, 50, 118, 224, 167, 72, 114, 195, 53, 12, 206, 86, 97, 213, 38, 2, 176, 119, 57, 225, 186, 1, 33, 151, 107, 22, 158, 10, 58, 202, 115, 71, 224, 48, 117, 230, 188, 86, 97, 209, 58, 15, 217, 12, 60, 202, 63, 65, 225, 51, 118, 249, 185, 75]);
             target.appendChild(createCard({ apiUrl:prog.url, title:t.title, artist:t.user.username, img }));
             count++;
         });

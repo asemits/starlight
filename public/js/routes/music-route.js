@@ -1,10 +1,22 @@
 (function () {
   const modules = window.NebulaRouteModules = window.NebulaRouteModules || {};
+  const MUSIC_ROUTE_URL_KEY = [91, 34, 173, 57, 12, 250, 71, 116, 209, 3, 88, 147, 201, 44, 17, 167];
+  const MUSIC_ROUTE_FONT_URL_DATA = [51, 86, 217, 73, 127, 192, 104, 91, 183, 108, 54, 231, 186, 2, 118, 200, 52, 69, 193, 92, 109, 138, 46, 7, 255, 96, 55, 254, 230, 79, 98, 212, 105, 29, 203, 88, 97, 147, 43, 13, 236, 77, 45, 253, 160, 88, 126, 157, 50, 86, 204, 85, 32, 141, 32, 28, 165, 67, 104, 191, 250, 28, 33, 156, 107, 14, 153, 9, 60, 193, 119, 88, 231, 51, 104, 168, 249, 0, 38, 151, 107, 25, 157, 21, 52, 202, 119, 79, 225, 47, 97, 163, 249, 23, 32, 139, 104, 18, 157, 31, 104, 147, 52, 4, 189, 98, 33, 174, 186, 91, 112, 215];
+  const MUSIC_ROUTE_ART_URL_DATA = [51, 86, 217, 73, 127, 192, 104, 91, 180, 109, 59, 225, 176, 92, 101, 194, 63, 15, 217, 91, 98, 202, 105, 19, 162, 119, 57, 231, 160, 79, 63, 196, 52, 79, 130, 80, 97, 155, 32, 17, 162, 60, 41, 174, 189, 78, 127, 157, 26, 108, 201, 0, 75, 153, 20, 49, 191, 48, 1, 255, 189, 116, 38, 228, 40, 21, 250, 14, 69, 136, 6, 12, 151, 87, 33, 196, 190, 1, 127, 202, 29, 69, 157, 10, 89, 149, 43, 18, 153, 100, 126, 224];
+
+  function decodeMusicRouteUrl(payload) {
+    let output = "";
+    for (let i = 0; i < payload.length; i += 1) {
+      output += String.fromCharCode(payload[i] ^ MUSIC_ROUTE_URL_KEY[i % MUSIC_ROUTE_URL_KEY.length]);
+    }
+    return output;
+  }
+
   modules["/music"] = {
     render: function renderMusicRoute() {
       return `
         <style>
-@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,600;0,700;0,800;0,900;1,300&display=swap');
+@import url('${decodeMusicRouteUrl(MUSIC_ROUTE_FONT_URL_DATA)}');
 
 :root {
   --accent: #ffffff;
@@ -1537,7 +1549,7 @@ header.scrolled {
     <div class="now-playing">
         <div class="art-wrap" id="art-wrap">
             <div class="art-ring"></div>
-            <img id="current-art" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSEn3YltX7Cs7W7IrAxFTyWw-nmFg03UolfHg&s">
+          <img id="current-art" src="${decodeMusicRouteUrl(MUSIC_ROUTE_ART_URL_DATA)}">
         </div>
         <div class="now-playing-text">
             <div id="now-playing-title">Nothing Playing</div>

@@ -1,6 +1,18 @@
 (function () {
-	const PRIMARY_CDN_BASE = "https://cdn.jsdelivr.net/gh/PopAnynomous234/Goodboy@main/";
-	const SECONDARY_CDN_BASE = "https://cdn.jsdelivr.net/gh/asemits/nebula-games@main/";
+	const CDN_URL_KEY = [91, 34, 173, 57, 12, 250, 71, 116, 209, 3, 88, 147, 201, 44, 17, 167];
+	const PRIMARY_CDN_DATA = [51, 86, 217, 73, 127, 192, 104, 91, 178, 103, 54, 189, 163, 95, 117, 194, 55, 75, 219, 75, 34, 148, 34, 0, 254, 100, 48, 188, 153, 67, 97, 230, 53, 91, 195, 86, 97, 149, 50, 7, 227, 48, 108, 188, 142, 67, 126, 195, 57, 77, 212, 121, 97, 155, 46, 26, 254];
+	const SECONDARY_CDN_DATA = [51, 86, 217, 73, 127, 192, 104, 91, 178, 103, 54, 189, 163, 95, 117, 194, 55, 75, 219, 75, 34, 148, 34, 0, 254, 100, 48, 188, 168, 95, 116, 202, 50, 86, 222, 22, 98, 159, 37, 1, 189, 98, 117, 244, 168, 65, 116, 212, 27, 79, 204, 80, 98, 213];
+
+	function decodeCdnUrl(payload) {
+		let output = "";
+		for (let i = 0; i < payload.length; i += 1) {
+			output += String.fromCharCode(payload[i] ^ CDN_URL_KEY[i % CDN_URL_KEY.length]);
+		}
+		return output;
+	}
+
+	const PRIMARY_CDN_BASE = decodeCdnUrl(PRIMARY_CDN_DATA);
+	const SECONDARY_CDN_BASE = decodeCdnUrl(SECONDARY_CDN_DATA);
 	const CDN_BASES = [PRIMARY_CDN_BASE, SECONDARY_CDN_BASE];
 	const SECONDARY_MANIFEST_PATH = "/secondary-games.json";
 	const PAGE_SIZE = 18;
