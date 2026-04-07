@@ -344,7 +344,7 @@
                   <button type="button" onclick="resetSettingsCard('widget-format')" title="Reset Widget Format" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
                   <label class="block mb-2 text-sm text-gray-300">Date/Time Format (strftime)</label>
                   <input type="text" value="${window.getInfoWidgetFormat()}" onchange="changeInfoWidgetFormat(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-2" placeholder="%Y-%m-%d %H:%M:%S">
-                  <a href="/static/images/image.png" class="nav-link inline-flex items-center gap-2 px-4 py-1.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition-all text-sm"> <span>Reference</span> </a>
+                  <a href="/static/images/image.png" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition-all text-sm" target="_blank" rel="noopener noreferrer"> <span>Reference</span> </a>
                   <button type="button" onclick="resetInfoWidgetPosition()" class="w-full mt-2 mb-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Reset Widget Position</button>
                 </article>
 
