@@ -258,7 +258,7 @@
                     <button type="button" onclick="applyCloak('Dashboard | Khan Academy', 'http://www.google.com/s2/favicons?domain=khanacademy.org')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
                       <img src="http://www.google.com/s2/favicons?domain=khanacademy.org" class="w-5 h-5"> Khan Academy  
                     </button>
-                    <button type="button" onclick="applyCloak('Chrome New Tab', 'https://cdn.jsdelivr.net/gh/PopAnynomous234/assets/chrome.png')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
+                    <button type="button" onclick="applyCloak('New Tab', 'https://cdn.jsdelivr.net/gh/PopAnynomous234/assets/chrome.png')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
                       <img src="https://cdn.jsdelivr.net/gh/PopAnynomous234/assets/chrome.png" class="w-5 h-5"> Chrome New Tab  
                     </button>
                     <button type="button" onclick="applyCloak('Seesaw', 'http://www.google.com/s2/favicons?domain=seesaw.com')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
