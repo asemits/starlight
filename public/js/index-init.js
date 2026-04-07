@@ -59,6 +59,7 @@
     }
 
     appContent.classList.toggle("nebula-chat-screen", path === "/private-chat" || path === "/chat");
+    appContent.classList.toggle("nebula-proxy-screen", path === "/proxy");
 
     const route = routes[path] || routes["404"];
     if (!route || typeof route.render !== "function") {
