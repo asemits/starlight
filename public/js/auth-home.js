@@ -1064,6 +1064,21 @@
       .filter(Boolean);
   }
 
+  function mergeSettingsSnapshots(base, incoming) {
+    const merged = {};
+    if (base && typeof base === "object") {
+      Object.keys(base).forEach((key) => {
+        merged[key] = String(base[key]).slice(0, 2048);
+      });
+    }
+    if (incoming && typeof incoming === "object") {
+      Object.keys(incoming).forEach((key) => {
+        merged[key] = String(incoming[key]).slice(0, 2048);
+      });
+    }
+    return merged;
+  }
+
   function collectSyncStatsSnapshot(gameProgress) {
     const items = Array.isArray(gameProgress && gameProgress.items) ? gameProgress.items : [];
     return items.map((item) => ({
@@ -1161,10 +1176,22 @@
         existing.clickCount = Math.max(Number(existing.clickCount || 0), normalized.clickCount);
       }
       if (Number.isFinite(normalized.rating)) {
-        existing.rating = normalized.rating;
+        const existingRatedAtMs = Number(existing.lastRatedAtMs || 0);
+        const incomingRatedAtMs = Number(normalized.lastRatedAtMs || 0);
+        if (!existingRatedAtMs || incomingRatedAtMs >= existingRatedAtMs) {
+          existing.rating = normalized.rating;
+        }
       }
       if (typeof normalized.isFavorite === "boolean") {
-        existing.isFavorite = normalized.isFavorite;
+        if (typeof existing.isFavorite !== "boolean") {
+          existing.isFavorite = normalized.isFavorite;
+        } else {
+          const existingBasisMs = Math.max(Number(existing.lastPlayedAtMs || 0), Number(existing.lastRatedAtMs || 0));
+          const incomingBasisMs = Math.max(Number(normalized.lastPlayedAtMs || 0), Number(normalized.lastRatedAtMs || 0));
+          if (incomingBasisMs >= existingBasisMs) {
+            existing.isFavorite = normalized.isFavorite;
+          }
+        }
       }
       if (Number.isFinite(normalized.lastPlayedAtMs)) {
         existing.lastPlayedAtMs = Math.max(Number(existing.lastPlayedAtMs || 0), normalized.lastPlayedAtMs);
@@ -1209,6 +1236,23 @@
     return new Date(ms);
   }
 
+  function progressFromPlayerData(data, fallbackPath) {
+    if (!data || typeof data !== "object") {
+      return null;
+    }
+    return normalizeProgressItem({
+      gamePath: String(data.gamePath || data.activeGamePath || fallbackPath || ""),
+      sourceBase: String(data.sourceBase || ""),
+      gameName: String(data.gameName || ""),
+      gameImage: String(data.gameImage || ""),
+      clickCount: Number(data.clickCount || 0),
+      rating: Number(data.rating || 0),
+      isFavorite: typeof data.isFavorite === "boolean" ? data.isFavorite : undefined,
+      lastPlayedAtMs: toMillis(data.lastPlayedAt),
+      lastRatedAtMs: toMillis(data.lastRatedAt)
+    });
+  }
+
   async function restoreGameProgressToFirestore(items, user) {
     const firestore = db();
     if (!firestore || !user || !Array.isArray(items) || !items.length) {
@@ -1224,45 +1268,66 @@
     for (let i = 0; i < sanitized.length; i += chunkSize) {
       const chunk = sanitized.slice(i, i + chunkSize);
       const batch = firestore.batch();
-
-      chunk.forEach((item) => {
+      const refs = chunk.map((item) => {
         const gameId = pathToDocId(item.gamePath);
         if (!gameId) {
+          return null;
+        }
+        const statsRef = firestore.collection("gameStats").doc(gameId);
+        const playerRef = statsRef.collection("players").doc(user.uid);
+        return { gameId, statsRef, playerRef };
+      });
+
+      const existingDocs = await Promise.all(refs.map(async (entry) => {
+        if (!entry) {
+          return null;
+        }
+        try {
+          return await entry.playerRef.get();
+        } catch (_error) {
+          return null;
+        }
+      }));
+
+      chunk.forEach((item, index) => {
+        const entry = refs[index];
+        if (!entry) {
           return;
         }
 
-        const statsRef = firestore.collection("gameStats").doc(gameId);
-        const playerRef = statsRef.collection("players").doc(user.uid);
+        const existingSnap = existingDocs[index];
+        const existingItem = existingSnap && existingSnap.exists ? progressFromPlayerData(existingSnap.data() || {}, item.gamePath) : null;
+        const mergedItem = mergeProgressList(existingItem ? [existingItem] : [], [item])[0] || item;
         const now = firebase.firestore.FieldValue.serverTimestamp();
 
-        batch.set(statsRef, {
-          path: item.gamePath,
-          sourceBase: item.sourceBase || "",
-          name: item.gameName || item.gamePath,
-          image: item.gameImage || "",
+        batch.set(entry.statsRef, {
+          path: mergedItem.gamePath,
+          sourceBase: mergedItem.sourceBase || "",
+          name: mergedItem.gameName || mergedItem.gamePath,
+          image: mergedItem.gameImage || "",
           updatedAt: now
         }, { merge: true });
 
         const playerPatch = {
           uid: user.uid,
-          gamePath: item.gamePath,
-          sourceBase: item.sourceBase || "",
-          gameName: item.gameName || "",
-          gameImage: item.gameImage || ""
+          gamePath: mergedItem.gamePath,
+          sourceBase: mergedItem.sourceBase || "",
+          gameName: mergedItem.gameName || "",
+          gameImage: mergedItem.gameImage || ""
         };
 
-        if (Number.isFinite(item.clickCount)) {
-          playerPatch.clickCount = Math.max(0, Number(item.clickCount));
+        if (Number.isFinite(mergedItem.clickCount)) {
+          playerPatch.clickCount = Math.max(0, Number(mergedItem.clickCount));
         }
-        if (Number.isFinite(item.rating)) {
-          playerPatch.rating = item.rating === 1 || item.rating === -1 ? item.rating : 0;
+        if (Number.isFinite(mergedItem.rating)) {
+          playerPatch.rating = mergedItem.rating === 1 || mergedItem.rating === -1 ? mergedItem.rating : 0;
         }
-        if (typeof item.isFavorite === "boolean") {
-          playerPatch.isFavorite = item.isFavorite;
+        if (typeof mergedItem.isFavorite === "boolean") {
+          playerPatch.isFavorite = mergedItem.isFavorite;
         }
 
-        const lastPlayedAt = dateFromMillis(item.lastPlayedAtMs);
-        const lastRatedAt = dateFromMillis(item.lastRatedAtMs);
+        const lastPlayedAt = dateFromMillis(mergedItem.lastPlayedAtMs);
+        const lastRatedAt = dateFromMillis(mergedItem.lastRatedAtMs);
         if (lastPlayedAt) {
           playerPatch.lastPlayedAt = lastPlayedAt;
         }
@@ -1270,7 +1335,7 @@
           playerPatch.lastRatedAt = lastRatedAt;
         }
 
-        batch.set(playerRef, playerPatch, { merge: true });
+        batch.set(entry.playerRef, playerPatch, { merge: true });
       });
 
       await batch.commit();
@@ -1408,14 +1473,12 @@
     }
 
     const isManual = mode === "manual";
+    const isStartup = mode === "startup";
     const userRef = firestore.collection(USER_DOC_COLLECTION).doc(user.uid);
     const selections = getSyncSelectionsSnapshot();
     const needsGameProgress = selections.gameProgress || selections.stats || selections.favorites || selections.recentGames;
     const snapshot = selections.settings ? collectSyncSettingsSnapshot() : null;
     const gameProgress = needsGameProgress ? await collectGameProgressSnapshot() : { updatedAtMs: Date.now(), items: [] };
-    const statsSnapshot = selections.stats ? collectSyncStatsSnapshot(gameProgress) : [];
-    const favoritesSnapshot = selections.favorites ? collectSyncFavoritesSnapshot(gameProgress) : [];
-    const recentGamesSnapshot = selections.recentGames ? collectSyncRecentGamesSnapshot(gameProgress) : [];
     const recentMusicSnapshot = selections.recentMusic ? collectRecentMusicSnapshot() : [];
     const musicPlaylistSnapshot = selections.musicPlaylists ? collectMusicPlaylistSnapshot() : [];
     const musicFavoritesSnapshot = selections.musicPlaylists ? collectMusicFavoritesSnapshot() : [];
@@ -1432,19 +1495,38 @@
           const nextManualMs = lastManualMs + MANUAL_SYNC_INTERVAL_MS;
           throw new Error(`Wait until ${new Date(nextManualMs).toLocaleString()} to sync your data again.`);
         }
-        if (!isManual && lastAutoMs && nowMs - lastAutoMs < AUTO_SYNC_INTERVAL_MS) {
+        if (!isManual && !isStartup && lastAutoMs && nowMs - lastAutoMs < AUTO_SYNC_INTERVAL_MS) {
           throw new Error("Auto sync interval has not elapsed.");
         }
+
+        const mergedProgressItems = mergeProgressList(
+          data && data.gameProgress && Array.isArray(data.gameProgress.items) ? data.gameProgress.items : [],
+          gameProgress.items
+        );
+        const mergedProgressEnvelope = {
+          updatedAtMs: Math.max(
+            Number(data && data.gameProgress && data.gameProgress.updatedAtMs ? data.gameProgress.updatedAtMs : 0),
+            Number(gameProgress.updatedAtMs || 0),
+            nowMs
+          ),
+          items: mergedProgressItems
+        };
+        const mergedStatsSnapshot = collectSyncStatsSnapshot(mergedProgressEnvelope);
+        const mergedFavoritesSnapshot = collectSyncFavoritesSnapshot(mergedProgressEnvelope);
+        const mergedRecentGamesSnapshot = collectSyncRecentGamesSnapshot(mergedProgressEnvelope);
+        const mergedSettingsSnapshot = selections.settings
+          ? mergeSettingsSnapshots(data && data.settings && typeof data.settings === "object" ? data.settings : null, snapshot)
+          : null;
 
         const payload = {
           uid: user.uid,
           providers: (user.providerData || []).map((item) => item.providerId).filter(Boolean),
           syncSelections: selections,
-          settings: snapshot || firebase.firestore.FieldValue.delete(),
-          gameProgress: selections.gameProgress ? gameProgress : firebase.firestore.FieldValue.delete(),
-          syncStats: selections.stats ? statsSnapshot : firebase.firestore.FieldValue.delete(),
-          syncFavorites: selections.favorites ? favoritesSnapshot : firebase.firestore.FieldValue.delete(),
-          syncRecentGames: selections.recentGames ? recentGamesSnapshot : firebase.firestore.FieldValue.delete(),
+          settings: mergedSettingsSnapshot || firebase.firestore.FieldValue.delete(),
+          gameProgress: selections.gameProgress ? mergedProgressEnvelope : firebase.firestore.FieldValue.delete(),
+          syncStats: selections.stats ? mergedStatsSnapshot : firebase.firestore.FieldValue.delete(),
+          syncFavorites: selections.favorites ? mergedFavoritesSnapshot : firebase.firestore.FieldValue.delete(),
+          syncRecentGames: selections.recentGames ? mergedRecentGamesSnapshot : firebase.firestore.FieldValue.delete(),
           syncRecentMusic: selections.recentMusic ? recentMusicSnapshot : firebase.firestore.FieldValue.delete(),
           syncMusicPlaylists: selections.musicPlaylists ? musicPlaylistSnapshot : firebase.firestore.FieldValue.delete(),
           syncMusicFavorites: selections.musicPlaylists ? musicFavoritesSnapshot : firebase.firestore.FieldValue.delete(),
@@ -1480,7 +1562,7 @@
     }
     state.autoSyncTimerId = window.setInterval(() => {
       syncUserData("auto", true);
-    }, 60 * 1000);
+    }, AUTO_SYNC_INTERVAL_MS);
   }
 
   function stopAutoSyncLoop() {
@@ -3061,8 +3143,8 @@
     updateHomeNavLabel();
     if (user) {
       await restoreUserDataFromCloud(true);
+      await syncUserData("startup", true);
       startAutoSyncLoop();
-      await syncUserData("auto", true);
     } else {
       stopAutoSyncLoop();
     }
