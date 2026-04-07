@@ -235,13 +235,13 @@
           <a href="/notepad" class="nav-link tool-card" style="animation-delay: 0.7s;">
             <i class="fa-regular fa-clipboard" style="font-size: 52px;"></i>
             <h2>Notepad</h2>
-            <p class="card-desc">Take notes and jot down ideas.</p>
+            <p class="card-desc">Write down stuff</p>
             <div class="glow-bar"></div>
           </a>
           <a href="/timer" class="nav-link tool-card" style="animation-delay: 0.7s;">
             <i class="fa-regular fa-clock" style="font-size: 52px;"></i>
             <h2>Timer</h2>
-            <p class="card-desc">Set timers for tasks.</p>
+            <p class="card-desc">Timer + stopwatch</p>
             <div class="glow-bar"></div>
           </a>           
         </div>
