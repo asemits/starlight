@@ -94,6 +94,65 @@
         ".write": "auth != null && ((!data.exists() && newData.child('fromUid').val() === auth.uid && !root.child('users').child(newData.child('fromUid').val()).child('blockedUsers').child(newData.child('toUid').val()).exists() && !root.child('users').child(newData.child('toUid').val()).child('blockedUsers').child(newData.child('fromUid').val()).exists()) || (data.exists() && (data.child('fromUid').val() === auth.uid || data.child('toUid').val() === auth.uid) && (newData.child('status').val() !== 'accepted' || (!root.child('users').child(data.child('fromUid').val()).child('blockedUsers').child(data.child('toUid').val()).exists() && !root.child('users').child(data.child('toUid').val()).child('blockedUsers').child(data.child('fromUid').val()).exists()))))"
       }
     },
+    "feedRateLimits": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.exists() ? (newData.hasChildren(['uid', 'lastCreatedAt', 'updatedAt']) && newData.child('uid').val() === $uid && newData.child('lastCreatedAt').isNumber() && newData.child('updatedAt').isNumber()) : true"
+      }
+    },
+    "feedTopicNames": {
+      "$nameLower": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.exists() && newData.child('ownerId').val() === auth.uid) || (data.exists() && data.child('ownerId').val() === auth.uid))",
+        ".validate": "newData.exists() ? (newData.hasChildren(['nameLower', 'topicId', 'ownerId', 'createdAt']) && newData.child('nameLower').isString() && newData.child('nameLower').val() === $nameLower && newData.child('nameLower').val().matches(/^[a-z0-9][a-z0-9-]{2,30}$/) && newData.child('topicId').isString() && newData.child('topicId').val().length > 0 && newData.child('topicId').val().length <= 128 && newData.child('ownerId').isString() && newData.child('ownerId').val() === auth.uid && newData.child('createdAt').isNumber()) : true"
+      }
+    },
+    "feedTopics": {
+      ".indexOn": ["nameLower"],
+      "$topicId": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerId').val() === auth.uid) || (data.exists() && data.child('ownerId').val() === auth.uid))",
+        ".validate": "newData.exists() ? (newData.hasChildren(['name', 'nameLower', 'description', 'rules', 'ownerId', 'ownerName', 'createdAt', 'updatedAt']) && newData.child('name').isString() && newData.child('name').val().matches(/^[a-z0-9][a-z0-9-]{2,30}$/) && newData.child('nameLower').isString() && newData.child('nameLower').val() === newData.child('name').val() && newData.child('description').isString() && newData.child('description').val().length > 0 && newData.child('description').val().length <= 300 && newData.child('rules').isString() && newData.child('rules').val().length > 0 && newData.child('rules').val().length <= 800 && newData.child('ownerId').isString() && newData.child('ownerId').val().length > 0 && newData.child('ownerName').isString() && newData.child('ownerName').val().length > 0 && newData.child('ownerName').val().length <= 60 && newData.child('createdAt').isNumber() && newData.child('updatedAt').isNumber()) : true",
+        "members": {
+          "$uid": {
+            ".read": "auth != null",
+            ".write": "auth != null && auth.uid === $uid",
+            ".validate": "newData.exists() ? (newData.hasChildren(['uid', 'role', 'favorite', 'joinedAt', 'updatedAt']) && newData.child('uid').val() === $uid && newData.child('favorite').isBoolean() && newData.child('joinedAt').isNumber() && newData.child('updatedAt').isNumber() && ((newData.child('role').val() === 'member') || (newData.child('role').val() === 'owner' && root.child('feedTopics').child($topicId).child('ownerId').val() === $uid))) : true"
+          }
+        }
+      }
+    },
+    "feedThreads": {
+      ".indexOn": ["topicId", "updatedAt", "createdAt"],
+      "$threadId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.exists() ? (((!data.exists()) && newData.hasChildren(['topicId', 'title', 'body', 'authorId', 'authorName', 'createdAt', 'updatedAt', 'commentCount', 'deletedAt', 'deletedBy']) && newData.child('topicId').isString() && root.child('feedTopics').child(newData.child('topicId').val()).exists() && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 160 && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 4000 && newData.child('authorId').val() === auth.uid && newData.child('authorName').isString() && newData.child('authorName').val().length > 0 && newData.child('authorName').val().length <= 60 && newData.child('createdAt').isNumber() && newData.child('updatedAt').isNumber() && newData.child('commentCount').isNumber() && newData.child('commentCount').val() === 0 && !newData.child('deletedAt').exists() && newData.child('deletedBy').isString() && newData.child('deletedBy').val() === '') || ((data.exists()) && newData.child('topicId').val() === data.child('topicId').val() && newData.child('authorId').val() === data.child('authorId').val() && newData.child('authorName').val() === data.child('authorName').val() && newData.child('createdAt').val() === data.child('createdAt').val() && ((((auth.uid === data.child('authorId').val()) && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 160 && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 4000 && newData.child('commentCount').val() === data.child('commentCount').val() && ((!newData.child('deletedAt').exists() && !data.child('deletedAt').exists()) || (newData.child('deletedAt').val() === data.child('deletedAt').val())) && newData.child('deletedBy').val() === data.child('deletedBy').val() && newData.child('updatedAt').isNumber()) || ((newData.child('title').val() === data.child('title').val()) && (newData.child('body').val() === data.child('body').val()) && newData.child('commentCount').isNumber() && data.child('commentCount').isNumber() && newData.child('commentCount').val() === data.child('commentCount').val() + 1 && ((!newData.child('deletedAt').exists() && !data.child('deletedAt').exists()) || (newData.child('deletedAt').val() === data.child('deletedAt').val())) && newData.child('deletedBy').val() === data.child('deletedBy').val() && newData.child('updatedAt').isNumber()) || (((auth.uid === data.child('authorId').val()) || (root.child('feedTopics').child(data.child('topicId').val()).child('ownerId').val() === auth.uid)) && newData.child('title').val() === data.child('title').val() && newData.child('commentCount').val() === data.child('commentCount').val() && newData.child('body').val() === '[removed by moderator]' && newData.child('deletedAt').isNumber() && newData.child('deletedBy').val() === auth.uid && newData.child('updatedAt').isNumber()))))) : true",
+        "votes": {
+          "$uid": {
+            ".read": "auth != null",
+            ".write": "auth != null && auth.uid === $uid",
+            ".validate": "newData.exists() ? (newData.hasChildren(['uid', 'value', 'updatedAt']) && newData.child('uid').val() === $uid && newData.child('value').isNumber() && (newData.child('value').val() === 1 || newData.child('value').val() === -1) && newData.child('updatedAt').isNumber()) : true"
+          }
+        },
+        "comments": {
+          ".indexOn": ["createdAt"],
+          "$commentId": {
+            ".read": "auth != null",
+            ".write": "auth != null && ((!data.exists() && newData.child('authorId').val() === auth.uid) || (data.exists() && (data.child('authorId').val() === auth.uid || root.child('feedTopics').child(root.child('feedThreads').child($threadId).child('topicId').val()).child('ownerId').val() === auth.uid)))",
+            ".validate": "newData.exists() ? (((!data.exists()) && newData.hasChildren(['parentId', 'body', 'authorId', 'authorName', 'createdAt', 'updatedAt', 'deletedAt', 'deletedBy']) && newData.child('authorId').val() === auth.uid && newData.child('authorName').isString() && newData.child('authorName').val().length > 0 && newData.child('authorName').val().length <= 60 && newData.child('parentId').isString() && newData.child('parentId').val().length <= 200 && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 2000 && newData.child('createdAt').isNumber() && newData.child('updatedAt').isNumber() && !newData.child('deletedAt').exists() && newData.child('deletedBy').isString() && newData.child('deletedBy').val() === '') || ((data.exists()) && newData.child('parentId').val() === data.child('parentId').val() && newData.child('authorId').val() === data.child('authorId').val() && newData.child('authorName').val() === data.child('authorName').val() && newData.child('createdAt').val() === data.child('createdAt').val() && (((auth.uid === data.child('authorId').val()) && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 2000 && ((!newData.child('deletedAt').exists() && !data.child('deletedAt').exists()) || (newData.child('deletedAt').val() === data.child('deletedAt').val())) && newData.child('deletedBy').val() === data.child('deletedBy').val() && newData.child('updatedAt').isNumber()) || (((auth.uid === data.child('authorId').val()) || (root.child('feedTopics').child(root.child('feedThreads').child($threadId).child('topicId').val()).child('ownerId').val() === auth.uid)) && newData.child('body').val() === '[removed by moderator]' && newData.child('deletedAt').isNumber() && newData.child('deletedBy').val() === auth.uid && newData.child('updatedAt').isNumber())))) : true",
+            "votes": {
+              "$uid": {
+                ".read": "auth != null",
+                ".write": "auth != null && auth.uid === $uid",
+                ".validate": "newData.exists() ? (newData.hasChildren(['uid', 'value', 'updatedAt']) && newData.child('uid').val() === $uid && newData.child('value').isNumber() && (newData.child('value').val() === 1 || newData.child('value').val() === -1) && newData.child('updatedAt').isNumber()) : true"
+              }
+            }
+          }
+        }
+      }
+    },
     "privateChats": {
       ".indexOn": ["participantsMap", "type", "lastMessageAt"],
       ".read": false,
