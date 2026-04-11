@@ -80,6 +80,18 @@
                     <option value="alphabetical" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? 'selected' : ''}>Alphabetical</option>
                   </select>
                 </article>
+                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
+  <button type="button" onclick="resetSettingsCard('layout-font')" title="Reset Font" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+  <label class="block mb-2 text-sm text-gray-300">Interface Font</label>
+  <select onchange="changeNebulaFont(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
+    <option value="geist"    ${window.getNebulaFont() === 'geist'     ? 'selected' : ''}>Geist (Default)</option>
+    <option value="nunito"   ${window.getNebulaFont() === 'nunito'    ? 'selected' : ''}>Nunito</option>
+    <option value="oxanium"  ${window.getNebulaFont() === 'oxanium'   ? 'selected' : ''}>Oxanium</option>
+    <option value="cormorant"${window.getNebulaFont() === 'cormorant' ? 'selected' : ''}>Cormorant Garamond</option>
+    <option value="mono"     ${window.getNebulaFont() === 'mono'      ? 'selected' : ''}>Fira Code (Mono)</option>
+    <option value="system"   ${window.getNebulaFont() === 'system'    ? 'selected' : ''}>System Default</option>
+  </select>
+</article>
 
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
                   <button type="button" onclick="resetSettingsCard('layout-dashboard-recent')" title="Reset Recently Played Section" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>

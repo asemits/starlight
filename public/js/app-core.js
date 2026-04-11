@@ -392,6 +392,24 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       tag: String(raw.tag || `${type}:${Date.now()}`).slice(0, 160)
     };
   }
+  window.getNebulaFont = function getNebulaFont() {
+    return localStorage.getItem(FONT_KEY) || "geist";
+};
+
+window.changeNebulaFont = function changeNebulaFont(value) {
+    const fonts = {
+        geist: "'Geist','Montserrat',sans-serif",
+        cormorant: "'Cormorant Garamond','Georgia',serif",
+        nunito: "'Nunito',sans-serif",
+        mono: "'Fira Code','Courier New',monospace",
+        oxanium: "'Oxanium',sans-serif",
+        system: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+    };
+    const key = fonts[value] ? value : "geist";
+    localStorage.setItem(FONT_KEY, key);
+    document.documentElement.style.setProperty("--nebula-font", fonts[key]);
+    document.body.style.fontFamily = fonts[key];
+};
 
   window.getNebulaNotificationPreferences = function getNebulaNotificationPreferences() {
     return readNotificationPreferences();
@@ -668,6 +686,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   }
 
   function resetSettingsCard(cardId) {
+    if (cardId === "layout-font") {
+    window.changeNebulaFont("geist");
+    return;
+}
     if (cardId === "layout-sidebar") {
       window.changeSidebarPos("top");
       return;
@@ -779,13 +801,12 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   window.resetSettingsCategory = function resetSettingsCategory(category) {
     const map = {
-      layout: ["layout-sidebar", "layout-measurement", "layout-dashboard-recent", "layout-dashboard-favorites", "layout-dashboard-stats", "layout-dashboard-recent-music", "layout-dashboard-recent-ai", "games-pagination"],
+      layout: ["layout-sidebar", "layout-measurement", "layout-dashboard-recent", "layout-dashboard-favorites", "layout-dashboard-stats", "layout-dashboard-recent-music", "games-pagination"],
       games: ["games-pagination"],
       particles: ["particles-enabled", "particles-bonds", "particles-color", "particles-shape", "particles-frequency", "particles-size"],
       shortcut: ["shortcut-main", "shortcut-anticlose"],
       cloak: ["cloak-main", "cloak-open"],
-      widget: ["widget-main", "widget-format", "widget-content"],
-      ai: ["ai-custom-instructions", "ai-cloud-sync", "ai-server-base"]
+      widget: ["widget-main", "widget-format", "widget-content"]
     };
     const keys = map[String(category || "")] || [];
     keys.forEach((key) => resetSettingsCard(key));
@@ -1574,4 +1595,5 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   }
 
   mountInfoWidget();
+  window.changeNebulaFont(window.getNebulaFont());
 })();
