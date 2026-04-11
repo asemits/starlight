@@ -292,23 +292,26 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       allow create: if isSignedIn()
-        && hasOnlyKeys(request.resource.data, [
-          'title', 'body', 'community', 'flair',
-          'authorId', 'authorName', 'authorHandle',
-          'commentCount', 'likesCount', 'createdAt', 'lastActivityAt'
-        ])
-        && isNonEmptyString(request.resource.data.title, 300)
-        && isStringMax(request.resource.data.body, 4000)
-        && isNonEmptyString(request.resource.data.community, 48)
-        && isNonEmptyString(request.resource.data.flair, 32)
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 300
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 4000
+        && request.resource.data.community is string
+        && request.resource.data.community.size() > 0
+        && request.resource.data.community.size() <= 48
+        && request.resource.data.flair is string
+        && request.resource.data.flair.size() > 0
+        && request.resource.data.flair.size() <= 32
         && request.resource.data.authorId == request.auth.uid
-        && isNonEmptyString(request.resource.data.authorName, 80)
-        && isHandle(request.resource.data.authorHandle)
+        && request.resource.data.authorName is string
+        && request.resource.data.authorName.size() > 0
+        && request.resource.data.authorName.size() <= 80
+        && request.resource.data.authorHandle is string
+        && request.resource.data.authorHandle.size() > 0
+        && request.resource.data.authorHandle.size() <= 40
         && request.resource.data.commentCount == 0
-        && (
-          !hasKey(request.resource.data, 'likesCount')
-          || (request.resource.data.likesCount is int && request.resource.data.likesCount == 0)
-        )
+        && (!('likesCount' in request.resource.data) || (request.resource.data.likesCount is int && request.resource.data.likesCount >= 0))
         && request.resource.data.createdAt is timestamp
         && request.resource.data.lastActivityAt is timestamp;
 

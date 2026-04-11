@@ -914,15 +914,15 @@
       `;
     },
     afterRender: async function afterRenderFeedRoute() {
-      const fb = window["firebase"];
-      if (!fb || typeof fb.firestore !== "function") {
+      const fireb = window["firebase"];
+      if (!fireb || typeof fireb.firestore !== "function") {
         console.error("Firebase Firestore is unavailable.");
         return;
       }
 
-      const db = fb.firestore();
-      const fieldValue = fb.firestore.FieldValue;
-      const auth = fb.auth();
+      const db = fireb.firestore();
+      const fieldValue = fireb.firestore.FieldValue;
+      const auth = fireb.auth();
 
       if (window.NebulaFeedRoute && typeof window.NebulaFeedRoute.teardown === "function") {
         window.NebulaFeedRoute.teardown();
@@ -1013,10 +1013,12 @@
         return String(user && (user.displayName || (user.email ? user.email.split("@")[0] : user.uid.slice(0, 8))) || "Member").trim();
       }
 
-      function handle(user) {
-        const raw = String(user && (user.displayName || (user.email ? user.email.split("@")[0] : user.uid.slice(0, 8))) || "member").toLowerCase().replace(/[^a-z0-9_]+/g, "");
-        return "@" + (raw || "member");
-      }
+function handle(user) {
+  const raw = String(user && (user.displayName || (user.email ? user.email.split("@")[0] : user.uid.slice(0, 8))))
+    .toLowerCase() // Ensure this is here
+    .replace(/[^a-z0-9_]+/g, "");
+  return "@" + (raw || "member");
+}
 
       function setStatus(node, text, tone) {
         if (!node) return;
@@ -1412,11 +1414,12 @@ Title: ${post.title}
 Body: ${post.body || "(no body)"}
 Community: ${post.community}`;
 
+console.log("Sending to AI:", prompt);
   try {
     const res = await fetch(GROQ_TUNNEL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ message: prompt })
     });
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

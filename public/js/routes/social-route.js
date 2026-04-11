@@ -19,17 +19,6 @@
               </div>
               <i class="fa-solid fa-arrow-right nebula-social-card-arrow"></i>
             </a>
-            <a href="/topics" class="nav-link nebula-social-card">
-              <div class="nebula-social-card-icon">
-                <i class="fa-solid fa-layer-group"></i>
-              </div>
-              <div>
-                <h2>Topics</h2>
-                <p>Forum</p>
-              </div>
-              <i class="fa-solid fa-arrow-right nebula-social-card-arrow"></i>
-            </a>
-          </div>
         </section>
       `;
     }
