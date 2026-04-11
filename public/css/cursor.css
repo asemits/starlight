@@ -1,0 +1,10 @@
+* {
+    cursor: none !important;
+}
+i.fas, i.fab, i.far, span {
+    pointer-events: none !important;
+}
+
+div[onclick], .clickable, .btn, [role="button"] {
+    cursor: pointer !important;
+}
