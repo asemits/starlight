@@ -351,40 +351,44 @@
         return;
       }
 
+      const pick = function (selector) {
+        return root.querySelector(selector) || document.querySelector(selector);
+      };
+
       const el = {
-        search: document.querySelector("#social-topic-search"),
-        refresh: document.querySelector("#social-refresh-topics"),
-        auth: root.querySelector("#social-auth-note"),
-        openTopicCompose: root.querySelector("#social-open-topic-compose"),
-        topicComposeModal: document.querySelector("#social-topic-compose-modal"),
-        closeTopicCompose: document.querySelector("#social-close-topic-compose"),
-        topicList: root.querySelector("#social-topic-list"),
-        topicName: root.querySelector("#social-topic-name"),
-        topicDescription: root.querySelector("#social-topic-description"),
-        topicRules: root.querySelector("#social-topic-rules"),
-        createTopic: root.querySelector("#social-create-topic"),
-        editTopic: root.querySelector("#social-edit-topic"),
-        topicStatus: root.querySelector("#social-topic-status"),
-        selectedTopic: root.querySelector("#social-selected-topic"),
-        joinTopic: root.querySelector("#social-join-topic"),
-        openTopic: root.querySelector("#social-open-topic"),
-        topicDetail: root.querySelector("#social-topic-detail"),
-        threadTitle: root.querySelector("#social-thread-title"),
-        threadBody: root.querySelector("#social-thread-body"),
-        createThread: root.querySelector("#social-create-thread"),
-        threadStatus: root.querySelector("#social-thread-status"),
-        threadList: root.querySelector("#social-thread-list"),
-        threadComposeModal: document.querySelector("#social-thread-compose-modal"),
-        closeThreadCompose: document.querySelector("#social-close-thread-compose"),
-        threadWindow: root.querySelector("#social-thread-window"),
-        closeThread: root.querySelector("#social-close-thread"),
-        threadTitleView: root.querySelector("#social-thread-title-view"),
-        threadBodyView: root.querySelector("#social-thread-body-view"),
-        threadMetaView: root.querySelector("#social-thread-meta-view"),
-        replyBody: root.querySelector("#social-reply-body"),
-        createReply: root.querySelector("#social-create-reply"),
-        replyStatus: root.querySelector("#social-reply-status"),
-        replyList: root.querySelector("#social-reply-list")
+        search: pick("#social-topic-search"),
+        refresh: pick("#social-refresh-topics"),
+        auth: pick("#social-auth-note"),
+        openTopicCompose: pick("#social-open-topic-compose"),
+        topicComposeModal: pick("#social-topic-compose-modal"),
+        closeTopicCompose: pick("#social-close-topic-compose"),
+        topicList: pick("#social-topic-list"),
+        topicName: pick("#social-topic-name"),
+        topicDescription: pick("#social-topic-description"),
+        topicRules: pick("#social-topic-rules"),
+        createTopic: pick("#social-create-topic"),
+        editTopic: pick("#social-edit-topic"),
+        topicStatus: pick("#social-topic-status"),
+        selectedTopic: pick("#social-selected-topic"),
+        joinTopic: pick("#social-join-topic"),
+        openTopic: pick("#social-open-topic"),
+        topicDetail: pick("#social-topic-detail"),
+        threadTitle: pick("#social-thread-title"),
+        threadBody: pick("#social-thread-body"),
+        createThread: pick("#social-create-thread"),
+        threadStatus: pick("#social-thread-status"),
+        threadList: pick("#social-thread-list"),
+        threadComposeModal: pick("#social-thread-compose-modal"),
+        closeThreadCompose: pick("#social-close-thread-compose"),
+        threadWindow: pick("#social-thread-window"),
+        closeThread: pick("#social-close-thread"),
+        threadTitleView: pick("#social-thread-title-view"),
+        threadBodyView: pick("#social-thread-body-view"),
+        threadMetaView: pick("#social-thread-meta-view"),
+        replyBody: pick("#social-reply-body"),
+        createReply: pick("#social-create-reply"),
+        replyStatus: pick("#social-reply-status"),
+        replyList: pick("#social-reply-list")
       };
 
       const state = {
@@ -1394,19 +1398,33 @@
         });
       }
 
-      el.createTopic.addEventListener("click", createTopic);
-      el.editTopic.addEventListener("click", saveTopicEdits);
-      el.joinTopic.addEventListener("click", toggleJoin);
-      el.openTopic.addEventListener("click", function () {
-        if (!state.selectedTopic) {
-          setStatus(el.threadStatus, "Select a Topic first.", "error");
-          return;
-        }
-        openThreadComposer();
-      });
-      el.createThread.addEventListener("click", createThread);
-      el.createReply.addEventListener("click", createReply);
-      el.closeThread.addEventListener("click", closeThread);
+      if (el.createTopic) {
+        el.createTopic.addEventListener("click", createTopic);
+      }
+      if (el.editTopic) {
+        el.editTopic.addEventListener("click", saveTopicEdits);
+      }
+      if (el.joinTopic) {
+        el.joinTopic.addEventListener("click", toggleJoin);
+      }
+      if (el.openTopic) {
+        el.openTopic.addEventListener("click", function () {
+          if (!state.selectedTopic) {
+            setStatus(el.threadStatus, "Select a Topic first.", "error");
+            return;
+          }
+          openThreadComposer();
+        });
+      }
+      if (el.createThread) {
+        el.createThread.addEventListener("click", createThread);
+      }
+      if (el.createReply) {
+        el.createReply.addEventListener("click", createReply);
+      }
+      if (el.closeThread) {
+        el.closeThread.addEventListener("click", closeThread);
+      }
       if (el.closeThreadCompose) {
         el.closeThreadCompose.addEventListener("click", closeThreadComposer);
       }
@@ -1418,73 +1436,81 @@
         });
       }
 
-      el.topicList.addEventListener("click", function (event) {
-        const button = event.target.closest('[data-action="select-topic"]');
-        if (!button) {
-          return;
-        }
-        const topicId = button.getAttribute("data-topic-id") || "";
-        if (!topicId) {
-          return;
-        }
-        selectTopic(topicId);
-      });
+      if (el.topicList) {
+        el.topicList.addEventListener("click", function (event) {
+          const button = event.target.closest('[data-action="select-topic"]');
+          if (!button) {
+            return;
+          }
+          const topicId = button.getAttribute("data-topic-id") || "";
+          if (!topicId) {
+            return;
+          }
+          selectTopic(topicId);
+        });
+      }
 
-      el.threadList.addEventListener("click", function (event) {
-        const button = event.target.closest("[data-action]");
-        if (!button) {
-          return;
-        }
-        const action = button.getAttribute("data-action") || "";
-        const threadId = button.getAttribute("data-thread-id") || "";
-        if (!threadId) {
-          return;
-        }
-        if (action === "open-thread") {
-          openThread(threadId);
-        }
-        if (action === "upvote-thread") {
-          voteThread(threadId, 1);
-        }
-        if (action === "downvote-thread") {
-          voteThread(threadId, -1);
-        }
-        if (action === "edit-thread") {
-          editThread(threadId);
-        }
-        if (action === "remove-thread") {
-          removeThread(threadId);
-        }
-      });
+      if (el.threadList) {
+        el.threadList.addEventListener("click", function (event) {
+          const button = event.target.closest("[data-action]");
+          if (!button) {
+            return;
+          }
+          const action = button.getAttribute("data-action") || "";
+          const threadId = button.getAttribute("data-thread-id") || "";
+          if (!threadId) {
+            return;
+          }
+          if (action === "open-thread") {
+            openThread(threadId);
+          }
+          if (action === "upvote-thread") {
+            voteThread(threadId, 1);
+          }
+          if (action === "downvote-thread") {
+            voteThread(threadId, -1);
+          }
+          if (action === "edit-thread") {
+            editThread(threadId);
+          }
+          if (action === "remove-thread") {
+            removeThread(threadId);
+          }
+        });
+      }
 
-      el.replyList.addEventListener("click", function (event) {
-        const button = event.target.closest("[data-action]");
-        if (!button) {
-          return;
-        }
-        const action = button.getAttribute("data-action") || "";
-        const replyId = button.getAttribute("data-reply-id") || "";
-        if (!replyId) {
-          return;
-        }
-        if (action === "reply-to-reply") {
-          state.replyParentId = replyId;
-          el.replyBody.focus();
-          setStatus(el.replyStatus, "Replying to nested comment.");
-        }
-        if (action === "upvote-reply") {
-          voteReply(replyId, 1);
-        }
-        if (action === "downvote-reply") {
-          voteReply(replyId, -1);
-        }
-        if (action === "edit-reply") {
-          editReply(replyId);
-        }
-        if (action === "remove-reply") {
-          removeReply(replyId);
-        }
-      });
+      if (el.replyList) {
+        el.replyList.addEventListener("click", function (event) {
+          const button = event.target.closest("[data-action]");
+          if (!button) {
+            return;
+          }
+          const action = button.getAttribute("data-action") || "";
+          const replyId = button.getAttribute("data-reply-id") || "";
+          if (!replyId) {
+            return;
+          }
+          if (action === "reply-to-reply") {
+            state.replyParentId = replyId;
+            if (el.replyBody) {
+              el.replyBody.focus();
+            }
+            setStatus(el.replyStatus, "Replying to nested comment.");
+          }
+          if (action === "upvote-reply") {
+            voteReply(replyId, 1);
+          }
+          if (action === "downvote-reply") {
+            voteReply(replyId, -1);
+          }
+          if (action === "edit-reply") {
+            editReply(replyId);
+          }
+          if (action === "remove-reply") {
+            removeReply(replyId);
+          }
+        });
+      }
 
       state.unsubTopics = db.collection("feedTopics").orderBy("nameLower", "asc").limit(200)
         .onSnapshot(function (snapshot) {
