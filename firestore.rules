@@ -31,18 +31,6 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/feedTopics/$(topicId)).data.ownerId == request.auth.uid;
     }
 
-    function hasRateWindowElapsed(uid) {
-      return !exists(/databases/$(database)/documents/feedRateLimits/$(uid))
-        || request.time >= get(/databases/$(database)/documents/feedRateLimits/$(uid)).data.lastCreatedAt + duration.value(5, 's');
-    }
-
-    function hasRateAfterStamp(uid) {
-      return existsAfter(/databases/$(database)/documents/feedRateLimits/$(uid))
-        && getAfter(/databases/$(database)/documents/feedRateLimits/$(uid)).data.uid == uid
-        && getAfter(/databases/$(database)/documents/feedRateLimits/$(uid)).data.lastCreatedAt == request.time
-        && getAfter(/databases/$(database)/documents/feedRateLimits/$(uid)).data.updatedAt == request.time;
-    }
-
     match /feedRateLimits/{uid} {
       allow read: if isOwner(uid);
 
@@ -70,8 +58,7 @@ service cloud.firestore {
       allow update: if false;
 
       allow delete: if isSignedIn()
-        && resource.data.ownerId == request.auth.uid
-        && isTopicOwner(resource.data.topicId);
+        && resource.data.ownerId == request.auth.uid;
     }
 
     match /feedTopics/{topicId} {
@@ -89,12 +76,7 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && isNonEmptyString(request.resource.data.ownerName, 60)
         && request.resource.data.createdAt is timestamp
-        && request.resource.data.updatedAt is timestamp
-        && existsAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower))
-        && getAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower)).data.topicId == topicId
-        && getAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower)).data.ownerId == request.auth.uid
-        && hasRateWindowElapsed(request.auth.uid)
-        && hasRateAfterStamp(request.auth.uid);
+        && request.resource.data.updatedAt is timestamp;
 
       allow update: if isSignedIn()
         && resource.data.ownerId == request.auth.uid
@@ -109,17 +91,7 @@ service cloud.firestore {
         && request.resource.data.nameLower == request.resource.data.name
         && isNonEmptyString(request.resource.data.description, 300)
         && isNonEmptyString(request.resource.data.rules, 800)
-        && request.resource.data.updatedAt is timestamp
-        && (
-          request.resource.data.nameLower == resource.data.nameLower
-          || (
-            request.resource.data.nameLower != resource.data.nameLower
-            && !exists(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower))
-            && existsAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower))
-            && getAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower)).data.topicId == topicId
-            && getAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower)).data.ownerId == request.auth.uid
-          )
-        );
+        && request.resource.data.updatedAt is timestamp;
 
       allow delete: if false;
     }
@@ -128,7 +100,6 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       allow create: if isOwner(uid)
-        && existsAfter(/databases/$(database)/documents/feedTopics/$(topicId))
         && hasOnlyKeys(request.resource.data, ['uid', 'role', 'favorite', 'joinedAt', 'updatedAt'])
         && request.resource.data.uid == uid
         && request.resource.data.favorite is bool
@@ -138,7 +109,7 @@ service cloud.firestore {
           request.resource.data.role == 'member'
           || (
             request.resource.data.role == 'owner'
-            && uid == getAfter(/databases/$(database)/documents/feedTopics/$(topicId)).data.ownerId
+            && uid == get(/databases/$(database)/documents/feedTopics/$(topicId)).data.ownerId
           )
         );
 
@@ -172,9 +143,7 @@ service cloud.firestore {
         && request.resource.data.updatedAt is timestamp
         && request.resource.data.commentCount == 0
         && request.resource.data.deletedAt == null
-        && request.resource.data.deletedBy == ''
-        && hasRateWindowElapsed(request.auth.uid)
-        && hasRateAfterStamp(request.auth.uid);
+        && request.resource.data.deletedBy == '';
 
       allow update: if isSignedIn()
         && hasOnlyKeys(request.resource.data, [
@@ -255,9 +224,7 @@ service cloud.firestore {
         && (
           request.resource.data.parentId == ''
           || exists(/databases/$(database)/documents/feedThreads/$(threadId)/comments/$(request.resource.data.parentId))
-        )
-        && hasRateWindowElapsed(request.auth.uid)
-        && hasRateAfterStamp(request.auth.uid);
+        );
 
       allow update: if isSignedIn()
         && hasOnlyKeys(request.resource.data, [
