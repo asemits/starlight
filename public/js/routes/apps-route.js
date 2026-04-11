@@ -243,7 +243,13 @@
             <h2>Timer</h2>
             <p class="card-desc">Timer + stopwatch</p>
             <div class="glow-bar"></div>
-          </a>           
+          </a>     
+          <a href="/feed" class="nav-link tool-card" style="animation-delay: 0.7s;">
+            <i class="fa-regular fa-clock" style="font-size: 52px;"></i>
+            <h2>Feed</h2>
+            <p class="card-desc">Post stuff</p>
+            <div class="glow-bar"></div>
+          </a>         
         </div>
       `;
     }

@@ -42,10 +42,6 @@
                 <button type="button" onclick="resetSettingsCategory('widget')" title="Reset Widget defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
               <div class="flex items-center gap-2 mt-2">
-                <button type="button" data-settings-tab="ai" onclick="switchSettingsCategory('ai')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-robot"></i><span>AI</span></button>
-                <button type="button" onclick="resetSettingsCategory('ai')" title="Reset AI defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-              </div>
-              <div class="flex items-center gap-2 mt-2">
                 <button type="button" data-settings-tab="about" onclick="switchSettingsCategory('about')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-circle-info"></i><span>About</span></button>
               </div>
             </aside>
@@ -80,18 +76,6 @@
                     <option value="alphabetical" ${localStorage.getItem('games-pagination-mode') === 'alphabetical' ? 'selected' : ''}>Alphabetical</option>
                   </select>
                 </article>
-                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-  <button type="button" onclick="resetSettingsCard('layout-font')" title="Reset Font" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-  <label class="block mb-2 text-sm text-gray-300">Interface Font</label>
-  <select onchange="changeNebulaFont(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-    <option value="geist"    ${window.getNebulaFont() === 'geist'     ? 'selected' : ''}>Geist (Default)</option>
-    <option value="nunito"   ${window.getNebulaFont() === 'nunito'    ? 'selected' : ''}>Nunito</option>
-    <option value="oxanium"  ${window.getNebulaFont() === 'oxanium'   ? 'selected' : ''}>Oxanium</option>
-    <option value="cormorant"${window.getNebulaFont() === 'cormorant' ? 'selected' : ''}>Cormorant Garamond</option>
-    <option value="mono"     ${window.getNebulaFont() === 'mono'      ? 'selected' : ''}>Fira Code (Mono)</option>
-    <option value="system"   ${window.getNebulaFont() === 'system'    ? 'selected' : ''}>System Default</option>
-  </select>
-</article>
 
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
                   <button type="button" onclick="resetSettingsCard('layout-dashboard-recent')" title="Reset Recently Played Section" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
@@ -126,15 +110,6 @@
                   <select onchange="changeDashboardSectionVisibility('recent-music', this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
                     <option value="on" ${window.getDashboardSectionVisibility('recent-music') === 'on' ? 'selected' : ''}>On</option>
                     <option value="off" ${window.getDashboardSectionVisibility('recent-music') === 'off' ? 'selected' : ''}>Off</option>
-                  </select>
-                </article>
-
-                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                  <button type="button" onclick="resetSettingsCard('layout-dashboard-recent-ai')" title="Reset Recent AI Conversations Section" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                  <label class="block mb-2 text-sm text-gray-300">Dashboard Recent AI Conversations</label>
-                  <select onchange="changeDashboardSectionVisibility('recent-ai', this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none">
-                    <option value="on" ${window.getDashboardSectionVisibility('recent-ai') === 'on' ? 'selected' : ''}>On</option>
-                    <option value="off" ${window.getDashboardSectionVisibility('recent-ai') === 'off' ? 'selected' : ''}>Off</option>
                   </select>
                 </article>
               </div>
@@ -283,7 +258,7 @@
                     <button type="button" onclick="applyCloak('Dashboard | Khan Academy', 'http://www.google.com/s2/favicons?domain=khanacademy.org')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
                       <img src="http://www.google.com/s2/favicons?domain=khanacademy.org" class="w-5 h-5"> Khan Academy  
                     </button>
-                    <button type="button" onclick="applyCloak('New Tab', 'https://cdn.jsdelivr.net/gh/PopAnynomous234/assets/chrome.png')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
+                    <button type="button" onclick="applyCloak('Chrome New Tab', 'https://cdn.jsdelivr.net/gh/PopAnynomous234/assets/chrome.png')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
                       <img src="https://cdn.jsdelivr.net/gh/PopAnynomous234/assets/chrome.png" class="w-5 h-5"> Chrome New Tab  
                     </button>
                     <button type="button" onclick="applyCloak('Seesaw', 'http://www.google.com/s2/favicons?domain=seesaw.com')" class="w-full text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3">
@@ -369,7 +344,7 @@
                   <button type="button" onclick="resetSettingsCard('widget-format')" title="Reset Widget Format" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
                   <label class="block mb-2 text-sm text-gray-300">Date/Time Format (strftime)</label>
                   <input type="text" value="${window.getInfoWidgetFormat()}" onchange="changeInfoWidgetFormat(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-2" placeholder="%Y-%m-%d %H:%M:%S">
-                  <a href="/static/images/image.png" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition-all text-sm" target="_blank" rel="noopener noreferrer"> <span>Reference</span> </a>
+                  <a href="/static/images/image.png" class="nav-link inline-flex items-center gap-2 px-4 py-1.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition-all text-sm"> <span>Reference</span> </a>
                   <button type="button" onclick="resetInfoWidgetPosition()" class="w-full mt-2 mb-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Reset Widget Position</button>
                 </article>
 
@@ -399,34 +374,6 @@
                       </select>
                     </div>
                   </div>
-                </article>
-              </div>
-
-              <div data-settings-panel="ai" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
-                  <button type="button" onclick="resetSettingsCard('ai-custom-instructions')" title="Reset Custom Instructions" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                  <label class="block mb-2 text-sm text-gray-300">Custom Instructions</label>
-                  <textarea oninput="setAiCustomInstructions(this.value)" class="w-full min-h-[180px] bg-black border border-white/20 p-3 rounded-xl text-white outline-none" placeholder="How should the AI respond? Tone, depth, preferred formats, and coding conventions.">${escapeHtml(window.getAiCustomInstructions ? window.getAiCustomInstructions() : '')}</textarea>
-                </article>
-
-                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                  <button type="button" onclick="resetSettingsCard('ai-cloud-sync')" title="Reset AI Cloud Sync" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                  <label class="block mb-2 text-sm text-gray-300">Cloud Sync for AI Conversations</label>
-                  <select onchange="setAiConversationSync(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-4">
-                    <option value="on" ${(window.getAiConversationSync && window.getAiConversationSync() === 'on') ? 'selected' : ''}>On</option>
-                    <option value="off" ${(window.getAiConversationSync && window.getAiConversationSync() === 'off') ? 'selected' : ''}>Off</option>
-                  </select>
-                  <a href="/ai-chat" class="nav-link inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">
-                    <i class="fa-solid fa-robot"></i>
-                    <span>Open AI Chat</span>
-                  </a>
-                </article>
-
-                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                  <button type="button" onclick="resetSettingsCard('ai-server-base')" title="Reset AI Server Base URL" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                  <label class="block mb-2 text-sm text-gray-300">AI Server Base URL</label>
-                  <input type="text" value="${escapeHtml(window.getAiServerBase ? window.getAiServerBase() : window.location.origin)}" onchange="setAiServerBase(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" placeholder="https://your-ai-server.example.com">
-                  <p class="text-xs text-gray-400 mt-2">Default uses the current origin. For a separate server, set a full origin with optional path.</p>
                 </article>
               </div>
 

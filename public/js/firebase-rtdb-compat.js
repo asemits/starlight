@@ -1175,7 +1175,15 @@
       return;
     }
 
-    const namespace = isObject(window.firebase.firestore) ? window.firebase.firestore : {};
+    const existing = window.firebase.firestore;
+
+    if (typeof existing === "function") {
+      existing.FieldValue = fieldValue;
+      existing.FieldPath = fieldPath;
+      return;
+    }
+
+    const namespace = isObject(existing) ? existing : {};
     namespace.FieldValue = fieldValue;
     namespace.FieldPath = fieldPath;
     window.firebase.firestore = namespace;

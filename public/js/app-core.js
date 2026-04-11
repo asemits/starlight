@@ -37,16 +37,12 @@
   const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
   const DASHBOARD_SHOW_STATS_KEY = "dashboard-show-stats";
   const DASHBOARD_SHOW_RECENT_MUSIC_KEY = "dashboard-show-recent-music";
-  const DASHBOARD_SHOW_RECENT_AI_KEY = "dashboard-show-recent-ai";
   const MEASUREMENT_SYSTEM_KEY = "nebula-measurement-system";
   const WIDGET_WEATHER_CACHE_KEY = "nebula-widget-weather-current";
   const NOTIFY_INAPP_KEY = "nebula-notify-inapp";
   const NOTIFY_OS_KEY = "nebula-notify-os";
   const NOTIFY_MESSAGES_KEY = "nebula-notify-messages";
   const NOTIFY_FRIEND_REQUESTS_KEY = "nebula-notify-friend-requests";
-  const AI_CUSTOM_INSTRUCTIONS_KEY = "nebula-ai-custom-instructions";
-  const AI_CLOUD_SYNC_KEY = "nebula-sync-ai-conversations";
-  const AI_SERVER_BASE_KEY = "nebula-ai-server-base";
 
   function escapeHtml(value) {
     return String(value || "")
@@ -392,24 +388,6 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       tag: String(raw.tag || `${type}:${Date.now()}`).slice(0, 160)
     };
   }
-  window.getNebulaFont = function getNebulaFont() {
-    return localStorage.getItem(FONT_KEY) || "geist";
-};
-
-window.changeNebulaFont = function changeNebulaFont(value) {
-    const fonts = {
-        geist: "'Geist','Montserrat',sans-serif",
-        cormorant: "'Cormorant Garamond','Georgia',serif",
-        nunito: "'Nunito',sans-serif",
-        mono: "'Fira Code','Courier New',monospace",
-        oxanium: "'Oxanium',sans-serif",
-        system: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
-    };
-    const key = fonts[value] ? value : "geist";
-    localStorage.setItem(FONT_KEY, key);
-    document.documentElement.style.setProperty("--nebula-font", fonts[key]);
-    document.body.style.fontFamily = fonts[key];
-};
 
   window.getNebulaNotificationPreferences = function getNebulaNotificationPreferences() {
     return readNotificationPreferences();
@@ -515,8 +493,7 @@ window.changeNebulaFont = function changeNebulaFont(value) {
       recent: DASHBOARD_SHOW_RECENT_KEY,
       favorites: DASHBOARD_SHOW_FAVORITES_KEY,
       stats: DASHBOARD_SHOW_STATS_KEY,
-      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY,
-      "recent-ai": DASHBOARD_SHOW_RECENT_AI_KEY
+      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY
     };
     const key = keyMap[String(section || "")];
     if (!key) {
@@ -530,8 +507,7 @@ window.changeNebulaFont = function changeNebulaFont(value) {
       recent: DASHBOARD_SHOW_RECENT_KEY,
       favorites: DASHBOARD_SHOW_FAVORITES_KEY,
       stats: DASHBOARD_SHOW_STATS_KEY,
-      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY,
-      "recent-ai": DASHBOARD_SHOW_RECENT_AI_KEY
+      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY
     };
     const key = keyMap[String(section || "")];
     if (!key) {
@@ -541,43 +517,6 @@ window.changeNebulaFont = function changeNebulaFont(value) {
     if (window.location.pathname === "/" && typeof window.router === "function") {
       window.router();
     }
-  };
-
-  function normalizeAiServerBase(value) {
-    const raw = String(value || "").trim();
-    if (!raw) {
-      return window.location.origin;
-    }
-    try {
-      const parsed = new URL(raw, window.location.origin);
-      return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/g, "") || window.location.origin;
-    } catch (_error) {
-      return window.location.origin;
-    }
-  }
-
-  window.getAiCustomInstructions = function getAiCustomInstructions() {
-    return String(localStorage.getItem(AI_CUSTOM_INSTRUCTIONS_KEY) || "");
-  };
-
-  window.setAiCustomInstructions = function setAiCustomInstructions(value) {
-    localStorage.setItem(AI_CUSTOM_INSTRUCTIONS_KEY, String(value || "").slice(0, 4000));
-  };
-
-  window.getAiConversationSync = function getAiConversationSync() {
-    return localStorage.getItem(AI_CLOUD_SYNC_KEY) === "off" ? "off" : "on";
-  };
-
-  window.setAiConversationSync = function setAiConversationSync(value) {
-    localStorage.setItem(AI_CLOUD_SYNC_KEY, value === "off" ? "off" : "on");
-  };
-
-  window.getAiServerBase = function getAiServerBase() {
-    return normalizeAiServerBase(localStorage.getItem(AI_SERVER_BASE_KEY) || "");
-  };
-
-  window.setAiServerBase = function setAiServerBase(value) {
-    localStorage.setItem(AI_SERVER_BASE_KEY, normalizeAiServerBase(value));
   };
 
   window.changeGamesPaginationMode = function changeGamesPaginationMode(newMode) {
@@ -686,10 +625,6 @@ window.changeNebulaFont = function changeNebulaFont(value) {
   }
 
   function resetSettingsCard(cardId) {
-    if (cardId === "layout-font") {
-    window.changeNebulaFont("geist");
-    return;
-}
     if (cardId === "layout-sidebar") {
       window.changeSidebarPos("top");
       return;
@@ -712,10 +647,6 @@ window.changeNebulaFont = function changeNebulaFont(value) {
     }
     if (cardId === "layout-dashboard-recent-music") {
       window.changeDashboardSectionVisibility("recent-music", "on");
-      return;
-    }
-    if (cardId === "layout-dashboard-recent-ai") {
-      window.changeDashboardSectionVisibility("recent-ai", "on");
       return;
     }
     if (cardId === "games-pagination") {
@@ -779,18 +710,6 @@ window.changeNebulaFont = function changeNebulaFont(value) {
       window.changeInfoWidgetSectionVisibility("weather", "on");
       window.changeInfoWidgetSectionVisibility("datetime", "on");
       window.changeInfoWidgetSectionVisibility("battery", "on");
-      return;
-    }
-    if (cardId === "ai-custom-instructions") {
-      window.setAiCustomInstructions("");
-      return;
-    }
-    if (cardId === "ai-cloud-sync") {
-      window.setAiConversationSync("on");
-      return;
-    }
-    if (cardId === "ai-server-base") {
-      window.setAiServerBase(window.location.origin);
     }
   }
 
@@ -1595,5 +1514,4 @@ window.changeNebulaFont = function changeNebulaFont(value) {
   }
 
   mountInfoWidget();
-  window.changeNebulaFont(window.getNebulaFont());
 })();
