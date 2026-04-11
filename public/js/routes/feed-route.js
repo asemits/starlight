@@ -159,36 +159,99 @@ const fb = window['firebase'];
         state.unsubComments = posts.doc(postId).collection("comments").orderBy("createdAt", "asc").limit(300).onSnapshot((snapshot) => { state.comments.set(postId, snapshot.docs.map(normComment)); renderThreadPost(postId); renderThreadList(postId); setReplyTarget(state.replyParentId); }, () => { el.threadList.innerHTML = `<div class="feed-panel" style="padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.06)">Unable to load the thread right now.</div>`; });
       }
       async function publishPost() {
-        if (!state.user) { setStatus(el.status, "Sign in to publish a post.", "error"); return; }
-        const titleValue = editor(el.title); const bodyValue = editor(el.body); const derivedTitle = titleValue || bodyValue.split("\n")[0].slice(0, 140);
-        if (!bodyValue) { setStatus(el.status, "Add some body text before publishing.", "error"); return; }
-        if (!derivedTitle) { setStatus(el.status, "Add a title or enough body text to derive one.", "error"); return; }
-        el.submit.disabled = true; setStatus(el.status, "Publishing post...");
-        try {
-          await posts.add({ title: derivedTitle.slice(0, 140), body: bodyValue.slice(0, 4000), community: "r/nebula", flair: "Discussion", authorId: state.user.uid, authorName: name(state.user).slice(0, 80), authorHandle: handle(state.user).slice(0, 40), commentCount: 0, createdAt: fieldValue.serverTimestamp(), lastActivityAt: fieldValue.serverTimestamp() });
-          clear(el.title); clear(el.body); setStatus(el.status, "Post published.", "success");
-        } catch (_error) {
-          setStatus(el.status, "Could not publish the post. Check your Firestore rules.", "error");
-        } finally {
-          el.submit.disabled = state.user == null;
-        }
-      }
+  if (!state.user) { 
+    setStatus(el.status, "Sign in to publish a post.", "error"); 
+    return; 
+  }
+
+  const titleValue = editor(el.title); 
+  const bodyValue = editor(el.body); 
+  const derivedTitle = titleValue || bodyValue.split("\n")[0].slice(0, 140);
+
+  if (!bodyValue) { 
+    setStatus(el.status, "Add some body text before publishing.", "error"); 
+    return; 
+  }
+
+  el.submit.disabled = true; 
+  setStatus(el.status, "Publishing post...");
+
+  try {
+    const postData = {
+      title: String(derivedTitle).slice(0, 140),
+      body: String(bodyValue).slice(0, 4000),
+      community: "r/nebula",
+      flair: "Discussion",
+      authorId: String(state.user.uid),
+      authorName: String(name(state.user)).slice(0, 80),
+      authorHandle: String(handle(state.user)).slice(0, 40),
+      commentCount: 0, 
+      createdAt: fb.firestore.Timestamp.now(),
+      lastActivityAt: fb.firestore.Timestamp.now() 
+    };
+
+    await posts.add(postData);
+    
+    clear(el.title); 
+    clear(el.body); 
+    setStatus(el.status, "Post published.", "success");
+  } catch (error) {
+    console.error("DEBUG - Firestore Reject:", error);
+    setStatus(el.status, "Publish failed: " + error.message, "error");
+  } finally {
+    el.submit.disabled = false;
+  }
+}
       async function publishComment() {
-        if (!state.user) { setStatus(el.threadStatus, "Sign in to reply.", "error"); return; }
-        if (!state.threadPostId) { setStatus(el.threadStatus, "Open a thread before replying.", "error"); return; }
-        const bodyValue = editor(el.comment); if (!bodyValue) { setStatus(el.threadStatus, "Write a reply first.", "error"); return; }
-        el.submitComment.disabled = true; setStatus(el.threadStatus, "Sending reply...");
-        try {
-          const postRef = posts.doc(state.threadPostId); const commentRef = postRef.collection("comments").doc(); const batch = db.batch();
-          batch.set(commentRef, { parentId: state.replyParentId || "", authorId: state.user.uid, authorName: name(state.user).slice(0, 80), authorHandle: handle(state.user).slice(0, 40), body: bodyValue.slice(0, 2000), createdAt: fieldValue.serverTimestamp() });
-          batch.update(postRef, { commentCount: fieldValue.increment(1), lastActivityAt: fieldValue.serverTimestamp() });
-          await batch.commit(); clear(el.comment); setReplyTarget(null); setStatus(el.threadStatus, "Reply posted.", "success");
-        } catch (_error) {
-          setStatus(el.threadStatus, "Could not send the reply. Check your Firestore rules.", "error");
-        } finally {
-          el.submitComment.disabled = state.user == null;
-        }
-      }
+  if (!state.user) { setStatus(el.threadStatus, "Sign in to reply.", "error"); return; }
+  if (!state.threadPostId) { setStatus(el.threadStatus, "Open a thread before replying.", "error"); return; }
+  
+  const bodyValue = editor(el.comment); 
+  if (!bodyValue) { setStatus(el.threadStatus, "Write a reply first.", "error"); return; }
+  const currentPost = state.posts.find(p => p.id === state.threadPostId);
+  if (!currentPost) { setStatus(el.threadStatus, "Original post not found.", "error"); return; }
+
+  el.submitComment.disabled = true; 
+  setStatus(el.threadStatus, "Sending reply...");
+
+  try {
+    const postRef = posts.doc(state.threadPostId); 
+    const commentRef = postRef.collection("comments").doc(); 
+    const batch = db.batch();
+    const now = fb.firestore.Timestamp.now();
+    batch.set(commentRef, { 
+      parentId: state.replyParentId || "", 
+      authorId: String(state.user.uid), 
+      authorName: String(name(state.user)).slice(0, 80), 
+      authorHandle: String(handle(state.user)).slice(0, 40), 
+      body: String(bodyValue).slice(0, 2000), 
+      createdAt: now 
+    });
+
+    batch.update(postRef, { 
+      title: currentPost.title,
+      body: currentPost.body,
+      community: currentPost.community,
+      flair: currentPost.flair,
+      authorId: currentPost.authorId || state.user.uid, 
+      authorName: currentPost.authorName,
+      authorHandle: currentPost.authorHandle,
+      createdAt: currentPost.createdAt,
+      commentCount: Number(currentPost.commentCount || 0) + 1, 
+      lastActivityAt: now 
+    });
+
+    await batch.commit(); 
+    clear(el.comment); 
+    setReplyTarget(null); 
+    setStatus(el.threadStatus, "Reply posted.", "success");
+  } catch (error) {
+    console.error("DEBUG - Reply Rejected:", error);
+    setStatus(el.threadStatus, "Reply failed. Check console.", "error");
+  } finally {
+    el.submitComment.disabled = false;
+  }
+}
       function syncAuth() { if (state.user) { el.auth.textContent = `Posting as ${name(state.user)} ${handle(state.user)}`; enable(true); } else { el.auth.textContent = "Sign in to create posts and threaded replies."; enable(false); } updateSummary(); }
       el.submit.addEventListener("click", publishPost);
       el.clear.addEventListener("click", () => { clear(el.title); clear(el.body); setStatus(el.status, ""); });
