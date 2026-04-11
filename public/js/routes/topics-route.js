@@ -334,13 +334,12 @@
     },
     afterRender: async function afterRenderTopicsRoute() {
       const fb = window.firebase;
-      if (!fb || typeof fb.firestore !== "function") {
+      const db = window.nebulaDb || (fb && typeof fb.firestore === "function" ? fb.firestore() : null);
+      const auth = window.nebulaAuth || (fb && typeof fb.auth === "function" ? fb.auth() : null);
+      const fieldValue = fb && fb.firestore && fb.firestore.FieldValue ? fb.firestore.FieldValue : null;
+      if (!db || !auth || !fieldValue) {
         return;
       }
-
-      const db = fb.firestore();
-      const auth = fb.auth();
-      const fieldValue = fb.firestore.FieldValue;
 
       if (window.NebulaTopicsRoute && typeof window.NebulaTopicsRoute.teardown === "function") {
         window.NebulaTopicsRoute.teardown();
