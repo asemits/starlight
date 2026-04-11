@@ -7,7 +7,6 @@
         <section class="nebula-social-shell">
           <header class="nebula-social-header">
             <h1>Social</h1>
-            <p>Choose a social surface.</p>
           </header>
           <div class="nebula-social-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,420px));">
             <a href="/chat" class="nav-link nebula-social-card">
@@ -16,7 +15,7 @@
               </div>
               <div>
                 <h2>Chat</h2>
-                <p>E2EE DMs and GCs</p>
+                <p>DMs and GCs</p>
               </div>
               <i class="fa-solid fa-arrow-right nebula-social-card-arrow"></i>
             </a>
@@ -26,7 +25,7 @@
               </div>
               <div>
                 <h2>Topics</h2>
-                <p>Reddit-like threads, replies, moderation, and votes.</p>
+                <p>Forum</p>
               </div>
               <i class="fa-solid fa-arrow-right nebula-social-card-arrow"></i>
             </a>
