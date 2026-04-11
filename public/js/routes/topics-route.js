@@ -165,7 +165,7 @@
             .nebula-topics-brand{font-family:'Geist','Oxanium',sans-serif;font-size:1.9rem;font-weight:700;color:#f5f5f5;letter-spacing:-.03em}
             .nebula-topics-search-wrap{flex:1;display:flex;align-items:center;gap:8px;max-width:760px}
             .nebula-topics-search-wrap input{width:100%;height:42px;border-radius:999px;border:1px solid #333;background:#111;color:#f2f2f2;padding:0 16px;font-family:'Geist','Montserrat',sans-serif}
-            .nebula-topics-search-wrap input:focus{outline:none;border-color:#ff6a00;box-shadow:0 0 0 1px rgba(255,106,0,.28)}
+            .nebula-topics-search-wrap input:focus{outline:none;border-color:#6a6a6a;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
             .nebula-topics-page button{cursor:pointer}
             .nebula-topics-shell{display:grid;grid-template-columns:270px minmax(0,1fr) 350px;gap:12px;min-height:0}
             .nebula-topics-col{background:#0f0f10;border:1px solid #242424;border-radius:14px;min-height:0}
@@ -183,8 +183,8 @@
             .nebula-topics-editor input:focus,.nebula-topics-editor textarea:focus,.nebula-thread-composer input:focus,.nebula-thread-composer textarea:focus,.nebula-reply-editor textarea:focus{outline:none;border-color:#5d5d5d}
             .nebula-social-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
             .nebula-topics-btn,.nebula-thread-action,.nebula-reply-action{border:1px solid #3a3a3a;background:#1d1d1e;color:#f0f0f0;border-radius:999px;padding:8px 12px;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-family:'Geist','Montserrat',sans-serif}
-            .nebula-topics-btn.primary{background:#ff4500;border-color:#ff4500;color:white}
-            .nebula-thread-action.active,.nebula-reply-action.active{border-color:#ff6a00;color:#fff;background:#2a1a12}
+            .nebula-topics-btn.primary{background:#2a2a2b;border-color:#4a4a4a;color:#f8f8f8}
+            .nebula-thread-action.active,.nebula-reply-action.active{border-color:#8a8a8a;color:#fff;background:#303031}
             .nebula-social-note{margin:0;color:#8d8d8d;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase}
             .nebula-social-error{color:#ffb4b4}
             .nebula-social-success{color:#bbffd4}
@@ -220,12 +220,18 @@
             .nebula-social-md-list .depth-2{padding-left:36px}
             .nebula-social-md-list .depth-3{padding-left:48px}
             .nebula-social-md-quote{margin:0 0 8px;border-left:2px solid #555;padding-left:10px;color:#b5b5b5}
+            .nebula-compose-modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:18px}
+            .nebula-compose-modal.open{display:flex}
+            .nebula-compose-card{width:min(760px,100%);border:1px solid #2d2d2d;background:#111;border-radius:14px;display:grid;grid-template-rows:auto minmax(0,1fr);max-height:86vh;overflow:hidden}
+            .nebula-compose-head{padding:12px;border-bottom:1px solid #242424;display:flex;align-items:center;justify-content:space-between;gap:8px}
+            .nebula-compose-head strong{font-family:'Geist','Oxanium',sans-serif;color:#f3f3f3;letter-spacing:.04em;text-transform:uppercase;font-size:.9rem}
+            .nebula-compose-body{padding:12px;display:grid;gap:8px;overflow:auto}
             @media (max-width:1300px){.nebula-topics-shell{grid-template-columns:240px minmax(0,1fr)}.nebula-topics-shell .nebula-thread-window{grid-column:1 / -1;min-height:380px}}
             @media (max-width:900px){.nebula-topics-shell{grid-template-columns:1fr}.nebula-topics-page{min-height:0}.nebula-topics-col{min-height:320px}}
           </style>
 
           <div class="nebula-topics-topbar">
-            <div class="nebula-topics-brand">reddit</div>
+            <div class="nebula-topics-brand">Topics</div>
             <div class="nebula-topics-search-wrap">
               <input id="social-topic-search" type="search" placeholder="Search Topics" autocomplete="off" />
               <button type="button" id="social-refresh-topics" class="nebula-topics-btn">Refresh</button>
@@ -256,19 +262,12 @@
                 <strong id="social-selected-topic">Select a Topic</strong>
                 <div class="nebula-social-inline">
                   <button id="social-join-topic" type="button" class="nebula-topics-btn" disabled>Join</button>
-                  <button id="social-open-topic" type="button" class="nebula-topics-btn" disabled>Open Thread</button>
+                  <button id="social-open-topic" type="button" class="nebula-topics-btn" disabled>New Thread</button>
                 </div>
               </div>
               <div id="social-topic-detail" class="nebula-social-empty" style="margin:10px">Pick a Topic from the left to browse threads.</div>
               <div class="nebula-topics-main-controls">
-                <div class="nebula-thread-composer">
-                  <input id="social-thread-title" maxlength="160" placeholder="Thread title" />
-                  <textarea id="social-thread-body" rows="4" maxlength="4000" placeholder="Thread markdown body"></textarea>
-                  <div class="nebula-social-inline">
-                    <button type="button" id="social-create-thread" class="nebula-topics-btn primary">Post Thread</button>
-                    <p id="social-thread-status" class="nebula-social-note"></p>
-                  </div>
-                </div>
+                <p class="nebula-social-note">Threads appear here. Use New Thread to open the composer popup.</p>
               </div>
               <div id="social-thread-list" class="nebula-thread-list"></div>
             </main>
@@ -290,6 +289,25 @@
               <div id="social-reply-list" class="nebula-replies-list"></div>
             </section>
           </section>
+
+          <div id="social-thread-compose-modal" class="nebula-compose-modal" aria-hidden="true">
+            <div class="nebula-compose-card" role="dialog" aria-modal="true" aria-label="Create thread">
+              <div class="nebula-compose-head">
+                <strong>Create Thread</strong>
+                <button id="social-close-thread-compose" type="button" class="nebula-topics-btn">Close</button>
+              </div>
+              <div class="nebula-compose-body">
+                <div class="nebula-thread-composer">
+                  <input id="social-thread-title" maxlength="160" placeholder="Thread title" />
+                  <textarea id="social-thread-body" rows="6" maxlength="4000" placeholder="Thread markdown body"></textarea>
+                  <div class="nebula-social-inline">
+                    <button type="button" id="social-create-thread" class="nebula-topics-btn primary">Post Thread</button>
+                    <p id="social-thread-status" class="nebula-social-note"></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
       `;
     },
@@ -332,6 +350,8 @@
         createThread: root.querySelector("#social-create-thread"),
         threadStatus: root.querySelector("#social-thread-status"),
         threadList: root.querySelector("#social-thread-list"),
+        threadComposeModal: document.querySelector("#social-thread-compose-modal"),
+        closeThreadCompose: document.querySelector("#social-close-thread-compose"),
         threadWindow: root.querySelector("#social-thread-window"),
         closeThread: root.querySelector("#social-close-thread"),
         threadTitleView: root.querySelector("#social-thread-title-view"),
@@ -429,6 +449,22 @@
         el.createThread.disabled = !canUse;
         el.createReply.disabled = !canUse;
         el.joinTopic.disabled = !canUse || !state.selectedTopic;
+      }
+
+      function openThreadComposer() {
+        if (!el.threadComposeModal) {
+          return;
+        }
+        el.threadComposeModal.classList.add("open");
+        el.threadComposeModal.setAttribute("aria-hidden", "false");
+      }
+
+      function closeThreadComposer() {
+        if (!el.threadComposeModal) {
+          return;
+        }
+        el.threadComposeModal.classList.remove("open");
+        el.threadComposeModal.setAttribute("aria-hidden", "true");
       }
 
       function normalizeTopic(doc) {
@@ -1012,6 +1048,7 @@
           clearInput(el.threadTitle);
           clearInput(el.threadBody);
           setStatus(el.threadStatus, "Thread posted.", "success");
+          closeThreadComposer();
         } catch (error) {
           setStatus(el.threadStatus, "Could not post thread. " + (error && error.message ? error.message : ""), "error");
         } finally {
@@ -1302,16 +1339,24 @@
       el.joinTopic.addEventListener("click", toggleJoin);
       el.openTopic.addEventListener("click", function () {
         if (!state.selectedTopic) {
+          setStatus(el.threadStatus, "Select a Topic first.", "error");
           return;
         }
-        const first = state.threads[0];
-        if (first) {
-          openThread(first.id);
-        }
+        openThreadComposer();
       });
       el.createThread.addEventListener("click", createThread);
       el.createReply.addEventListener("click", createReply);
       el.closeThread.addEventListener("click", closeThread);
+      if (el.closeThreadCompose) {
+        el.closeThreadCompose.addEventListener("click", closeThreadComposer);
+      }
+      if (el.threadComposeModal) {
+        el.threadComposeModal.addEventListener("click", function (event) {
+          if (event.target === el.threadComposeModal) {
+            closeThreadComposer();
+          }
+        });
+      }
 
       el.topicList.addEventListener("click", function (event) {
         const button = event.target.closest('[data-action="select-topic"]');
