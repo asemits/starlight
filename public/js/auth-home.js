@@ -8,10 +8,8 @@
   const DASHBOARD_SHOW_FAVORITES_KEY = "dashboard-show-favorites";
   const DASHBOARD_SHOW_STATS_KEY = "dashboard-show-stats";
   const DASHBOARD_SHOW_RECENT_MUSIC_KEY = "dashboard-show-recent-music";
-  const DASHBOARD_SHOW_RECENT_AI_KEY = "dashboard-show-recent-ai";
   const DASHBOARD_RECENT_COUNT_KEY = "dashboard-last-recent-count";
   const DASHBOARD_FAVORITES_COUNT_KEY = "dashboard-last-favorites-count";
-  const DASHBOARD_RECENT_AI_COUNT_KEY = "dashboard-last-recent-ai-count";
   const SYNC_PREF_STATS_KEY = "nebula-sync-stats";
   const SYNC_PREF_GAME_PROGRESS_KEY = "nebula-sync-game-progress";
   const SYNC_PREF_SETTINGS_KEY = "nebula-sync-settings";
@@ -19,10 +17,6 @@
   const SYNC_PREF_RECENT_GAMES_KEY = "nebula-sync-recent-games";
   const SYNC_PREF_RECENT_MUSIC_KEY = "nebula-sync-recent-music";
   const SYNC_PREF_MUSIC_PLAYLISTS_KEY = "nebula-sync-music-playlists";
-  const AI_STORE_KEY = "nebula-ai-store-v1";
-  const AI_CLOUD_SYNC_KEY = "nebula-sync-ai-conversations";
-  const AI_CUSTOM_INSTRUCTIONS_KEY = "nebula-ai-custom-instructions";
-  const AI_SERVER_BASE_KEY = "nebula-ai-server-base";
   const MUSIC_RECENT_KEY = "nebula-music-recent";
   const MUSIC_PLAYLIST_KEY = "cl-playlist";
   const MUSIC_FAVORITES_KEY = "cl-favs";
@@ -31,6 +25,7 @@
   const SOUNDBOARD_VOLUME_KEY = "nebula-soundboard-volume";
   const NOTIFY_INAPP_KEY = "nebula-notify-inapp";
   const NOTIFY_OS_KEY = "nebula-notify-os";
+  const FONT_KEY = "nebula-font";
   const NOTIFY_MESSAGES_KEY = "nebula-notify-messages";
   const NOTIFY_FRIEND_REQUESTS_KEY = "nebula-notify-friend-requests";
   const SYNC_SETTINGS_KEYS = [
@@ -61,12 +56,9 @@
     "dashboard-show-favorites",
     "dashboard-show-stats",
     "dashboard-show-recent-music",
-    "dashboard-show-recent-ai",
-    AI_CLOUD_SYNC_KEY,
-    AI_CUSTOM_INSTRUCTIONS_KEY,
-    AI_SERVER_BASE_KEY,
     "nebula-measurement-system",
     MUSIC_VOLUME_KEY,
+    FONT_KEY,
     SOUNDBOARD_VOLUME_KEY,
     NOTIFY_INAPP_KEY,
     NOTIFY_OS_KEY,
@@ -192,8 +184,7 @@
       recent: DASHBOARD_SHOW_RECENT_KEY,
       favorites: DASHBOARD_SHOW_FAVORITES_KEY,
       stats: DASHBOARD_SHOW_STATS_KEY,
-      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY,
-      "recent-ai": DASHBOARD_SHOW_RECENT_AI_KEY
+      "recent-music": DASHBOARD_SHOW_RECENT_MUSIC_KEY
     };
     const key = keyMap[String(section || "")];
     if (!key) {
@@ -502,17 +493,22 @@
       throw new Error("auth-unavailable");
     }
 
-    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        email,
-        password,
-        returnSecureToken: true
-      })
-    });
+    let response = null;
+    try {
+      response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          returnSecureToken: true
+        })
+      });
+    } catch (_error) {
+      return false;
+    }
 
     if (response.ok) {
       return true;
@@ -1075,60 +1071,6 @@
       .filter(Boolean);
   }
 
-  function collectRecentAiConversationSnapshot(limit) {
-    const max = Math.max(1, Math.min(20, Number(limit || 6)));
-    try {
-      const parsed = JSON.parse(localStorage.getItem(AI_STORE_KEY) || "{}");
-      const conversations = Array.isArray(parsed && parsed.conversations) ? parsed.conversations : [];
-      return conversations
-        .map((item) => {
-          const id = String(item && item.id ? item.id : "").trim();
-          if (!id) {
-            return null;
-          }
-          const title = String(item && item.title ? item.title : "New conversation").trim().slice(0, 120) || "New conversation";
-          const updatedAt = Number(item && item.updatedAt ? item.updatedAt : item && item.createdAt ? item.createdAt : 0);
-          const messageCount = Number(item && item.messageCount ? item.messageCount : 0);
-          const preview = String(item && item.lastPreview ? item.lastPreview : "").trim().slice(0, 220);
-          return {
-            id,
-            title,
-            updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0,
-            messageCount: Number.isFinite(messageCount) ? Math.max(0, messageCount) : 0,
-            lastPreview: preview
-          };
-        })
-        .filter(Boolean)
-        .sort((a, b) => b.updatedAt - a.updatedAt)
-        .slice(0, max);
-    } catch (_error) {
-      return [];
-    }
-  }
-
-  function removeRecentAiConversation(conversationId) {
-    const targetId = String(conversationId || "").trim();
-    if (!targetId) {
-      return;
-    }
-    try {
-      const parsed = JSON.parse(localStorage.getItem(AI_STORE_KEY) || "{}");
-      const conversations = Array.isArray(parsed && parsed.conversations) ? parsed.conversations : [];
-      const next = conversations.filter((item) => String(item && item.id ? item.id : "") !== targetId);
-      const nextActiveId = String(parsed && parsed.activeConversationId ? parsed.activeConversationId : "") === targetId
-        ? ""
-        : String(parsed && parsed.activeConversationId ? parsed.activeConversationId : "");
-      localStorage.setItem(AI_STORE_KEY, JSON.stringify({
-        activeConversationId: nextActiveId,
-        conversations: next
-      }));
-    } catch (_error) {
-    }
-    if (window.NebulaAIChat && typeof window.NebulaAIChat.clearConversation === "function") {
-      window.NebulaAIChat.clearConversation(targetId);
-    }
-  }
-
   function collectSyncStatsSnapshot(gameProgress) {
     const items = Array.isArray(gameProgress && gameProgress.items) ? gameProgress.items : [];
     return items.map((item) => ({
@@ -1226,22 +1168,10 @@
         existing.clickCount = Math.max(Number(existing.clickCount || 0), normalized.clickCount);
       }
       if (Number.isFinite(normalized.rating)) {
-        const existingRatedAtMs = Number(existing.lastRatedAtMs || 0);
-        const incomingRatedAtMs = Number(normalized.lastRatedAtMs || 0);
-        if (!existingRatedAtMs || incomingRatedAtMs >= existingRatedAtMs) {
-          existing.rating = normalized.rating;
-        }
+        existing.rating = normalized.rating;
       }
       if (typeof normalized.isFavorite === "boolean") {
-        if (typeof existing.isFavorite !== "boolean") {
-          existing.isFavorite = normalized.isFavorite;
-        } else {
-          const existingBasisMs = Math.max(Number(existing.lastPlayedAtMs || 0), Number(existing.lastRatedAtMs || 0));
-          const incomingBasisMs = Math.max(Number(normalized.lastPlayedAtMs || 0), Number(normalized.lastRatedAtMs || 0));
-          if (incomingBasisMs >= existingBasisMs) {
-            existing.isFavorite = normalized.isFavorite;
-          }
-        }
+        existing.isFavorite = normalized.isFavorite;
       }
       if (Number.isFinite(normalized.lastPlayedAtMs)) {
         existing.lastPlayedAtMs = Math.max(Number(existing.lastPlayedAtMs || 0), normalized.lastPlayedAtMs);
@@ -1286,23 +1216,6 @@
     return new Date(ms);
   }
 
-  function progressFromPlayerData(data, fallbackPath) {
-    if (!data || typeof data !== "object") {
-      return null;
-    }
-    return normalizeProgressItem({
-      gamePath: String(data.gamePath || data.activeGamePath || fallbackPath || ""),
-      sourceBase: String(data.sourceBase || ""),
-      gameName: String(data.gameName || ""),
-      gameImage: String(data.gameImage || ""),
-      clickCount: Number(data.clickCount || 0),
-      rating: Number(data.rating || 0),
-      isFavorite: typeof data.isFavorite === "boolean" ? data.isFavorite : undefined,
-      lastPlayedAtMs: toMillis(data.lastPlayedAt),
-      lastRatedAtMs: toMillis(data.lastRatedAt)
-    });
-  }
-
   async function restoreGameProgressToFirestore(items, user) {
     const firestore = db();
     if (!firestore || !user || !Array.isArray(items) || !items.length) {
@@ -1318,66 +1231,45 @@
     for (let i = 0; i < sanitized.length; i += chunkSize) {
       const chunk = sanitized.slice(i, i + chunkSize);
       const batch = firestore.batch();
-      const refs = chunk.map((item) => {
+
+      chunk.forEach((item) => {
         const gameId = pathToDocId(item.gamePath);
         if (!gameId) {
-          return null;
-        }
-        const statsRef = firestore.collection("gameStats").doc(gameId);
-        const playerRef = statsRef.collection("players").doc(user.uid);
-        return { gameId, statsRef, playerRef };
-      });
-
-      const existingDocs = await Promise.all(refs.map(async (entry) => {
-        if (!entry) {
-          return null;
-        }
-        try {
-          return await entry.playerRef.get();
-        } catch (_error) {
-          return null;
-        }
-      }));
-
-      chunk.forEach((item, index) => {
-        const entry = refs[index];
-        if (!entry) {
           return;
         }
 
-        const existingSnap = existingDocs[index];
-        const existingItem = existingSnap && existingSnap.exists ? progressFromPlayerData(existingSnap.data() || {}, item.gamePath) : null;
-        const mergedItem = mergeProgressList(existingItem ? [existingItem] : [], [item])[0] || item;
+        const statsRef = firestore.collection("gameStats").doc(gameId);
+        const playerRef = statsRef.collection("players").doc(user.uid);
         const now = firebase.firestore.FieldValue.serverTimestamp();
 
-        batch.set(entry.statsRef, {
-          path: mergedItem.gamePath,
-          sourceBase: mergedItem.sourceBase || "",
-          name: mergedItem.gameName || mergedItem.gamePath,
-          image: mergedItem.gameImage || "",
+        batch.set(statsRef, {
+          path: item.gamePath,
+          sourceBase: item.sourceBase || "",
+          name: item.gameName || item.gamePath,
+          image: item.gameImage || "",
           updatedAt: now
         }, { merge: true });
 
         const playerPatch = {
           uid: user.uid,
-          gamePath: mergedItem.gamePath,
-          sourceBase: mergedItem.sourceBase || "",
-          gameName: mergedItem.gameName || "",
-          gameImage: mergedItem.gameImage || ""
+          gamePath: item.gamePath,
+          sourceBase: item.sourceBase || "",
+          gameName: item.gameName || "",
+          gameImage: item.gameImage || ""
         };
 
-        if (Number.isFinite(mergedItem.clickCount)) {
-          playerPatch.clickCount = Math.max(0, Number(mergedItem.clickCount));
+        if (Number.isFinite(item.clickCount)) {
+          playerPatch.clickCount = Math.max(0, Number(item.clickCount));
         }
-        if (Number.isFinite(mergedItem.rating)) {
-          playerPatch.rating = mergedItem.rating === 1 || mergedItem.rating === -1 ? mergedItem.rating : 0;
+        if (Number.isFinite(item.rating)) {
+          playerPatch.rating = item.rating === 1 || item.rating === -1 ? item.rating : 0;
         }
-        if (typeof mergedItem.isFavorite === "boolean") {
-          playerPatch.isFavorite = mergedItem.isFavorite;
+        if (typeof item.isFavorite === "boolean") {
+          playerPatch.isFavorite = item.isFavorite;
         }
 
-        const lastPlayedAt = dateFromMillis(mergedItem.lastPlayedAtMs);
-        const lastRatedAt = dateFromMillis(mergedItem.lastRatedAtMs);
+        const lastPlayedAt = dateFromMillis(item.lastPlayedAtMs);
+        const lastRatedAt = dateFromMillis(item.lastRatedAtMs);
         if (lastPlayedAt) {
           playerPatch.lastPlayedAt = lastPlayedAt;
         }
@@ -1385,7 +1277,7 @@
           playerPatch.lastRatedAt = lastRatedAt;
         }
 
-        batch.set(entry.playerRef, playerPatch, { merge: true });
+        batch.set(playerRef, playerPatch, { merge: true });
       });
 
       await batch.commit();
@@ -1523,12 +1415,14 @@
     }
 
     const isManual = mode === "manual";
-    const isStartup = mode === "startup";
     const userRef = firestore.collection(USER_DOC_COLLECTION).doc(user.uid);
     const selections = getSyncSelectionsSnapshot();
     const needsGameProgress = selections.gameProgress || selections.stats || selections.favorites || selections.recentGames;
     const snapshot = selections.settings ? collectSyncSettingsSnapshot() : null;
     const gameProgress = needsGameProgress ? await collectGameProgressSnapshot() : { updatedAtMs: Date.now(), items: [] };
+    const statsSnapshot = selections.stats ? collectSyncStatsSnapshot(gameProgress) : [];
+    const favoritesSnapshot = selections.favorites ? collectSyncFavoritesSnapshot(gameProgress) : [];
+    const recentGamesSnapshot = selections.recentGames ? collectSyncRecentGamesSnapshot(gameProgress) : [];
     const recentMusicSnapshot = selections.recentMusic ? collectRecentMusicSnapshot() : [];
     const musicPlaylistSnapshot = selections.musicPlaylists ? collectMusicPlaylistSnapshot() : [];
     const musicFavoritesSnapshot = selections.musicPlaylists ? collectMusicFavoritesSnapshot() : [];
@@ -1545,38 +1439,19 @@
           const nextManualMs = lastManualMs + MANUAL_SYNC_INTERVAL_MS;
           throw new Error(`Wait until ${new Date(nextManualMs).toLocaleString()} to sync your data again.`);
         }
-        if (!isManual && !isStartup && lastAutoMs && nowMs - lastAutoMs < AUTO_SYNC_INTERVAL_MS) {
+        if (!isManual && lastAutoMs && nowMs - lastAutoMs < AUTO_SYNC_INTERVAL_MS) {
           throw new Error("Auto sync interval has not elapsed.");
         }
-
-        const mergedProgressItems = mergeProgressList(
-          data && data.gameProgress && Array.isArray(data.gameProgress.items) ? data.gameProgress.items : [],
-          gameProgress.items
-        );
-        const mergedProgressEnvelope = {
-          updatedAtMs: Math.max(
-            Number(data && data.gameProgress && data.gameProgress.updatedAtMs ? data.gameProgress.updatedAtMs : 0),
-            Number(gameProgress.updatedAtMs || 0),
-            nowMs
-          ),
-          items: mergedProgressItems
-        };
-        const mergedStatsSnapshot = collectSyncStatsSnapshot(mergedProgressEnvelope);
-        const mergedFavoritesSnapshot = collectSyncFavoritesSnapshot(mergedProgressEnvelope);
-        const mergedRecentGamesSnapshot = collectSyncRecentGamesSnapshot(mergedProgressEnvelope);
-        const mergedSettingsSnapshot = selections.settings
-          ? mergeSettingsSnapshots(data && data.settings && typeof data.settings === "object" ? data.settings : null, snapshot)
-          : null;
 
         const payload = {
           uid: user.uid,
           providers: (user.providerData || []).map((item) => item.providerId).filter(Boolean),
           syncSelections: selections,
-          settings: mergedSettingsSnapshot || firebase.firestore.FieldValue.delete(),
-          gameProgress: selections.gameProgress ? mergedProgressEnvelope : firebase.firestore.FieldValue.delete(),
-          syncStats: selections.stats ? mergedStatsSnapshot : firebase.firestore.FieldValue.delete(),
-          syncFavorites: selections.favorites ? mergedFavoritesSnapshot : firebase.firestore.FieldValue.delete(),
-          syncRecentGames: selections.recentGames ? mergedRecentGamesSnapshot : firebase.firestore.FieldValue.delete(),
+          settings: snapshot || firebase.firestore.FieldValue.delete(),
+          gameProgress: selections.gameProgress ? gameProgress : firebase.firestore.FieldValue.delete(),
+          syncStats: selections.stats ? statsSnapshot : firebase.firestore.FieldValue.delete(),
+          syncFavorites: selections.favorites ? favoritesSnapshot : firebase.firestore.FieldValue.delete(),
+          syncRecentGames: selections.recentGames ? recentGamesSnapshot : firebase.firestore.FieldValue.delete(),
           syncRecentMusic: selections.recentMusic ? recentMusicSnapshot : firebase.firestore.FieldValue.delete(),
           syncMusicPlaylists: selections.musicPlaylists ? musicPlaylistSnapshot : firebase.firestore.FieldValue.delete(),
           syncMusicFavorites: selections.musicPlaylists ? musicFavoritesSnapshot : firebase.firestore.FieldValue.delete(),
@@ -1612,7 +1487,7 @@
     }
     state.autoSyncTimerId = window.setInterval(() => {
       syncUserData("auto", true);
-    }, AUTO_SYNC_INTERVAL_MS);
+    }, 60 * 1000);
   }
 
   function stopAutoSyncLoop() {
@@ -1650,7 +1525,6 @@
       const showFavorites = dashboardSectionEnabled("favorites");
       const showStats = dashboardSectionEnabled("stats");
       const showRecentMusic = dashboardSectionEnabled("recent-music");
-      const showRecentAi = dashboardSectionEnabled("recent-ai");
       root.innerHTML = `
         <section class="nebula-home-shell nebula-dashboard-shell">
           <header class="nebula-home-hero">
@@ -1687,14 +1561,6 @@
               <button id="dashboard-clear-recent-music" type="button" class="nebula-btn nebula-btn-muted">Clear Recent Music</button>
             </div>
             <div id="dashboard-recent-music" class="nebula-dashboard-grid"></div>
-          </section>` : ""}
-
-          ${showRecentAi ? `<section class="nebula-dashboard-section">
-            <div class="nebula-dashboard-head">
-              <h2>Recent AI Conversations</h2>
-              <a href="/ai-chat" class="nebula-dashboard-link nav-link">Open AI Chat</a>
-            </div>
-            <div id="dashboard-recent-ai" class="nebula-dashboard-grid"></div>
           </section>` : ""}
         </section>
       `;
@@ -1738,7 +1604,6 @@
     const favoritesNode = document.getElementById("dashboard-favorites");
     const statsNode = document.getElementById("dashboard-stats");
     const recentMusicNode = document.getElementById("dashboard-recent-music");
-    const recentAiNode = document.getElementById("dashboard-recent-ai");
     if (!firestore || !user) {
       return;
     }
@@ -1747,53 +1612,8 @@
     const showFavorites = dashboardSectionEnabled("favorites");
     const showStats = dashboardSectionEnabled("stats");
     const showRecentMusic = dashboardSectionEnabled("recent-music");
-    const showRecentAi = dashboardSectionEnabled("recent-ai");
-    if ((showRecent && !recentNode) || (showFavorites && !favoritesNode) || (showStats && !statsNode) || (showRecentMusic && !recentMusicNode) || (showRecentAi && !recentAiNode)) {
+    if ((showRecent && !recentNode) || (showFavorites && !favoritesNode) || (showStats && !statsNode) || (showRecentMusic && !recentMusicNode)) {
       return;
-    }
-
-    if (showRecentAi && recentAiNode) {
-      function renderRecentAiConversations(items) {
-        const safeItems = Array.isArray(items) ? items : [];
-        localStorage.setItem(DASHBOARD_RECENT_AI_COUNT_KEY, String(safeItems.length));
-        if (!safeItems.length) {
-          recentAiNode.innerHTML = '<p class="nebula-dashboard-empty">No recent AI conversations yet.</p>';
-          return;
-        }
-        recentAiNode.innerHTML = safeItems.map((item) => {
-          const dateText = item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "";
-          const subtitle = item.lastPreview || "No preview available.";
-          return `
-            <a href="/ai-chat?conversation=${encodeURIComponent(item.id)}" class="nav-link nebula-dashboard-item nebula-dashboard-ai-item">
-              <div class="nebula-dashboard-thumb nebula-dashboard-thumb-ai">
-                <div class="nebula-dashboard-fallback"><i class="fa-solid fa-robot"></i></div>
-                <div class="nebula-dashboard-meta">
-                  <h3>${escapeHtml(item.title)}</h3>
-                  <p>${escapeHtml(subtitle)}</p>
-                  <p>${escapeHtml(dateText)}</p>
-                </div>
-                <button type="button" class="nebula-dashboard-remove-favorite" data-remove-recent-ai="1" data-conversation-id="${escapeHtml(item.id)}" aria-label="Remove AI conversation from recent list"><i class="fa-solid fa-trash"></i></button>
-              </div>
-            </a>
-          `;
-        }).join("");
-
-        recentAiNode.querySelectorAll("[data-remove-recent-ai='1']").forEach((button) => {
-          button.addEventListener("click", (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            const conversationId = String(button.getAttribute("data-conversation-id") || "").trim();
-            if (!conversationId) {
-              return;
-            }
-            removeRecentAiConversation(conversationId);
-            renderRecentAiConversations(collectRecentAiConversationSnapshot(6));
-          });
-        });
-      }
-
-      const recentAi = collectRecentAiConversationSnapshot(6);
-      renderRecentAiConversations(recentAi);
     }
 
     if (showRecentMusic && recentMusicNode) {
@@ -3248,8 +3068,8 @@
     updateHomeNavLabel();
     if (user) {
       await restoreUserDataFromCloud(true);
-      await syncUserData("startup", true);
       startAutoSyncLoop();
+      await syncUserData("auto", true);
     } else {
       stopAutoSyncLoop();
     }
