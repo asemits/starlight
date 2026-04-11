@@ -366,6 +366,12 @@
         replyParentId: "",
         throttleUntil: 0,
         lastCreateAt: 0,
+        threadVoteTotals: new Map(),
+        threadUserVotes: new Map(),
+        replyVoteTotals: new Map(),
+        replyUserVotes: new Map(),
+        unsubThreadVotes: new Map(),
+        unsubReplyVotes: new Map(),
         unsubTopics: null,
         unsubThreads: null,
         unsubReplies: null,
@@ -496,6 +502,98 @@
         return topic.ownerId === state.user.uid;
       }
 
+      function tallyVotes(snapshot) {
+        let score = 0;
+        let myVote = 0;
+        snapshot.forEach(function (doc) {
+          const data = doc.data() || {};
+          const value = Number(data.value) || 0;
+          if (value === 1 || value === -1) {
+            score += value;
+          }
+          if (state.user && doc.id === state.user.uid && (value === 1 || value === -1)) {
+            myVote = value;
+          }
+        });
+        return { score: score, myVote: myVote };
+      }
+
+      function clearVoteWatchers(map) {
+        map.forEach(function (unsub) {
+          if (typeof unsub === "function") {
+            unsub();
+          }
+        });
+        map.clear();
+      }
+
+      function syncThreadVoteWatchers() {
+        const activeIds = new Set(state.threads.map(function (thread) {
+          return thread.id;
+        }));
+
+        state.unsubThreadVotes.forEach(function (unsub, threadId) {
+          if (!activeIds.has(threadId)) {
+            if (typeof unsub === "function") {
+              unsub();
+            }
+            state.unsubThreadVotes.delete(threadId);
+            state.threadVoteTotals.delete(threadId);
+            state.threadUserVotes.delete(threadId);
+          }
+        });
+
+        state.threads.forEach(function (thread) {
+          if (state.unsubThreadVotes.has(thread.id)) {
+            return;
+          }
+          const unsub = db.collection("feedThreads").doc(thread.id).collection("votes")
+            .onSnapshot(function (snapshot) {
+              const tally = tallyVotes(snapshot);
+              state.threadVoteTotals.set(thread.id, tally.score);
+              state.threadUserVotes.set(thread.id, tally.myVote);
+              renderThreads();
+            });
+          state.unsubThreadVotes.set(thread.id, unsub);
+        });
+      }
+
+      function syncReplyVoteWatchers() {
+        const activeIds = new Set(state.replies.map(function (reply) {
+          return reply.id;
+        }));
+
+        state.unsubReplyVotes.forEach(function (unsub, replyId) {
+          if (!activeIds.has(replyId)) {
+            if (typeof unsub === "function") {
+              unsub();
+            }
+            state.unsubReplyVotes.delete(replyId);
+            state.replyVoteTotals.delete(replyId);
+            state.replyUserVotes.delete(replyId);
+          }
+        });
+
+        if (!state.activeThread) {
+          return;
+        }
+
+        state.replies.forEach(function (reply) {
+          if (state.unsubReplyVotes.has(reply.id)) {
+            return;
+          }
+          const unsub = db.collection("feedThreads").doc(state.activeThread.id)
+            .collection("comments").doc(reply.id).collection("votes")
+            .onSnapshot(function (snapshot) {
+              const tally = tallyVotes(snapshot);
+              state.replyVoteTotals.set(reply.id, tally.score);
+              state.replyUserVotes.set(reply.id, tally.myVote);
+              renderReplies();
+            });
+          state.unsubReplyVotes.set(reply.id, unsub);
+        });
+      }
+
       function renderTopics() {
         const queryText = normalizeText(el.search.value).toLowerCase();
         const filtered = queryText
@@ -574,14 +672,16 @@
           const mine = state.user && thread.authorId === state.user.uid;
           const mod = canModerateTopic(thread.topicId);
           const body = thread.deletedAt ? "[removed]" : thread.body;
+          const score = Number(state.threadVoteTotals.get(thread.id) || 0);
+          const myVote = Number(state.threadUserVotes.get(thread.id) || 0);
           return ""
             + "<article class=\"nebula-thread-card\" data-thread-id=\"" + escapeHtml(thread.id) + "\">"
-            + "<div class=\"nebula-thread-card-meta\">by " + escapeHtml(thread.authorName || "member") + " • " + escapeHtml(relativeTime(thread.createdAt)) + " • " + escapeHtml(formatCount(thread.commentCount)) + " replies</div>"
+            + "<div class=\"nebula-thread-card-meta\">by " + escapeHtml(thread.authorName || "member") + " • " + escapeHtml(relativeTime(thread.createdAt)) + " • " + escapeHtml(formatCount(thread.commentCount)) + " replies • score " + escapeHtml(formatCount(score)) + "</div>"
             + "<h3>" + escapeHtml(thread.title || "Untitled thread") + "</h3>"
             + "<div class=\"nebula-thread-markdown\">" + renderMarkdown(body) + "</div>"
             + "<div class=\"nebula-thread-actions\">"
-            + "<button class=\"nebula-thread-action\" type=\"button\" data-action=\"upvote-thread\" data-thread-id=\"" + escapeHtml(thread.id) + "\">Upvote</button>"
-            + "<button class=\"nebula-thread-action\" type=\"button\" data-action=\"downvote-thread\" data-thread-id=\"" + escapeHtml(thread.id) + "\">Downvote</button>"
+            + "<button class=\"nebula-thread-action" + (myVote === 1 ? " active" : "") + "\" type=\"button\" data-action=\"upvote-thread\" data-thread-id=\"" + escapeHtml(thread.id) + "\">Upvote " + escapeHtml(formatCount(score)) + "</button>"
+            + "<button class=\"nebula-thread-action" + (myVote === -1 ? " active" : "") + "\" type=\"button\" data-action=\"downvote-thread\" data-thread-id=\"" + escapeHtml(thread.id) + "\">Downvote</button>"
             + "<button class=\"nebula-thread-action\" type=\"button\" data-action=\"open-thread\" data-thread-id=\"" + escapeHtml(thread.id) + "\">Open</button>"
             + (mine ? "<button class=\"nebula-thread-action\" type=\"button\" data-action=\"edit-thread\" data-thread-id=\"" + escapeHtml(thread.id) + "\">Edit</button>" : "")
             + ((mine || mod) ? "<button class=\"nebula-thread-action\" type=\"button\" data-action=\"remove-thread\" data-thread-id=\"" + escapeHtml(thread.id) + "\">Remove</button>" : "")
@@ -615,14 +715,16 @@
             const mine = state.user && reply.authorId === state.user.uid;
             const mod = state.activeThread ? canModerateTopic(state.activeThread.topicId) : false;
             const content = reply.deletedAt ? "[removed]" : reply.body;
+            const score = Number(state.replyVoteTotals.get(reply.id) || 0);
+            const myVote = Number(state.replyUserVotes.get(reply.id) || 0);
             return ""
               + "<article class=\"nebula-reply-card\" style=\"margin-left:" + (Math.min(depth, 6) * 18) + "px\">"
-              + "<div class=\"nebula-reply-card-meta\">" + escapeHtml(reply.authorName || "member") + " • " + escapeHtml(relativeTime(reply.createdAt)) + "</div>"
+              + "<div class=\"nebula-reply-card-meta\">" + escapeHtml(reply.authorName || "member") + " • " + escapeHtml(relativeTime(reply.createdAt)) + " • score " + escapeHtml(formatCount(score)) + "</div>"
               + "<div class=\"nebula-thread-markdown\">" + renderMarkdown(content) + "</div>"
               + "<div class=\"nebula-reply-actions\">"
               + "<button class=\"nebula-reply-action\" type=\"button\" data-action=\"reply-to-reply\" data-reply-id=\"" + escapeHtml(reply.id) + "\">Reply</button>"
-              + "<button class=\"nebula-reply-action\" type=\"button\" data-action=\"upvote-reply\" data-reply-id=\"" + escapeHtml(reply.id) + "\">Upvote</button>"
-              + "<button class=\"nebula-reply-action\" type=\"button\" data-action=\"downvote-reply\" data-reply-id=\"" + escapeHtml(reply.id) + "\">Downvote</button>"
+              + "<button class=\"nebula-reply-action" + (myVote === 1 ? " active" : "") + "\" type=\"button\" data-action=\"upvote-reply\" data-reply-id=\"" + escapeHtml(reply.id) + "\">Upvote " + escapeHtml(formatCount(score)) + "</button>"
+              + "<button class=\"nebula-reply-action" + (myVote === -1 ? " active" : "") + "\" type=\"button\" data-action=\"downvote-reply\" data-reply-id=\"" + escapeHtml(reply.id) + "\">Downvote</button>"
               + (mine ? "<button class=\"nebula-reply-action\" type=\"button\" data-action=\"edit-reply\" data-reply-id=\"" + escapeHtml(reply.id) + "\">Edit</button>" : "")
               + ((mine || mod) ? "<button class=\"nebula-reply-action\" type=\"button\" data-action=\"remove-reply\" data-reply-id=\"" + escapeHtml(reply.id) + "\">Remove</button>" : "")
               + "</div>"
@@ -847,6 +949,7 @@
         state.unsubReplies = db.collection("feedThreads").doc(threadId).collection("comments").orderBy("createdAt", "asc").limit(400)
           .onSnapshot(function (snapshot) {
             state.replies = snapshot.docs.map(normalizeReply);
+            syncReplyVoteWatchers();
             renderReplies();
           });
       }
@@ -864,6 +967,9 @@
           state.unsubReplies();
           state.unsubReplies = null;
         }
+        clearVoteWatchers(state.unsubReplyVotes);
+        state.replyVoteTotals.clear();
+        state.replyUserVotes.clear();
       }
 
       async function createThread() {
@@ -1129,7 +1235,11 @@
 
         if (!topicId) {
           state.threads = [];
+          clearVoteWatchers(state.unsubThreadVotes);
+          state.threadVoteTotals.clear();
+          state.threadUserVotes.clear();
           renderThreads();
+          closeThread();
           return;
         }
 
@@ -1139,6 +1249,7 @@
           .limit(80)
           .onSnapshot(function (snapshot) {
             state.threads = snapshot.docs.map(normalizeThread);
+            syncThreadVoteWatchers();
             renderThreads();
             if (state.activeThreadId) {
               const nextActive = state.threads.find(function (thread) {
@@ -1149,6 +1260,8 @@
                 el.threadTitleView.textContent = nextActive.title || "Thread";
                 el.threadBodyView.innerHTML = renderMarkdown(nextActive.deletedAt ? "[removed]" : nextActive.body);
                 el.threadMetaView.textContent = "by " + (nextActive.authorName || "member") + " • " + relativeTime(nextActive.createdAt);
+              } else {
+                closeThread();
               }
             }
           });
@@ -1164,6 +1277,8 @@
         if (state.unsubReplies) {
           state.unsubReplies();
         }
+        clearVoteWatchers(state.unsubThreadVotes);
+        clearVoteWatchers(state.unsubReplyVotes);
         if (state.unsubMembership) {
           state.unsubMembership();
         }
