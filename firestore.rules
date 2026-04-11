@@ -15,499 +15,291 @@ service cloud.firestore {
       return data.keys().hasOnly(keys);
     }
 
-    function isNonNegativeInt(v) {
-      return v is int && v >= 0;
-    }
-
     function isNonEmptyString(v, maxLen) {
       return v is string && v.size() > 0 && v.size() <= maxLen;
     }
 
-    function isValidFriendRequestStatus(v) {
-      return v in ['pending', 'accepted', 'declined', 'canceled'];
+    function isTopicName(v) {
+      return v is string
+        && v.size() >= 3
+        && v.size() <= 31
+        && v.matches('^[a-z0-9][a-z0-9-]*$');
     }
 
-    function hasBlockingRelation(uidA, uidB) {
-      return exists(/databases/$(database)/documents/users/$(uidA)/blockedUsers/$(uidB))
-        || exists(/databases/$(database)/documents/users/$(uidB)/blockedUsers/$(uidA));
-    }
-
-    function dmParticipantsBlocked(participants) {
-      return participants is list
-        && participants.size() == 2
-        && hasBlockingRelation(participants[0], participants[1]);
-    }
-
-    function chatAllowsMessaging(chatId) {
-      let chatDoc = get(/databases/$(database)/documents/privateChats/$(chatId)).data;
-      return !(chatDoc.type == 'dm' && dmParticipantsBlocked(chatDoc.participants));
-    }
-
-    function isChatParticipant(chatId) {
+    function isTopicOwner(topicId) {
       return isSignedIn()
-        && request.auth.uid in get(/databases/$(database)/documents/privateChats/$(chatId)).data.participants;
+        && get(/databases/$(database)/documents/feedTopics/$(topicId)).data.ownerId == request.auth.uid;
     }
 
-    function isChatParticipantAfter(chatId) {
-      return isSignedIn()
-        && request.auth.uid in getAfter(/databases/$(database)/documents/privateChats/$(chatId)).data.participants;
+    function hasRateWindowElapsed(uid) {
+      return !exists(/databases/$(database)/documents/feedRateLimits/$(uid))
+        || request.time >= get(/databases/$(database)/documents/feedRateLimits/$(uid)).data.lastCreatedAt + duration.value(5, 's');
     }
 
-    match /gameStats/{gameId} {
-      allow read: if true;
-
-      allow create, update: if isSignedIn()
-        && hasOnlyKeys(request.resource.data, [
-          'name', 'path', 'image', 'type', 'sourceBase',
-          'plays', 'uniqueClicks', 'currentPlayers',
-          'thumbsUp', 'thumbsDown',
-          'updatedAt'
-        ])
-        && isNonNegativeInt(request.resource.data.plays)
-        && isNonNegativeInt(request.resource.data.uniqueClicks)
-        && isNonNegativeInt(request.resource.data.currentPlayers)
-        && isNonNegativeInt(request.resource.data.thumbsUp)
-        && isNonNegativeInt(request.resource.data.thumbsDown)
-        && (!('name' in request.resource.data) || request.resource.data.name is string)
-        && (!('path' in request.resource.data) || request.resource.data.path is string)
-        && (!('image' in request.resource.data) || request.resource.data.image is string)
-        && (!('type' in request.resource.data) || request.resource.data.type is string)
-        && (!('sourceBase' in request.resource.data) || request.resource.data.sourceBase is string);
+    function hasRateAfterStamp(uid) {
+      return existsAfter(/databases/$(database)/documents/feedRateLimits/$(uid))
+        && getAfter(/databases/$(database)/documents/feedRateLimits/$(uid)).data.uid == uid
+        && getAfter(/databases/$(database)/documents/feedRateLimits/$(uid)).data.lastCreatedAt == request.time
+        && getAfter(/databases/$(database)/documents/feedRateLimits/$(uid)).data.updatedAt == request.time;
     }
 
-    match /gameStats/{gameId}/players/{uid} {
+    match /feedRateLimits/{uid} {
       allow read: if isOwner(uid);
 
       allow create, update: if isOwner(uid)
-        && hasOnlyKeys(request.resource.data, [
-          'uid',
-          'rating', 'lastPlayedAt', 'lastRatedAt', 'clickCount',
-          'activeSession', 'activeGamePath', 'activeAt',
-          'gamePath', 'gameName', 'gameImage', 'sourceBase',
-          'isFavorite', 'favoritedAt'
-        ])
-        && (!('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid)
-        && (!('rating' in request.resource.data) || (request.resource.data.rating is int && request.resource.data.rating in [-1, 0, 1]))
-        && (!('clickCount' in request.resource.data) || isNonNegativeInt(request.resource.data.clickCount))
-        && (!('activeSession' in request.resource.data) || isNonEmptyString(request.resource.data.activeSession, 200))
-        && (!('activeGamePath' in request.resource.data) || request.resource.data.activeGamePath is string)
-        && (!('gamePath' in request.resource.data) || request.resource.data.gamePath is string)
-        && (!('gameName' in request.resource.data) || request.resource.data.gameName is string)
-        && (!('gameImage' in request.resource.data) || request.resource.data.gameImage is string)
-        && (!('sourceBase' in request.resource.data) || request.resource.data.sourceBase is string)
-        && (!('isFavorite' in request.resource.data) || request.resource.data.isFavorite is bool)
-        && (!('favoritedAt' in request.resource.data) || request.resource.data.favoritedAt is timestamp);
-
-      allow delete: if isOwner(uid);
-    }
-
-    match /users/{uid} {
-      allow read: if isOwner(uid);
-
-      allow create: if isOwner(uid)
-        && hasOnlyKeys(request.resource.data, [
-          'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt',
-          'email', 'username', 'usernameLower', 'settings', 'gameProgress', 'lastManualSyncAt', 'lastAutoSyncAt'
-        ])
-        && request.resource.data.uid == request.auth.uid
-        && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
-        && (!('usernameHash' in request.resource.data) || isNonEmptyString(request.resource.data.usernameHash, 128))
-        && (!('usernameChangedAt' in request.resource.data) || request.resource.data.usernameChangedAt is timestamp)
-        && (!('providers' in request.resource.data) || request.resource.data.providers is list)
-        && (!('email' in request.resource.data) || request.resource.data.email is string)
-        && (!('username' in request.resource.data) || request.resource.data.username is string)
-        && (!('usernameLower' in request.resource.data) || request.resource.data.usernameLower is string)
-        && (!('settings' in request.resource.data) || request.resource.data.settings is map)
-        && (!('gameProgress' in request.resource.data) || request.resource.data.gameProgress is map)
-        && (!('lastManualSyncAt' in request.resource.data) || request.resource.data.lastManualSyncAt is timestamp)
-        && (!('lastAutoSyncAt' in request.resource.data) || request.resource.data.lastAutoSyncAt is timestamp);
-
-      allow update: if isOwner(uid)
-        && hasOnlyKeys(request.resource.data, [
-          'uid', 'emailHash', 'providers', 'usernameHash', 'usernameChangedAt', 'updatedAt',
-          'email', 'username', 'usernameLower', 'settings', 'gameProgress', 'lastManualSyncAt', 'lastAutoSyncAt'
-        ])
-        && request.resource.data.uid == request.auth.uid
-        && (!('emailHash' in request.resource.data) || isNonEmptyString(request.resource.data.emailHash, 128))
-        && (!('usernameHash' in request.resource.data) || isNonEmptyString(request.resource.data.usernameHash, 128))
-        && (!('providers' in request.resource.data) || request.resource.data.providers is list)
-        && (!('email' in request.resource.data) || request.resource.data.email is string)
-        && (!('username' in request.resource.data) || request.resource.data.username is string)
-        && (!('usernameLower' in request.resource.data) || request.resource.data.usernameLower is string)
-        && (!('settings' in request.resource.data) || request.resource.data.settings is map)
-        && (!('gameProgress' in request.resource.data) || request.resource.data.gameProgress is map)
-        && (!('lastManualSyncAt' in request.resource.data) || request.resource.data.lastManualSyncAt is timestamp)
-        && (!('lastAutoSyncAt' in request.resource.data) || request.resource.data.lastAutoSyncAt is timestamp)
-        && (
-          request.resource.data.usernameHash == resource.data.usernameHash
-          || (
-            ('usernameChangedAt' in request.resource.data)
-            && request.resource.data.usernameChangedAt == request.time
-            && (
-              !('usernameChangedAt' in resource.data)
-              || !(resource.data.usernameChangedAt is timestamp)
-              || request.time >= resource.data.usernameChangedAt + duration.value(7, 'd')
-            )
-          )
-        )
-        && (
-          !('lastManualSyncAt' in request.resource.data)
-          || !('lastManualSyncAt' in resource.data)
-          || !(resource.data.lastManualSyncAt is timestamp)
-          || request.resource.data.lastManualSyncAt == resource.data.lastManualSyncAt
-          || (
-            request.resource.data.lastManualSyncAt == request.time
-            && request.time >= resource.data.lastManualSyncAt + duration.value(5, 'm')
-          )
-        )
-        && (
-          !('lastAutoSyncAt' in request.resource.data)
-          || !('lastAutoSyncAt' in resource.data)
-          || !(resource.data.lastAutoSyncAt is timestamp)
-          || request.resource.data.lastAutoSyncAt == resource.data.lastAutoSyncAt
-          || (
-            request.resource.data.lastAutoSyncAt == request.time
-            && request.time >= resource.data.lastAutoSyncAt + duration.value(30, 'm')
-          )
-        );
-
-      allow delete: if isOwner(uid);
-    }
-
-    match /users/{uid}/friends/{friendUid} {
-      allow read: if isOwner(uid);
-
-      allow create, update: if (
-          isOwner(uid)
-          || (
-            isSignedIn()
-            && request.auth.uid in [uid, friendUid]
-            && ('requestId' in request.resource.data)
-            && isNonEmptyString(request.resource.data.requestId, 256)
-            && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.status == 'accepted'
-            && (
-              (
-                getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.fromUid == uid
-                && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.toUid == friendUid
-              )
-              ||
-              (
-                getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.fromUid == friendUid
-                && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.requestId)).data.toUid == uid
-              )
-            )
-          )
-        )
-        && hasOnlyKeys(request.resource.data, ['uid', 'username', 'usernameLower', 'requestId', 'createdAt'])
-        && request.resource.data.uid == friendUid
-        && isNonEmptyString(request.resource.data.username, 60)
-        && isNonEmptyString(request.resource.data.usernameLower, 60)
-        && (!('requestId' in request.resource.data) || isNonEmptyString(request.resource.data.requestId, 256))
-        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp);
-
-      allow delete: if isOwner(uid);
-    }
-
-    match /users/{uid}/blockedUsers/{blockedUid} {
-      allow read: if isOwner(uid) || (isSignedIn() && request.auth.uid == blockedUid);
-
-      allow create, update: if isOwner(uid)
-        && hasOnlyKeys(request.resource.data, ['uid', 'username', 'usernameLower', 'createdAt'])
-        && request.resource.data.uid == blockedUid
-        && isNonEmptyString(request.resource.data.username, 60)
-        && isNonEmptyString(request.resource.data.usernameLower, 60)
-        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp);
-
-      allow delete: if isOwner(uid);
-    }
-
-    match /users/{uid}/privateChatIdentity/{docId} {
-      allow read: if isOwner(uid) && docId == 'main';
-
-      allow create, update: if isOwner(uid)
-        && docId == 'main'
-        && hasOnlyKeys(request.resource.data, [
-          'uid', 'version', 'publicJwk', 'salt', 'iv', 'ciphertext', 'updatedAt'
-        ])
+        && hasOnlyKeys(request.resource.data, ['uid', 'lastCreatedAt', 'updatedAt'])
         && request.resource.data.uid == uid
-        && isNonNegativeInt(request.resource.data.version)
-        && request.resource.data.publicJwk is map
-        && isNonEmptyString(request.resource.data.salt, 512)
-        && isNonEmptyString(request.resource.data.iv, 512)
-        && isNonEmptyString(request.resource.data.ciphertext, 30000)
-        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
-
-      allow delete: if isOwner(uid) && docId == 'main';
-    }
-
-    match /users/{uid}/aiDailyUsage/{dayKey} {
-      allow read: if isOwner(uid);
-      allow create, update, delete: if false;
-    }
-
-    match /users/{uid}/aiConversations/{conversationId} {
-      allow read: if isOwner(uid);
-      allow create, update, delete: if false;
-    }
-
-    match /users/{uid}/aiConversations/{conversationId}/messages/{messageId} {
-      allow read: if isOwner(uid);
-      allow create, update, delete: if false;
-    }
-
-    match /friendRequests/{requestId} {
-      allow read: if isSignedIn()
-        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
-
-      allow create: if isSignedIn()
-        && hasOnlyKeys(request.resource.data, [
-          'fromUid', 'fromUsername', 'fromUsernameLower',
-          'toUid', 'toUsername', 'toUsernameLower',
-          'status', 'pairKey', 'createdAt', 'updatedAt'
-        ])
-        && request.resource.data.fromUid == request.auth.uid
-        && request.resource.data.toUid is string
-        && request.resource.data.toUid != request.auth.uid
-        && isNonEmptyString(request.resource.data.fromUsername, 60)
-        && isNonEmptyString(request.resource.data.fromUsernameLower, 60)
-        && isNonEmptyString(request.resource.data.toUsername, 60)
-        && isNonEmptyString(request.resource.data.toUsernameLower, 60)
-        && isNonEmptyString(request.resource.data.pairKey, 256)
-        && request.resource.data.status == 'pending'
-        && !hasBlockingRelation(request.resource.data.fromUid, request.resource.data.toUid)
-        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp)
-        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
-
-      allow update: if isSignedIn()
-        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid)
-        && hasOnlyKeys(request.resource.data, [
-          'fromUid', 'fromUsername', 'fromUsernameLower',
-          'toUid', 'toUsername', 'toUsernameLower',
-          'status', 'pairKey', 'createdAt', 'updatedAt'
-        ])
-        && request.resource.data.fromUid == resource.data.fromUid
-        && request.resource.data.fromUsername == resource.data.fromUsername
-        && request.resource.data.fromUsernameLower == resource.data.fromUsernameLower
-        && request.resource.data.toUid == resource.data.toUid
-        && request.resource.data.toUsername == resource.data.toUsername
-        && request.resource.data.toUsernameLower == resource.data.toUsernameLower
-        && request.resource.data.pairKey == resource.data.pairKey
-        && request.resource.data.createdAt == resource.data.createdAt
-        && isValidFriendRequestStatus(request.resource.data.status)
-        && request.resource.data.updatedAt is timestamp
-        && (request.resource.data.status != 'accepted' || !hasBlockingRelation(resource.data.fromUid, resource.data.toUid))
-        && (
-          (request.auth.uid == resource.data.fromUid
-            && resource.data.status == 'pending'
-            && request.resource.data.status == 'canceled')
-          ||
-          (request.auth.uid == resource.data.toUid
-            && resource.data.status == 'pending'
-            && request.resource.data.status in ['accepted', 'declined'])
-        );
-
-      allow delete: if false;
-    }
-
-    match /usernames/{usernameHash} {
-      allow read: if isSignedIn();
-
-      allow create, update: if isSignedIn()
-        && hasOnlyKeys(request.resource.data, ['uid', 'usernameHash', 'updatedAt'])
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.usernameHash == usernameHash
-        && isNonEmptyString(request.resource.data.usernameHash, 128)
-        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.usernameHash == usernameHash;
-
-      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
-    }
-
-    match /userPublicProfiles/{uid} {
-      allow read: if isSignedIn();
-
-      allow create, update: if isOwner(uid)
-        && hasOnlyKeys(request.resource.data, [
-          'uid', 'username', 'usernameLower', 'chatPublicKeyJwk', 'updatedAt'
-        ])
-        && request.resource.data.uid == request.auth.uid
-        && isNonEmptyString(request.resource.data.username, 60)
-        && isNonEmptyString(request.resource.data.usernameLower, 60)
-        && request.resource.data.chatPublicKeyJwk is map;
-
-      allow delete: if isOwner(uid);
-    }
-
-    match /privateChats/{chatId} {
-      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
-
-      allow create: if isSignedIn()
-        && hasOnlyKeys(request.resource.data, [
-          'type', 'participants', 'participantUsernames', 'createdBy', 'createdAt', 'lastMessageAt'
-        ])
-        && request.resource.data.type in ['dm', 'gc']
-        && request.resource.data.participants is list
-        && request.resource.data.participants.size() >= 2
-        && request.resource.data.participants.size() <= 25
-        && (request.resource.data.type != 'dm'
-          || (
-            request.resource.data.participants.size() == 2
-            && !hasBlockingRelation(request.resource.data.participants[0], request.resource.data.participants[1])
-          ))
-        && request.auth.uid in request.resource.data.participants
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.participantUsernames is map
-        && request.resource.data.participantUsernames.keys().hasAll(request.resource.data.participants);
-
-      allow update: if isSignedIn()
-        && request.auth.uid in resource.data.participants
-        && hasOnlyKeys(request.resource.data, [
-          'type', 'participants', 'participantUsernames', 'createdBy', 'createdAt', 'lastMessageAt'
-        ])
-        && request.resource.data.type == resource.data.type
-        && request.resource.data.participants == resource.data.participants
-        && request.resource.data.participantUsernames == resource.data.participantUsernames
-        && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.createdAt == resource.data.createdAt;
-
-      allow delete: if false;
-    }
-
-    match /privateChats/{chatId}/members/{uid} {
-      allow read: if isChatParticipant(chatId);
-
-      allow create, update: if isChatParticipantAfter(chatId)
-        && uid in getAfter(/databases/$(database)/documents/privateChats/$(chatId)).data.participants
-        && hasOnlyKeys(request.resource.data, ['uid', 'username', 'wrappedKey', 'updatedAt'])
-        && request.resource.data.uid == uid
-        && isNonEmptyString(request.resource.data.username, 60)
-        && isNonEmptyString(request.resource.data.wrappedKey, 8192);
-
-      allow delete: if false;
-    }
-
-    match /privateChats/{chatId}/messageRateLimits/{uid} {
-      allow read: if isChatParticipant(chatId) && request.auth.uid == uid;
-
-      allow create, update: if isChatParticipant(chatId)
-        && request.auth.uid == uid
-        && hasOnlyKeys(request.resource.data, ['uid', 'windowStartMs', 'windowCount', 'throttleStartedAtMs', 'updatedAt'])
-        && request.resource.data.uid == uid
-        && request.resource.data.windowStartMs is timestamp
-        && isNonNegativeInt(request.resource.data.windowCount)
-        && request.resource.data.throttleStartedAtMs is timestamp
+        && request.resource.data.lastCreatedAt is timestamp
         && request.resource.data.updatedAt is timestamp;
 
       allow delete: if false;
     }
 
-    match /privateChats/{chatId}/messages/{messageId} {
-      allow read: if isChatParticipant(chatId);
+    match /feedTopicNames/{nameLower} {
+      allow read: if isSignedIn();
 
-      allow create: if isChatParticipant(chatId)
-        && chatAllowsMessaging(chatId)
-        && hasOnlyKeys(request.resource.data, ['senderId', 'senderUsername', 'ciphertext', 'iv', 'createdAt', 'createdAtClient', 'editedAt', 'replyToMessageId'])
-        && request.resource.data.senderId == request.auth.uid
-        && isNonEmptyString(request.resource.data.senderUsername, 60)
-        && isNonEmptyString(request.resource.data.ciphertext, 20000)
-        && isNonEmptyString(request.resource.data.iv, 256)
-        && (!('createdAtClient' in request.resource.data) || isNonNegativeInt(request.resource.data.createdAtClient))
-        && (!('editedAt' in request.resource.data) || request.resource.data.editedAt is timestamp)
-        && (!('replyToMessageId' in request.resource.data) || (request.resource.data.replyToMessageId is string && request.resource.data.replyToMessageId.size() <= 200));
+      allow create: if isSignedIn()
+        && isTopicName(nameLower)
+        && !exists(/databases/$(database)/documents/feedTopicNames/$(nameLower))
+        && hasOnlyKeys(request.resource.data, ['nameLower', 'topicId', 'ownerId', 'createdAt'])
+        && request.resource.data.nameLower == nameLower
+        && isNonEmptyString(request.resource.data.topicId, 128)
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.createdAt is timestamp;
 
-      allow update: if isChatParticipant(chatId)
-        && chatAllowsMessaging(chatId)
-        && request.auth.uid == resource.data.senderId
-        && hasOnlyKeys(request.resource.data, ['senderId', 'senderUsername', 'ciphertext', 'iv', 'createdAt', 'createdAtClient', 'editedAt', 'replyToMessageId'])
-        && request.resource.data.senderId == resource.data.senderId
-        && request.resource.data.senderUsername == resource.data.senderUsername
+      allow update: if false;
+
+      allow delete: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid
+        && isTopicOwner(resource.data.topicId);
+    }
+
+    match /feedTopics/{topicId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && hasOnlyKeys(request.resource.data, [
+          'name', 'nameLower', 'description', 'rules',
+          'ownerId', 'ownerName', 'createdAt', 'updatedAt'
+        ])
+        && isTopicName(request.resource.data.name)
+        && request.resource.data.nameLower == request.resource.data.name
+        && isNonEmptyString(request.resource.data.description, 300)
+        && isNonEmptyString(request.resource.data.rules, 800)
+        && request.resource.data.ownerId == request.auth.uid
+        && isNonEmptyString(request.resource.data.ownerName, 60)
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && existsAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower))
+        && getAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower)).data.topicId == topicId
+        && getAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower)).data.ownerId == request.auth.uid
+        && hasRateWindowElapsed(request.auth.uid)
+        && hasRateAfterStamp(request.auth.uid);
+
+      allow update: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid
+        && hasOnlyKeys(request.resource.data, [
+          'name', 'nameLower', 'description', 'rules',
+          'ownerId', 'ownerName', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.ownerName == resource.data.ownerName
         && request.resource.data.createdAt == resource.data.createdAt
+        && isTopicName(request.resource.data.name)
+        && request.resource.data.nameLower == request.resource.data.name
+        && isNonEmptyString(request.resource.data.description, 300)
+        && isNonEmptyString(request.resource.data.rules, 800)
+        && request.resource.data.updatedAt is timestamp
         && (
-          (!('createdAtClient' in resource.data) && !('createdAtClient' in request.resource.data))
+          request.resource.data.nameLower == resource.data.nameLower
           || (
-            ('createdAtClient' in resource.data)
-            && ('createdAtClient' in request.resource.data)
-            && request.resource.data.createdAtClient == resource.data.createdAtClient
-          )
-        )
-        && isNonEmptyString(request.resource.data.ciphertext, 20000)
-        && isNonEmptyString(request.resource.data.iv, 256)
-        && (!('editedAt' in request.resource.data) || request.resource.data.editedAt is timestamp)
-        && (
-          (!('replyToMessageId' in resource.data) && !('replyToMessageId' in request.resource.data))
-          || (
-            ('replyToMessageId' in resource.data)
-            && ('replyToMessageId' in request.resource.data)
-            && request.resource.data.replyToMessageId == resource.data.replyToMessageId
+            request.resource.data.nameLower != resource.data.nameLower
+            && !exists(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower))
+            && existsAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower))
+            && getAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower)).data.topicId == topicId
+            && getAfter(/databases/$(database)/documents/feedTopicNames/$(request.resource.data.nameLower)).data.ownerId == request.auth.uid
           )
         );
 
-      allow delete: if isChatParticipant(chatId) && request.auth.uid == resource.data.senderId;
+      allow delete: if false;
     }
 
-    match /feedPosts/{postId} {
+    match /feedTopics/{topicId}/members/{uid} {
+      allow read: if isSignedIn();
+
+      allow create: if isOwner(uid)
+        && existsAfter(/databases/$(database)/documents/feedTopics/$(topicId))
+        && hasOnlyKeys(request.resource.data, ['uid', 'role', 'favorite', 'joinedAt', 'updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.favorite is bool
+        && request.resource.data.joinedAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && (
+          request.resource.data.role == 'member'
+          || (
+            request.resource.data.role == 'owner'
+            && uid == getAfter(/databases/$(database)/documents/feedTopics/$(topicId)).data.ownerId
+          )
+        );
+
+      allow update: if isOwner(uid)
+        && hasOnlyKeys(request.resource.data, ['uid', 'role', 'favorite', 'joinedAt', 'updatedAt'])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.joinedAt == resource.data.joinedAt
+        && request.resource.data.favorite is bool
+        && request.resource.data.updatedAt is timestamp;
+
+      allow delete: if isOwner(uid)
+        && resource.data.role != 'owner';
+    }
+
+    match /feedThreads/{threadId} {
       allow read: if isSignedIn();
 
       allow create: if isSignedIn()
         && hasOnlyKeys(request.resource.data, [
-          'title', 'body', 'community', 'flair',
-          'authorId', 'authorName', 'authorHandle',
-          'commentCount', 'createdAt', 'lastActivityAt'
+          'topicId', 'title', 'body', 'authorId', 'authorName',
+          'createdAt', 'updatedAt', 'commentCount', 'deletedAt', 'deletedBy'
         ])
-        && request.resource.data.authorId == request.auth.uid
-        && isNonEmptyString(request.resource.data.title, 140)
+        && isNonEmptyString(request.resource.data.topicId, 128)
+        && exists(/databases/$(database)/documents/feedTopics/$(request.resource.data.topicId))
+        && isNonEmptyString(request.resource.data.title, 160)
         && isNonEmptyString(request.resource.data.body, 4000)
-        && isNonEmptyString(request.resource.data.community, 48)
-        && isNonEmptyString(request.resource.data.flair, 32)
-        && isNonEmptyString(request.resource.data.authorName, 80)
-        && isNonEmptyString(request.resource.data.authorHandle, 40)
-        && request.resource.data.commentCount == 0
+        && request.resource.data.authorId == request.auth.uid
+        && isNonEmptyString(request.resource.data.authorName, 60)
         && request.resource.data.createdAt is timestamp
-        && request.resource.data.lastActivityAt is timestamp;
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.commentCount == 0
+        && request.resource.data.deletedAt == null
+        && request.resource.data.deletedBy == ''
+        && hasRateWindowElapsed(request.auth.uid)
+        && hasRateAfterStamp(request.auth.uid);
 
       allow update: if isSignedIn()
         && hasOnlyKeys(request.resource.data, [
-          'title', 'body', 'community', 'flair',
-          'authorId', 'authorName', 'authorHandle',
-          'commentCount', 'createdAt', 'lastActivityAt'
+          'topicId', 'title', 'body', 'authorId', 'authorName',
+          'createdAt', 'updatedAt', 'commentCount', 'deletedAt', 'deletedBy'
         ])
+        && request.resource.data.topicId == resource.data.topicId
         && request.resource.data.authorId == resource.data.authorId
-        && request.resource.data.title == resource.data.title
-        && request.resource.data.body == resource.data.body
-        && request.resource.data.community == resource.data.community
-        && request.resource.data.flair == resource.data.flair
         && request.resource.data.authorName == resource.data.authorName
-        && request.resource.data.authorHandle == resource.data.authorHandle
         && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.commentCount is int
-        && resource.data.commentCount is int
-        && request.resource.data.commentCount == resource.data.commentCount + 1
-        && request.resource.data.lastActivityAt is timestamp;
+        && (
+          (
+            request.auth.uid == resource.data.authorId
+            && isNonEmptyString(request.resource.data.title, 160)
+            && isNonEmptyString(request.resource.data.body, 4000)
+            && request.resource.data.commentCount == resource.data.commentCount
+            && request.resource.data.deletedAt == resource.data.deletedAt
+            && request.resource.data.deletedBy == resource.data.deletedBy
+            && request.resource.data.updatedAt is timestamp
+          )
+          ||
+          (
+            request.resource.data.commentCount is int
+            && resource.data.commentCount is int
+            && request.resource.data.commentCount == resource.data.commentCount + 1
+            && request.resource.data.title == resource.data.title
+            && request.resource.data.body == resource.data.body
+            && request.resource.data.deletedAt == resource.data.deletedAt
+            && request.resource.data.deletedBy == resource.data.deletedBy
+            && request.resource.data.updatedAt is timestamp
+          )
+          ||
+          (
+            (request.auth.uid == resource.data.authorId || isTopicOwner(resource.data.topicId))
+            && request.resource.data.title == resource.data.title
+            && request.resource.data.commentCount == resource.data.commentCount
+            && request.resource.data.body == '[removed by moderator]'
+            && request.resource.data.deletedAt is timestamp
+            && request.resource.data.deletedBy == request.auth.uid
+            && request.resource.data.updatedAt is timestamp
+          )
+        );
 
-      allow delete: if isSignedIn() && resource.data.authorId == request.auth.uid;
+      allow delete: if false;
     }
 
-    match /feedPosts/{postId}/comments/{commentId} {
+    match /feedThreads/{threadId}/votes/{uid} {
+      allow read: if isSignedIn();
+
+      allow create, update: if isOwner(uid)
+        && hasOnlyKeys(request.resource.data, ['uid', 'value', 'updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.value is int
+        && request.resource.data.value in [-1, 1]
+        && request.resource.data.updatedAt is timestamp;
+
+      allow delete: if isOwner(uid);
+    }
+
+    match /feedThreads/{threadId}/comments/{commentId} {
       allow read: if isSignedIn();
 
       allow create: if isSignedIn()
         && hasOnlyKeys(request.resource.data, [
-          'parentId', 'authorId', 'authorName', 'authorHandle', 'body', 'createdAt'
+          'parentId', 'body', 'authorId', 'authorName',
+          'createdAt', 'updatedAt', 'deletedAt', 'deletedBy'
         ])
         && request.resource.data.authorId == request.auth.uid
+        && isNonEmptyString(request.resource.data.authorName, 60)
         && request.resource.data.parentId is string
         && request.resource.data.parentId.size() <= 200
-        && isNonEmptyString(request.resource.data.authorName, 80)
-        && isNonEmptyString(request.resource.data.authorHandle, 40)
         && isNonEmptyString(request.resource.data.body, 2000)
-        && request.resource.data.createdAt is timestamp;
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.deletedAt == null
+        && request.resource.data.deletedBy == ''
+        && get(/databases/$(database)/documents/feedThreads/$(threadId)).data.deletedAt == null
+        && (
+          request.resource.data.parentId == ''
+          || exists(/databases/$(database)/documents/feedThreads/$(threadId)/comments/$(request.resource.data.parentId))
+        )
+        && hasRateWindowElapsed(request.auth.uid)
+        && hasRateAfterStamp(request.auth.uid);
 
-      allow update, delete: if false;
+      allow update: if isSignedIn()
+        && hasOnlyKeys(request.resource.data, [
+          'parentId', 'body', 'authorId', 'authorName',
+          'createdAt', 'updatedAt', 'deletedAt', 'deletedBy'
+        ])
+        && request.resource.data.parentId == resource.data.parentId
+        && request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.authorName == resource.data.authorName
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (
+          (
+            request.auth.uid == resource.data.authorId
+            && isNonEmptyString(request.resource.data.body, 2000)
+            && request.resource.data.deletedAt == resource.data.deletedAt
+            && request.resource.data.deletedBy == resource.data.deletedBy
+            && request.resource.data.updatedAt is timestamp
+          )
+          ||
+          (
+            (request.auth.uid == resource.data.authorId || isTopicOwner(get(/databases/$(database)/documents/feedThreads/$(threadId)).data.topicId))
+            && request.resource.data.body == '[removed by moderator]'
+            && request.resource.data.deletedAt is timestamp
+            && request.resource.data.deletedBy == request.auth.uid
+            && request.resource.data.updatedAt is timestamp
+          )
+        );
+
+      allow delete: if false;
     }
 
-    match /posts/{postId} {
+    match /feedThreads/{threadId}/comments/{commentId}/votes/{uid} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isOwner(resource.data.userId);
+
+      allow create, update: if isOwner(uid)
+        && hasOnlyKeys(request.resource.data, ['uid', 'value', 'updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.value is int
+        && request.resource.data.value in [-1, 1]
+        && request.resource.data.updatedAt is timestamp;
+
+      allow delete: if isOwner(uid);
     }
 
     match /{document=**} {
