@@ -159,128 +159,136 @@
     render: function renderTopicsRoute() {
       return `
         <section class="nebula-topics-page">
-          <header class="nebula-topics-page-header">
-            <h1>Topics</h1>
-            <p>Reddit-like topics, threads, replies, votes, and moderation</p>
-          </header>
+          <style>
+            .nebula-topics-page{width:min(100%,1480px);margin:0 auto;min-height:calc(100vh - 130px);display:grid;grid-template-rows:auto minmax(0,1fr);gap:10px}
+            .nebula-topics-topbar{display:flex;align-items:center;gap:12px;padding:6px 0}
+            .nebula-topics-brand{font-family:'Geist','Oxanium',sans-serif;font-size:1.9rem;font-weight:700;color:#f5f5f5;letter-spacing:-.03em}
+            .nebula-topics-search-wrap{flex:1;display:flex;align-items:center;gap:8px;max-width:760px}
+            .nebula-topics-search-wrap input{width:100%;height:42px;border-radius:999px;border:1px solid #333;background:#111;color:#f2f2f2;padding:0 16px;font-family:'Geist','Montserrat',sans-serif}
+            .nebula-topics-search-wrap input:focus{outline:none;border-color:#ff6a00;box-shadow:0 0 0 1px rgba(255,106,0,.28)}
+            .nebula-topics-page button{cursor:pointer}
+            .nebula-topics-shell{display:grid;grid-template-columns:270px minmax(0,1fr) 350px;gap:12px;min-height:0}
+            .nebula-topics-col{background:#0f0f10;border:1px solid #242424;border-radius:14px;min-height:0}
+            .nebula-topics-left{display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
+            .nebula-topics-left-head{padding:12px;border-bottom:1px solid #222;display:flex;align-items:center;justify-content:space-between;gap:8px}
+            .nebula-topics-left-head strong{font-family:'Geist','Oxanium',sans-serif;font-size:.9rem;letter-spacing:.08em;text-transform:uppercase}
+            .nebula-topics-list{display:grid;gap:8px;overflow:auto;padding:10px}
+            .nebula-topic-chip{border:1px solid #2f2f2f;border-radius:10px;background:#161616;padding:10px;display:grid;gap:7px}
+            .nebula-topic-chip.active{border-color:#646464;background:#1c1c1d}
+            .nebula-topic-chip h3{margin:0;color:#efefef;font-size:.88rem;font-family:'Geist','Oxanium',sans-serif;letter-spacing:.02em}
+            .nebula-topic-chip p{margin:0;color:#a8a8a8;font-size:.75rem;line-height:1.45}
+            .nebula-topic-meta{display:flex;align-items:center;gap:8px;color:#8a8a8a;font-size:.66rem;text-transform:uppercase;letter-spacing:.07em}
+            .nebula-topics-editor{padding:10px;border-top:1px solid #222;display:grid;gap:8px}
+            .nebula-topics-editor input,.nebula-topics-editor textarea,.nebula-thread-composer input,.nebula-thread-composer textarea,.nebula-reply-editor textarea{width:100%;border:1px solid #323232;background:#151515;color:#eee;border-radius:10px;padding:10px 11px;font-family:'Geist','Montserrat',sans-serif;font-size:.84rem}
+            .nebula-topics-editor input:focus,.nebula-topics-editor textarea:focus,.nebula-thread-composer input:focus,.nebula-thread-composer textarea:focus,.nebula-reply-editor textarea:focus{outline:none;border-color:#5d5d5d}
+            .nebula-social-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+            .nebula-topics-btn,.nebula-thread-action,.nebula-reply-action{border:1px solid #3a3a3a;background:#1d1d1e;color:#f0f0f0;border-radius:999px;padding:8px 12px;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-family:'Geist','Montserrat',sans-serif}
+            .nebula-topics-btn.primary{background:#ff4500;border-color:#ff4500;color:white}
+            .nebula-thread-action.active,.nebula-reply-action.active{border-color:#ff6a00;color:#fff;background:#2a1a12}
+            .nebula-social-note{margin:0;color:#8d8d8d;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase}
+            .nebula-social-error{color:#ffb4b4}
+            .nebula-social-success{color:#bbffd4}
+            .nebula-topics-main{display:grid;grid-template-rows:auto auto minmax(0,1fr);min-height:0}
+            .nebula-topics-main-head{padding:12px;border-bottom:1px solid #222;display:flex;align-items:center;justify-content:space-between;gap:8px}
+            .nebula-topics-main-head strong{font-size:1rem;font-family:'Geist','Oxanium',sans-serif;color:#f3f3f3}
+            .nebula-topics-main-controls{padding:10px;border-bottom:1px solid #222;display:grid;gap:8px}
+            .nebula-thread-composer{display:grid;gap:8px}
+            .nebula-thread-list{display:grid;gap:10px;overflow:auto;padding:12px;min-height:0}
+            .nebula-thread-card{border:1px solid #2b2b2b;border-radius:12px;background:#151516;padding:12px;display:grid;gap:8px}
+            .nebula-thread-card h3{margin:0;font-family:'Geist','Oxanium',sans-serif;font-size:1.02rem;color:#fafafa}
+            .nebula-thread-card-meta,.nebula-reply-card-meta{color:#949494;font-size:.66rem;letter-spacing:.06em;text-transform:uppercase}
+            .nebula-thread-markdown p{margin:0 0 8px;color:#c8c8c8;line-height:1.65;font-size:.84rem}
+            .nebula-thread-markdown a{color:#8fc2ff}
+            .nebula-thread-actions,.nebula-reply-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+            .nebula-thread-window{display:grid;grid-template-rows:auto auto auto auto minmax(0,1fr);min-height:0}
+            .nebula-thread-window.hidden .nebula-thread-markdown,.nebula-thread-window.hidden .nebula-reply-editor,.nebula-thread-window.hidden .nebula-replies-list,.nebula-thread-window.hidden #social-thread-meta-view{display:none}
+            .nebula-thread-window.hidden #social-thread-title-view:after{content:' (open a thread)';color:#888;font-size:.75rem;font-weight:400;text-transform:none;letter-spacing:0}
+            .nebula-thread-head{padding:12px;border-bottom:1px solid #222;display:flex;align-items:center;justify-content:space-between;gap:8px}
+            .nebula-thread-head h2{margin:0;font-family:'Geist','Oxanium',sans-serif;font-size:1rem;color:#f4f4f4}
+            #social-thread-body-view{padding:12px 12px 0}
+            #social-thread-meta-view{padding:0 12px 10px}
+            .nebula-reply-editor{padding:0 12px 12px;display:grid;gap:8px}
+            .nebula-replies-list{overflow:auto;padding:0 12px 12px;display:grid;gap:8px;min-height:0}
+            .nebula-reply-card{border:1px solid #2b2b2b;border-radius:10px;background:#171718;padding:10px;display:grid;gap:6px}
+            .nebula-social-empty{padding:14px;border:1px dashed #333;border-radius:10px;color:#8f8f8f;text-align:center;font-size:.78rem}
+            .nebula-social-md-code{background:#252525;border:1px solid #3b3b3b;border-radius:6px;padding:1px 6px;font-size:.78rem}
+            .nebula-social-md-codeblock{background:#1b1b1c;border:1px solid #343434;border-radius:8px;padding:8px;overflow:auto}
+            .nebula-social-md-list{margin:0 0 8px;padding-left:0;list-style:none;display:grid;gap:4px}
+            .nebula-social-md-list li{padding-left:12px;position:relative}
+            .nebula-social-md-list li:before{content:'•';position:absolute;left:0;opacity:.75}
+            .nebula-social-md-list .depth-1{padding-left:24px}
+            .nebula-social-md-list .depth-2{padding-left:36px}
+            .nebula-social-md-list .depth-3{padding-left:48px}
+            .nebula-social-md-quote{margin:0 0 8px;border-left:2px solid #555;padding-left:10px;color:#b5b5b5}
+            @media (max-width:1300px){.nebula-topics-shell{grid-template-columns:240px minmax(0,1fr)}.nebula-topics-shell .nebula-thread-window{grid-column:1 / -1;min-height:380px}}
+            @media (max-width:900px){.nebula-topics-shell{grid-template-columns:1fr}.nebula-topics-page{min-height:0}.nebula-topics-col{min-height:320px}}
+          </style>
+
+          <div class="nebula-topics-topbar">
+            <div class="nebula-topics-brand">reddit</div>
+            <div class="nebula-topics-search-wrap">
+              <input id="social-topic-search" type="search" placeholder="Search Topics" autocomplete="off" />
+              <button type="button" id="social-refresh-topics" class="nebula-topics-btn">Refresh</button>
+            </div>
+          </div>
 
           <section class="nebula-topics-shell" id="social-topics-shell">
-            <style>
-              .nebula-topics-page{width:min(100%,1400px);margin:0 auto;display:grid;gap:14px;min-height:calc(100vh - 130px)}
-              .nebula-topics-page-header h1{margin:0;font-family:'Cormorant Garamond','Georgia',serif;font-size:clamp(2.2rem,4vw,3.5rem);font-weight:500;letter-spacing:.02em}
-              .nebula-topics-page-header p{margin:6px 0 0;color:var(--ink-dim);letter-spacing:.04em;font-size:.9rem}
-              .nebula-topics-shell{border:0.5px solid var(--border);border-radius:22px;background:rgba(7,7,7,.8);backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);padding:14px;display:grid;gap:12px;min-height:calc(100vh - 245px)}
-              .nebula-topics-toolbar,.nebula-topics-composer-head,.nebula-topics-list-head,.nebula-thread-head,.nebula-thread-card-meta,.nebula-reply-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-              .nebula-topics-toolbar input,.nebula-topics-editor input,.nebula-topics-editor textarea,.nebula-thread-composer input,.nebula-thread-composer textarea,.nebula-reply-editor textarea{width:100%;border:0.5px solid #2f2f2f;border-radius:11px;background:#141414;color:#f3f3f3;padding:11px 12px;font-family:'Geist','Montserrat',sans-serif;font-size:.89rem;letter-spacing:.02em}
-              .nebula-topics-toolbar input:focus,.nebula-topics-editor input:focus,.nebula-topics-editor textarea:focus,.nebula-thread-composer input:focus,.nebula-thread-composer textarea:focus,.nebula-reply-editor textarea:focus{outline:none;border-color:#545454;box-shadow:none}
-              .nebula-topics-toolbar button,.nebula-topics-editor button,.nebula-topic-chip button,.nebula-thread-action,.nebula-reply-action{border:0.5px solid #3a3a3a;background:#1e1e1e;color:#ececec;border-radius:999px;padding:9px 13px;cursor:pointer;font-family:'Geist','Montserrat',sans-serif;font-size:.72rem;letter-spacing:.07em;text-transform:uppercase}
-              .nebula-topics-toolbar button:hover,.nebula-topics-editor button:hover,.nebula-topic-chip button:hover,.nebula-thread-action:hover,.nebula-reply-action:hover{border-color:#6b6b6b;background:#232323}
-              .nebula-topics-layout{display:grid;grid-template-columns:minmax(250px,300px) minmax(0,1fr) minmax(300px,420px);gap:12px;min-height:0;flex:1}
-              .nebula-topics-sidebar,.nebula-topics-main,.nebula-thread-window{border:0.5px solid #2e2e2e;border-radius:14px;background:#0f0f0f;display:grid;gap:10px;min-height:0;padding:12px}
-              .nebula-topics-sidebar{grid-template-rows:auto minmax(0,1fr) auto}
-              .nebula-topics-main{grid-template-rows:auto auto auto minmax(0,1fr)}
-              .nebula-topics-list,.nebula-thread-list,.nebula-replies-list{display:grid;gap:8px;overflow:auto;min-height:0;padding-right:3px}
-              .nebula-topic-chip{border:0.5px solid #2c2c2c;border-radius:12px;background:#151515;padding:10px;display:grid;gap:8px}
-              .nebula-topic-chip.active{border-color:#666}
-              .nebula-topic-chip h3{margin:0;font-size:.84rem;font-family:'Geist','Oxanium',sans-serif;font-weight:500;letter-spacing:.07em;text-transform:uppercase}
-              .nebula-topic-chip p{margin:0;color:#b5b5b5;font-size:.76rem;line-height:1.5}
-              .nebula-topic-meta{display:flex;align-items:center;gap:10px;color:#8e8e8e;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase}
-              .nebula-topics-editor,.nebula-thread-composer,.nebula-reply-editor{display:grid;gap:8px}
-              .nebula-thread-card,.nebula-reply-card{border:0.5px solid #2c2c2c;border-radius:12px;background:#171717;padding:11px;display:grid;gap:7px}
-              .nebula-thread-card h3{margin:0;font-family:'Geist','Oxanium',sans-serif;font-size:1.02rem;font-weight:600;letter-spacing:.01em}
-              .nebula-thread-card p,.nebula-reply-card p{margin:0;color:#c2c2c2;line-height:1.66;font-size:.83rem}
-              .nebula-thread-card-meta,.nebula-reply-card-meta{color:#8f8f8f;font-size:.66rem;letter-spacing:.06em;text-transform:uppercase}
-              .nebula-thread-actions,.nebula-reply-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-              .nebula-thread-action.active,.nebula-reply-action.active{border-color:#7b7b7b;background:#2a2a2a}
-              .nebula-thread-window{grid-template-rows:auto auto auto auto minmax(0,1fr)}
-              .nebula-thread-window.hidden{display:grid;opacity:.55}
-              .nebula-thread-head h2{margin:0;font-family:'Geist','Oxanium',sans-serif;font-size:1.1rem;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
-              .nebula-thread-markdown h1,.nebula-thread-markdown h2,.nebula-thread-markdown h3{margin:0 0 8px}
-              .nebula-thread-markdown p{margin:0 0 8px;line-height:1.72;color:#c8c8c8}
-              .nebula-thread-markdown a{color:#f2f2f2}
-              .nebula-social-md-code{background:#252525;border:0.5px solid #3a3a3a;border-radius:7px;padding:1px 6px;font-size:.78rem}
-              .nebula-social-md-codeblock{background:#1d1d1d;border:0.5px solid #343434;border-radius:10px;padding:10px;overflow:auto}
-              .nebula-social-md-list{margin:0 0 8px;padding-left:0;list-style:none;display:grid;gap:4px}
-              .nebula-social-md-list li{padding-left:12px;position:relative}
-              .nebula-social-md-list li:before{content:'•';position:absolute;left:0;opacity:.7}
-              .nebula-social-md-list .depth-1{padding-left:24px}
-              .nebula-social-md-list .depth-2{padding-left:36px}
-              .nebula-social-md-list .depth-3{padding-left:48px}
-              .nebula-social-md-quote{margin:0 0 8px;border-left:2px solid #6a6a6a;padding-left:10px;color:#b8b8b8}
-              .nebula-social-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-              .nebula-social-empty{padding:16px;border:0.5px dashed #333;border-radius:11px;color:#8f8f8f;font-size:.78rem;letter-spacing:.03em;text-align:center}
-              .nebula-social-note{margin:0;color:#8f8f8f;font-size:.7rem;letter-spacing:.05em;text-transform:uppercase}
-              .nebula-social-error{color:#ffb4b4}
-              .nebula-social-success{color:#bbffd4}
-              @media (max-width:1280px){.nebula-topics-layout{grid-template-columns:minmax(250px,300px) minmax(0,1fr)}.nebula-thread-window{grid-column:1/-1;min-height:360px}}
-              @media (max-width:920px){.nebula-topics-page{width:100%}.nebula-topics-layout{grid-template-columns:1fr}.nebula-topics-shell{min-height:0}.nebula-topics-sidebar,.nebula-topics-main,.nebula-thread-window{min-height:320px}}
-            </style>
-
-            <div class="nebula-topics-toolbar">
-              <div class="nebula-social-inline" style="flex:1 1 320px;">
-                <input id="social-topic-search" type="search" placeholder="Search Topics" autocomplete="off" />
+            <aside class="nebula-topics-col nebula-topics-left">
+              <div class="nebula-topics-left-head">
+                <strong>Topics</strong>
+                <p id="social-auth-note" class="nebula-social-note">Checking session...</p>
               </div>
-              <div class="nebula-social-inline">
-                <button type="button" id="social-refresh-topics">Refresh</button>
+              <div id="social-topic-list" class="nebula-topics-list"></div>
+              <div class="nebula-topics-editor">
+                <input id="social-topic-name" maxlength="32" placeholder="Create topic name" />
+                <textarea id="social-topic-description" rows="2" maxlength="300" placeholder="Topic description"></textarea>
+                <textarea id="social-topic-rules" rows="3" maxlength="800" placeholder="Topic rules"></textarea>
+                <div class="nebula-social-inline">
+                  <button type="button" id="social-create-topic" class="nebula-topics-btn primary">Create Topic</button>
+                  <button type="button" id="social-edit-topic" class="nebula-topics-btn" disabled>Save Topic</button>
+                </div>
+                <p id="social-topic-status" class="nebula-social-note"></p>
               </div>
-            </div>
+            </aside>
 
-            <div class="nebula-topics-layout">
-              <aside class="nebula-topics-sidebar">
-                <div class="nebula-topics-composer-head">
-                  <strong>Topics</strong>
-                  <p id="social-auth-note" class="nebula-social-note">Checking session...</p>
+            <main class="nebula-topics-col nebula-topics-main">
+              <div class="nebula-topics-main-head">
+                <strong id="social-selected-topic">Select a Topic</strong>
+                <div class="nebula-social-inline">
+                  <button id="social-join-topic" type="button" class="nebula-topics-btn" disabled>Join</button>
+                  <button id="social-open-topic" type="button" class="nebula-topics-btn" disabled>Open Thread</button>
                 </div>
-                <div id="social-topic-list" class="nebula-topics-list"></div>
-                <div class="nebula-topics-editor">
-                  <input id="social-topic-name" maxlength="32" placeholder="New Topic name (letters, numbers, hyphen)" />
-                  <textarea id="social-topic-description" rows="3" maxlength="300" placeholder="Topic description"></textarea>
-                  <textarea id="social-topic-rules" rows="4" maxlength="800" placeholder="Topic rules"></textarea>
-                  <div class="nebula-social-inline">
-                    <button type="button" id="social-create-topic">Create Topic</button>
-                    <button type="button" id="social-edit-topic" disabled>Save Topic</button>
-                  </div>
-                  <p id="social-topic-status" class="nebula-social-note"></p>
-                </div>
-              </aside>
-
-              <main class="nebula-topics-main">
-                <div class="nebula-topics-list-head">
-                  <strong id="social-selected-topic">Select a Topic</strong>
-                  <div class="nebula-social-inline">
-                    <button id="social-join-topic" type="button" disabled>Join</button>
-                    <button id="social-open-topic" type="button" disabled>Open Thread View</button>
-                  </div>
-                </div>
-                <div id="social-topic-detail" class="nebula-social-empty">Pick a Topic from the left to browse threads.</div>
+              </div>
+              <div id="social-topic-detail" class="nebula-social-empty" style="margin:10px">Pick a Topic from the left to browse threads.</div>
+              <div class="nebula-topics-main-controls">
                 <div class="nebula-thread-composer">
                   <input id="social-thread-title" maxlength="160" placeholder="Thread title" />
-                  <textarea id="social-thread-body" rows="6" maxlength="4000" placeholder="Thread markdown body"></textarea>
+                  <textarea id="social-thread-body" rows="4" maxlength="4000" placeholder="Thread markdown body"></textarea>
                   <div class="nebula-social-inline">
-                    <button type="button" id="social-create-thread">Post Thread</button>
+                    <button type="button" id="social-create-thread" class="nebula-topics-btn primary">Post Thread</button>
                     <p id="social-thread-status" class="nebula-social-note"></p>
                   </div>
                 </div>
-                <div id="social-thread-list" class="nebula-thread-list"></div>
-              </main>
+              </div>
+              <div id="social-thread-list" class="nebula-thread-list"></div>
+            </main>
 
-              <section id="social-thread-window" class="nebula-thread-window hidden">
-                <div class="nebula-thread-head">
-                  <h2 id="social-thread-title-view">Thread</h2>
-                  <button id="social-close-thread" class="nebula-thread-action" type="button">Close</button>
+            <section id="social-thread-window" class="nebula-topics-col nebula-thread-window hidden">
+              <div class="nebula-thread-head">
+                <h2 id="social-thread-title-view">Thread</h2>
+                <button id="social-close-thread" class="nebula-topics-btn" type="button">Close</button>
+              </div>
+              <div id="social-thread-body-view" class="nebula-thread-markdown"></div>
+              <div id="social-thread-meta-view" class="nebula-thread-card-meta"></div>
+              <div class="nebula-reply-editor">
+                <textarea id="social-reply-body" rows="3" maxlength="2000" placeholder="Write a reply"></textarea>
+                <div class="nebula-social-inline">
+                  <button id="social-create-reply" type="button" class="nebula-topics-btn primary">Reply</button>
+                  <p id="social-reply-status" class="nebula-social-note"></p>
                 </div>
-                <div id="social-thread-body-view" class="nebula-thread-markdown"></div>
-                <div id="social-thread-meta-view" class="nebula-thread-card-meta"></div>
-                <div class="nebula-reply-editor">
-                  <textarea id="social-reply-body" rows="4" maxlength="2000" placeholder="Write a reply with markdown"></textarea>
-                  <div class="nebula-social-inline">
-                    <button id="social-create-reply" type="button">Reply</button>
-                    <p id="social-reply-status" class="nebula-social-note"></p>
-                  </div>
-                </div>
-                <div id="social-reply-list" class="nebula-replies-list"></div>
-              </section>
-            </div>
+              </div>
+              <div id="social-reply-list" class="nebula-replies-list"></div>
+            </section>
           </section>
         </section>
       `;
