@@ -334,10 +334,14 @@
     },
     afterRender: async function afterRenderTopicsRoute() {
       const fb = window.firebase;
-      const db = window.nebulaDb || (fb && typeof fb.firestore === "function" ? fb.firestore() : null);
+      const db = window.nebulaFirestore || (fb && typeof fb.firestore === "function" ? fb.firestore() : null);
       const auth = window.nebulaAuth || (fb && typeof fb.auth === "function" ? fb.auth() : null);
       const fieldValue = fb && fb.firestore && fb.firestore.FieldValue ? fb.firestore.FieldValue : null;
       if (!db || !auth || !fieldValue) {
+        const authNote = document.querySelector("#social-auth-note");
+        if (authNote) {
+          authNote.textContent = "Forum unavailable: Firestore is not initialized.";
+        }
         return;
       }
 
