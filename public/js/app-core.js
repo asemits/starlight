@@ -977,6 +977,23 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     const firebaseApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
     window.nebulaAuth = firebaseApp.auth();
     window.nebulaRtdb = firebaseApp.database();
+    window.nebulaFirestore = null;
+    if (typeof firebaseApp.firestore === "function") {
+      try {
+        const firestore = firebaseApp.firestore();
+        firestore.settings({
+          experimentalAutoDetectLongPolling: true,
+          useFetchStreams: false
+        });
+        window.nebulaFirestore = firestore;
+      } catch (_error) {
+        try {
+          window.nebulaFirestore = firebaseApp.firestore();
+        } catch (_innerError) {
+          window.nebulaFirestore = null;
+        }
+      }
+    }
     window.nebulaDb = window.createNebulaRtdbCompatDb
       ? window.createNebulaRtdbCompatDb(window.nebulaRtdb)
       : null;
