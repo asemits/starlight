@@ -26,6 +26,12 @@
   const NOTIFY_INAPP_KEY = "nebula-notify-inapp";
   const NOTIFY_OS_KEY = "nebula-notify-os";
   const FONT_KEY = "nebula-font";
+  const FONT_MODE_KEY = "nebula-font-mode";
+  const FONT_CUSTOM_URL_KEY = "nebula-font-custom-url";
+  const FONT_CUSTOM_FAMILY_KEY = "nebula-font-custom-family";
+  const FONT_UPLOAD_DATA_KEY = "nebula-font-upload-data";
+  const FONT_UPLOAD_FAMILY_KEY = "nebula-font-upload-family";
+  const FONT_UPLOAD_FORMAT_KEY = "nebula-font-upload-format";
   const NOTIFY_MESSAGES_KEY = "nebula-notify-messages";
   const NOTIFY_FRIEND_REQUESTS_KEY = "nebula-notify-friend-requests";
   const SYNC_SETTINGS_KEYS = [
@@ -59,6 +65,12 @@
     "nebula-measurement-system",
     MUSIC_VOLUME_KEY,
     FONT_KEY,
+    FONT_MODE_KEY,
+    FONT_CUSTOM_URL_KEY,
+    FONT_CUSTOM_FAMILY_KEY,
+    FONT_UPLOAD_DATA_KEY,
+    FONT_UPLOAD_FAMILY_KEY,
+    FONT_UPLOAD_FORMAT_KEY,
     SOUNDBOARD_VOLUME_KEY,
     NOTIFY_INAPP_KEY,
     NOTIFY_OS_KEY,

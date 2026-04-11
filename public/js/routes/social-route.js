@@ -19,6 +19,16 @@
               </div>
               <i class="fa-solid fa-arrow-right nebula-social-card-arrow"></i>
             </a>
+            <a href="/feed" class="nav-link nebula-social-card">
+              <div class="nebula-social-card-icon">
+                <i class="fa-regular fa-newspaper"></i>
+              </div>
+              <div>
+                <h2>Feed</h2>
+                <p>Send Posts, reply to posts, and see posts. Also summarize difficult posts.</p>
+              </div>
+              <i class="fa-solid fa-arrow-right nebula-social-card-arrow"></i>
+            </a>
         </section>
       `;
     }

@@ -741,7 +741,8 @@
   .neb-feed { grid-template-columns: 1fr; }
   .neb-sidebar { grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); }
 }
-  .neb-ai-btn {
+
+.neb-ai-btn {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -791,6 +792,14 @@
   text-transform: uppercase;
   color: rgba(255,255,255,0.25);
   margin-bottom: 5px;
+}
+
+.neb-poll-option {
+  transition: all 0.2s ease;
+}
+
+.neb-poll-option:active {
+  transform: scale(0.98);
 }
 </style>
 
@@ -978,7 +987,9 @@
         unsubPosts: null,
         unsubComments: null,
         unsubAuth: null,
-        observer: null
+        observer: null,
+        createType: null,
+        customCommunities: new Map()
       };
 
       function clean(text) {
@@ -1041,9 +1052,11 @@ function handle(user) {
         const memberships = Array.isArray(raw.memberships) ? raw.memberships : [];
         const subscriptions = Array.isArray(raw.subscriptions) ? raw.subscriptions : [];
         const likedPosts = Array.isArray(raw.likedPosts) ? raw.likedPosts : [];
+        const customCommunities = raw.customCommunities || {};
         state.memberships = new Set(memberships.map((item) => String(item || "")).filter(Boolean));
         state.subscriptions = new Set(subscriptions.map((item) => String(item || "")).filter(Boolean));
         state.likedPosts = new Set(likedPosts.map((item) => String(item || "")).filter(Boolean));
+        state.customCommunities = new Map(Object.entries(customCommunities));
       }
 
       function savePrefs() {
@@ -1051,7 +1064,8 @@ function handle(user) {
           localStorage.setItem(prefKey(), JSON.stringify({
             memberships: Array.from(state.memberships),
             subscriptions: Array.from(state.subscriptions),
-            likedPosts: Array.from(state.likedPosts)
+            likedPosts: Array.from(state.likedPosts),
+            customCommunities: Object.fromEntries(state.customCommunities)
           }));
         } catch (_error) {
         }
@@ -1076,7 +1090,11 @@ function handle(user) {
           authorHandle: clean(d.authorHandle || "").slice(0, 40),
           createdAt: d.createdAt || null,
           lastActivityAt: d.lastActivityAt || d.updatedAt || d.createdAt || null,
-          commentCount: Number(d.commentCount) || 0
+          commentCount: Number(d.commentCount) || 0,
+          imageUrl: d.imageUrl || null,
+          linkUrl: d.linkUrl || null,
+          poll: d.poll || null,
+          likesCount: Number(d.likesCount) || 0
         };
       }
 
@@ -1092,18 +1110,113 @@ function handle(user) {
         };
       }
 
-      function openCreateModal() {
+      // === CREATE TYPE HELPERS START ===
+      function openCreateModal(type) {
+        state.createType = type || null;
         if (!el.createModal) return;
         if (el.postCommunity && state.memberships.size && !state.memberships.has(el.postCommunity.value)) {
           el.postCommunity.value = Array.from(state.memberships)[0];
         }
         setStatus(el.createStatus, "");
+        renderCreateModalByType();
         el.createModal.classList.add("open");
         el.createModal.setAttribute("aria-hidden", "false");
         requestAnimationFrame(() => {
-          if (el.postTitle) el.postTitle.focus();
+          const firstInput = el.createModal.querySelector("input:not([type='hidden']), textarea");
+          if (firstInput) firstInput.focus();
         });
       }
+
+      function renderCreateModalByType() {
+        if (!el.createModal) return;
+        const modalBody = el.createModal.querySelector(".neb-modal-body");
+        if (!modalBody) return;
+        
+        let html = `
+          <div>
+            <label class="neb-input-label">Community</label>
+            <select class="neb-input" id="neb-post-community">`;
+        
+        const allCommunities = [...communityDefs];
+        state.customCommunities.forEach((desc, id) => {
+          allCommunities.push({ id, desc });
+        });
+        
+        html += allCommunities.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.id)}</option>`).join("");
+        html += `</select>
+          </div>`;
+        
+        if (state.createType === "image") {
+          html += `
+          <div>
+            <label class="neb-input-label">Title</label>
+            <input class="neb-input" id="neb-post-title" type="text" placeholder="Image title…" maxlength="300" />
+          </div>
+          <div>
+            <label class="neb-input-label">Image URL</label>
+            <input class="neb-input" id="neb-post-image-url" type="url" placeholder="https://example.com/image.jpg" />
+          </div>
+          <div>
+            <label class="neb-input-label">Caption (optional)</label>
+            <textarea class="neb-input neb-textarea" id="neb-post-body" placeholder="Add a caption…"></textarea>
+          </div>`;
+        } else if (state.createType === "link") {
+          html += `
+          <div>
+            <label class="neb-input-label">Title</label>
+            <input class="neb-input" id="neb-post-title" type="text" placeholder="Link title…" maxlength="300" />
+          </div>
+          <div>
+            <label class="neb-input-label">URL</label>
+            <input class="neb-input" id="neb-post-link-url" type="url" placeholder="https://example.com" />
+          </div>
+          <div>
+            <label class="neb-input-label">Description (optional)</label>
+            <textarea class="neb-input neb-textarea" id="neb-post-body" placeholder="What's this link about?"></textarea>
+          </div>`;
+        } else if (state.createType === "poll") {
+          html += `
+          <div>
+            <label class="neb-input-label">Poll Question</label>
+            <input class="neb-input" id="neb-post-title" type="text" placeholder="What's your question?" maxlength="300" />
+          </div>
+          <div>
+            <label class="neb-input-label">Option 1</label>
+            <input class="neb-input" id="neb-poll-option-0" type="text" placeholder="Option 1" maxlength="100" />
+          </div>
+          <div>
+            <label class="neb-input-label">Option 2</label>
+            <input class="neb-input" id="neb-poll-option-1" type="text" placeholder="Option 2" maxlength="100" />
+          </div>
+          <div>
+            <label class="neb-input-label">Option 3 (optional)</label>
+            <input class="neb-input" id="neb-poll-option-2" type="text" placeholder="Option 3" maxlength="100" />
+          </div>
+          <div>
+            <label class="neb-input-label">Option 4 (optional)</label>
+            <input class="neb-input" id="neb-poll-option-3" type="text" placeholder="Option 4" maxlength="100" />
+          </div>`;
+        } else {
+          html += `
+          <div>
+            <label class="neb-input-label">Title</label>
+            <input class="neb-input" id="neb-post-title" type="text" placeholder="An interesting title…" maxlength="300" />
+          </div>
+          <div>
+            <label class="neb-input-label">Body (optional)</label>
+            <textarea class="neb-input neb-textarea" id="neb-post-body" placeholder="Share your thoughts…"></textarea>
+          </div>`;
+        }
+        
+        html += `<p id="neb-create-status" class="neb-status"></p>`;
+        modalBody.innerHTML = html;
+        
+        el.postCommunity = el.createModal.querySelector("#neb-post-community");
+        el.postTitle = el.createModal.querySelector("#neb-post-title");
+        el.postBody = el.createModal.querySelector("#neb-post-body");
+        el.createStatus = el.createModal.querySelector("#neb-create-status");
+      }
+      // === CREATE TYPE HELPERS END ===
 
       function closeCreateModal() {
         if (!el.createModal) return;
@@ -1131,38 +1244,104 @@ function handle(user) {
         if (el.statMembers) el.statMembers.textContent = fmtCount(members);
       }
 
+      // === CUSTOM COMMUNITY START ===
+      function createCustomCommunity() {
+        const input = prompt("New community name (e.g., r/mygroup):");
+        if (!input || !input.trim()) return;
+        const id = input.trim();
+        if (state.customCommunities.has(id)) {
+          alert("This community already exists!");
+          return;
+        }
+        state.customCommunities.set(id, "Custom community");
+        state.memberships.add(id);
+        savePrefs();
+        renderCommunityList();
+      }
+      // === CUSTOM COMMUNITY END ===
+
       function renderCommunityList() {
         if (!el.communityList) return;
-        el.communityList.innerHTML = communityDefs.map((community) => {
+        const allCommunities = [...communityDefs];
+        state.customCommunities.forEach((desc, id) => {
+          allCommunities.push({ id, desc });
+        });
+        
+        el.communityList.innerHTML = allCommunities.map((community) => {
           const joined = state.memberships.has(community.id);
+          const isCustom = state.customCommunities.has(community.id);
           return `
             <article class="neb-community-item">
               <div class="neb-community-item-top">
-                <p class="neb-community-item-name">${escapeHtml(community.id)}</p>
-                <button class="neb-join-btn ${joined ? "joined" : ""}" type="button" data-action="toggle-community" data-community="${escapeHtml(community.id)}">${joined ? "Joined" : "Join"}</button>
+                <p class="neb-community-item-name">${escapeHtml(community.id)}${isCustom ? ' <span style="font-size:9px;color:rgba(255,255,255,0.4);">CUSTOM</span>' : ''}</p>
+                <button class="neb-join-btn ${joined ? "j oined" : ""}" type="button" data-action="toggle-community" data-community="${escapeHtml(community.id)}">${joined ? "Joined" : "Join"}</button>
               </div>
               <p class="neb-community-item-desc">${escapeHtml(community.desc)}</p>
             </article>
           `;
         }).join("");
+        
+        el.communityList.innerHTML += `
+          <button type="button" class="neb-join-btn" style="color: #fff; background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);" id="neb-create-community">+ Create Community</button>
+        `;
+        
+        el.communityList.querySelector("#neb-create-community")?.addEventListener("click", createCustomCommunity);
 
         if (el.postCommunity) {
           const current = el.postCommunity.value;
-          el.postCommunity.innerHTML = communityDefs.map((community) => `<option value="${escapeHtml(community.id)}">${escapeHtml(community.id)}</option>`).join("");
-          if (current && communityDefs.some((community) => community.id === current)) {
+          el.postCommunity.innerHTML = allCommunities.map((community) => `<option value="${escapeHtml(community.id)}">${escapeHtml(community.id)}</option>`).join("");
+          if (current && allCommunities.some((community) => community.id === current)) {
             el.postCommunity.value = current;
           }
         }
       }
 
+      // === COMMUNITY FILTERING START ===
+      function shouldShowPost(post) {
+        if (state.memberships.size === 0) return true;
+        return state.memberships.has(post.community);
+      }
+      // === COMMUNITY FILTERING END ===
+
+      // === POST RENDERING WITH MEDIA START ===
+      function renderPostContent(post) {
+        let content = "";
+        if (post.imageUrl) {
+          content += `<img src="${escapeHtml(post.imageUrl)}" alt="" style="max-width:100%;border-radius:12px;margin-top:8px;animation:fadeIn 0.3s ease;" />`;
+        }
+        if (post.linkUrl) {
+          content += `<div style="margin-top:8px;padding:12px;border-radius:10px;border:0.5px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);">
+            <a href="${escapeHtml(post.linkUrl)}" target="_blank" rel="noopener noreferrer" style="color:#fff;text-decoration:none;word-break:break-all;">${escapeHtml(post.linkUrl.slice(0, 80))}</a>
+          </div>`;
+        }
+        if (post.poll) {
+          const totalVotes = post.poll.options.reduce((sum, opt) => sum + opt.votes, 0);
+          content += `<div style="margin-top:12px;display:grid;gap:8px;">`;
+          post.poll.options.forEach((opt, idx) => {
+            const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+            const hasVoted = post.poll.voters && post.poll.voters.includes(state.user?.uid);
+            content += `<button class="neb-poll-option" data-action="vote-poll" data-post-id="${escapeHtml(post.id)}" data-option="${idx}" style="padding:10px;border-radius:8px;border:0.5px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:#fff;text-align:left;cursor:pointer;transition:all 0.2s ease;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+              <div style="font-size:12px;margin-bottom:4px;">${escapeHtml(opt.text)}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.5);">${opt.votes} vote${opt.votes !== 1 ? "s" : ""} (${pct}%)</div>
+            </button>`;
+          });
+          content += `</div>`;
+        }
+        if (post.body && !post.poll) {
+          content = `<p class="neb-post-excerpt">${rich(post.body)}</p>` + content;
+        }
+        return content;
+      }
+
       function renderPosts() {
         updateSidebarStats();
         if (!el.list) return;
-        if (!state.posts.length) {
+        const filteredPosts = state.posts.filter(shouldShowPost);
+        if (!filteredPosts.length) {
           el.list.innerHTML = `<div class="neb-card neb-empty">No posts yet</div>`;
           return;
         }
-        el.list.innerHTML = state.posts.map((post) => `
+        el.list.innerHTML = filteredPosts.map((post) => `
           <article class="neb-card neb-post" data-post-id="${escapeHtml(post.id)}" data-action="open-post">
             <div class="neb-vote-col">
               <button class="neb-vote-btn up" type="button" tabindex="-1"><i class="fa-solid fa-chevron-up"></i></button>
@@ -1179,8 +1358,8 @@ function handle(user) {
                 <span class="neb-post-flair">${escapeHtml(post.flair)}</span>
               </div>
               <h3 class="neb-post-title">${escapeHtml(post.title)}</h3>
-              <p class="neb-post-excerpt">${rich(post.body || "")}</p>
-              <div class="neb-post-actions">
+              ${renderPostContent(post)}
+              <div class="neb-post-actions" style="margin-top:8px;">
                 <button class="neb-action-btn" type="button" data-action="open-post" data-post-id="${escapeHtml(post.id)}"><i class="fa-regular fa-message"></i> ${escapeHtml(post.commentCount === 1 ? "1 Reply" : `${fmtCount(post.commentCount)} Replies`)}</button>
                 <button class="neb-action-btn" type="button" data-action="reply-post" data-post-id="${escapeHtml(post.id)}"><i class="fa-solid fa-reply"></i> Reply</button>
                 <button class="neb-action-btn ${state.likedPosts.has(post.id) ? "active" : ""}" type="button" data-action="like-post" data-post-id="${escapeHtml(post.id)}"><i class="fa-regular fa-heart"></i> ${state.likedPosts.has(post.id) ? "Liked" : "Like"} ${escapeHtml(fmtCount(Number(post.likesCount || 0)))}</button>
@@ -1262,11 +1441,25 @@ function handle(user) {
         });
       }
 
+      // === PUBLISH POST BY TYPE START ===
       async function publishPost() {
         if (!state.user) {
           setStatus(el.createStatus, "Sign in to publish a post.", "error");
           return;
         }
+
+        if (state.createType === "image") {
+          await publishImagePost();
+        } else if (state.createType === "link") {
+          await publishLinkPost();
+        } else if (state.createType === "poll") {
+          await publishPollPost();
+        } else {
+          await publishTextPost();
+        }
+      }
+
+      async function publishTextPost() {
         const community = clean(el.postCommunity && el.postCommunity.value ? el.postCommunity.value : "r/nebula").slice(0, 48) || "r/nebula";
         const titleInput = clean(el.postTitle && el.postTitle.value ? el.postTitle.value : "");
         const bodyInput = clean(el.postBody && el.postBody.value ? el.postBody.value : "");
@@ -1301,6 +1494,131 @@ function handle(user) {
           if (el.submitPost) el.submitPost.disabled = false;
         }
       }
+
+      async function publishImagePost() {
+        const community = clean(el.postCommunity && el.postCommunity.value ? el.postCommunity.value : "r/nebula").slice(0, 48) || "r/nebula";
+        const title = clean(el.postTitle && el.postTitle.value ? el.postTitle.value : "").slice(0, 300);
+        const imageUrl = (el.createModal.querySelector("#neb-post-image-url")?.value || "").trim();
+        const body = clean(el.postBody && el.postBody.value ? el.postBody.value : "").slice(0, 4000);
+
+        if (!title || !imageUrl) {
+          setStatus(el.createStatus, "Please add a title and image URL.", "error");
+          return;
+        }
+
+        if (el.submitPost) el.submitPost.disabled = true;
+        setStatus(el.createStatus, "Publishing...");
+        try {
+          await postsRef.add({
+            title,
+            body,
+            community,
+            flair: "Image",
+            imageUrl,
+            authorId: state.user.uid,
+            authorName: name(state.user).slice(0, 80),
+            authorHandle: handle(state.user).slice(0, 40),
+            commentCount: 0,
+            createdAt: fieldValue.serverTimestamp(),
+            lastActivityAt: fieldValue.serverTimestamp()
+          });
+          if (el.postTitle) el.postTitle.value = "";
+          if (el.postBody) el.postBody.value = "";
+          const urlInput = el.createModal.querySelector("#neb-post-image-url");
+          if (urlInput) urlInput.value = "";
+          setStatus(el.createStatus, "Image posted.", "success");
+          window.setTimeout(closeCreateModal, 300);
+        } catch (error) {
+          setStatus(el.createStatus, `Publish failed: ${String(error && error.message || "Unknown error")}`, "error");
+        } finally {
+          if (el.submitPost) el.submitPost.disabled = false;
+        }
+      }
+
+      async function publishLinkPost() {
+        const community = clean(el.postCommunity && el.postCommunity.value ? el.postCommunity.value : "r/nebula").slice(0, 48) || "r/nebula";
+        const title = clean(el.postTitle && el.postTitle.value ? el.postTitle.value : "").slice(0, 300);
+        const linkUrl = (el.createModal.querySelector("#neb-post-link-url")?.value || "").trim();
+        const body = clean(el.postBody && el.postBody.value ? el.postBody.value : "").slice(0, 4000);
+
+        if (!title || !linkUrl) {
+          setStatus(el.createStatus, "Please add a title and URL.", "error");
+          return;
+        }
+
+        if (el.submitPost) el.submitPost.disabled = true;
+        setStatus(el.createStatus, "Publishing...");
+        try {
+          await postsRef.add({
+            title,
+            body,
+            community,
+            flair: "Link",
+            linkUrl,
+            authorId: state.user.uid,
+            authorName: name(state.user).slice(0, 80),
+            authorHandle: handle(state.user).slice(0, 40),
+            commentCount: 0,
+            createdAt: fieldValue.serverTimestamp(),
+            lastActivityAt: fieldValue.serverTimestamp()
+          });
+          if (el.postTitle) el.postTitle.value = "";
+          if (el.postBody) el.postBody.value = "";
+          const urlInput = el.createModal.querySelector("#neb-post-link-url");
+          if (urlInput) urlInput.value = "";
+          setStatus(el.createStatus, "Link posted.", "success");
+          window.setTimeout(closeCreateModal, 300);
+        } catch (error) {
+          setStatus(el.createStatus, `Publish failed: ${String(error && error.message || "Unknown error")}`, "error");
+        } finally {
+          if (el.submitPost) el.submitPost.disabled = false;
+        }
+      }
+
+      async function publishPollPost() {
+        const community = clean(el.postCommunity && el.postCommunity.value ? el.postCommunity.value : "r/nebula").slice(0, 48) || "r/nebula";
+        const title = clean(el.postTitle && el.postTitle.value ? el.postTitle.value : "").slice(0, 300);
+        const options = [];
+        for (let i = 0; i < 4; i++) {
+          const opt = el.createModal.querySelector(`#neb-poll-option-${i}`)?.value || "";
+          if (opt.trim()) options.push({ text: opt.trim(), votes: 0 });
+        }
+
+        if (!title || options.length < 2) {
+          setStatus(el.createStatus, "Poll needs a question and at least 2 options.", "error");
+          return;
+        }
+
+        if (el.submitPost) el.submitPost.disabled = true;
+        setStatus(el.createStatus, "Publishing...");
+        try {
+          await postsRef.add({
+            title,
+            body: "",
+            community,
+            flair: "Poll",
+            poll: { options, voters: [] },
+            authorId: state.user.uid,
+            authorName: name(state.user).slice(0, 80),
+            authorHandle: handle(state.user).slice(0, 40),
+            commentCount: 0,
+            createdAt: fieldValue.serverTimestamp(),
+            lastActivityAt: fieldValue.serverTimestamp()
+          });
+          if (el.postTitle) el.postTitle.value = "";
+          for (let i = 0; i < 4; i++) {
+            const inp = el.createModal.querySelector(`#neb-poll-option-${i}`);
+            if (inp) inp.value = "";
+          }
+          setStatus(el.createStatus, "Poll posted.", "success");
+          window.setTimeout(closeCreateModal, 300);
+        } catch (error) {
+          setStatus(el.createStatus, `Publish failed: ${String(error && error.message || "Unknown error")}`, "error");
+        } finally {
+          if (el.submitPost) el.submitPost.disabled = false;
+        }
+      }
+      // === PUBLISH POST BY TYPE END ===
 
       async function publishComment() {
         if (!state.user) {
@@ -1386,6 +1704,7 @@ function handle(user) {
         else state.memberships.add(communityId);
         savePrefs();
         renderCommunityList();
+        renderPosts();
       }
 
             const GROQ_TUNNEL = "https://script.google.com/macros/s/AKfycbxJuTi1kjlVIFsdBHZis_pp-AXwSaxxa6hmgmM8zOXbevupfl42wugnPLt9J_7CxywH/exec";
@@ -1500,10 +1819,10 @@ console.log("Sending to AI:", prompt);
       });
       state.observer.observe(document.body, { childList: true, subtree: true });
 
-      if (el.openCreate) el.openCreate.addEventListener("click", openCreateModal);
-      if (el.openCreateImg) el.openCreateImg.addEventListener("click", openCreateModal);
-      if (el.openCreateLink) el.openCreateLink.addEventListener("click", openCreateModal);
-      if (el.openCreatePoll) el.openCreatePoll.addEventListener("click", openCreateModal);
+      if (el.openCreate) el.openCreate.addEventListener("click", () => openCreateModal());
+      if (el.openCreateImg) el.openCreateImg.addEventListener("click", () => openCreateModal("image"));
+      if (el.openCreateLink) el.openCreateLink.addEventListener("click", () => openCreateModal("link"));
+      if (el.openCreatePoll) el.openCreatePoll.addEventListener("click", () => openCreateModal("poll"));
       if (el.closeCreate) el.closeCreate.addEventListener("click", closeCreateModal);
       if (el.cancelCreate) el.cancelCreate.addEventListener("click", closeCreateModal);
       if (el.submitPost) el.submitPost.addEventListener("click", publishPost);
@@ -1532,7 +1851,7 @@ console.log("Sending to AI:", prompt);
           const target = event.target.closest("[data-action]");
           if (!target) return;
           const action = target.getAttribute("data-action");
-          const postId = target.getAttribute("data-post-id") || target.closest("[data-post-id]") && target.closest("[data-post-id]").getAttribute("data-post-id");
+          const postId = target.getAttribute("data-post-id") || target.closest("[data-post-id]")?.getAttribute("data-post-id");
           if (!postId) return;
           if (action === "like-post") {
             toggleLike(postId);
@@ -1543,9 +1862,14 @@ console.log("Sending to AI:", prompt);
             return;
           }
           if (action === "summarize-post") {
-          summarizePost(postId);
-          return;
-         }
+            summarizePost(postId);
+            return;
+          }
+          if (action === "vote-poll") {
+            const optionIdx = Number(target.getAttribute("data-option"));
+            votePoll(postId, optionIdx);
+            return;
+          }
           openThread(postId);
           if (action === "reply-post") {
             requestAnimationFrame(() => {
@@ -1554,6 +1878,38 @@ console.log("Sending to AI:", prompt);
           }
         });
       }
+
+      // === POLL VOTING START ===
+      async function votePoll(postId, optionIdx) {
+        if (!state.user) {
+          setStatus(el.feedStatus, "Sign in to vote.", "error");
+          return;
+        }
+        const post = state.posts.find((p) => p.id === postId);
+        if (!post || !post.poll) return;
+        if (post.poll.voters && post.poll.voters.includes(state.user.uid)) {
+          setStatus(el.feedStatus, "You already voted.", "error");
+          return;
+        }
+        try {
+          await db.runTransaction(async (transaction) => {
+            const postRef = postsRef.doc(postId);
+            const postData = await transaction.get(postRef);
+            if (!postData.exists) throw new Error("Post not found");
+            const updated = postData.data();
+            if (!updated.poll) throw new Error("Poll not found");
+            if (optionIdx < 0 || optionIdx >= updated.poll.options.length) throw new Error("Invalid option");
+            updated.poll.options[optionIdx].votes = (updated.poll.options[optionIdx].votes || 0) + 1;
+            updated.poll.voters = [...(updated.poll.voters || []), state.user.uid];
+            transaction.update(postRef, { poll: updated.poll });
+          });
+          renderPosts();
+          setStatus(el.feedStatus, "Vote counted!", "success");
+        } catch (error) {
+          setStatus(el.feedStatus, `Vote failed: ${error.message}`, "error");
+        }
+      }
+      // === POLL VOTING END ===
 
       if (el.communityList) {
         el.communityList.addEventListener("click", (event) => {
@@ -1604,6 +1960,11 @@ console.log("Sending to AI:", prompt);
       applySortButtonState();
       subscribePosts();
       renderPosts();
+
+      // === ADD FADE ANIMATION ===
+      const style = document.createElement("style");
+      style.textContent = `@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`;
+      document.head.appendChild(style);
     }
   };
 })();

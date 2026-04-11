@@ -15,6 +15,9 @@
         
       const tosHtml = escapeHtml(tosText).replaceAll("\n", "<br>");
       const privacyHtml = escapeHtml(privacyText).replaceAll("\n", "<br>");
+      const fontChoices = typeof window.getNebulaFontChoices === "function" ? window.getNebulaFontChoices() : [];
+      const fontCurrent = typeof window.getNebulaFontPreset === "function" ? window.getNebulaFontPreset() : "geist";
+      const fontOptionsHtml = fontChoices.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === fontCurrent ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("");
 
       return `
         <div class="p-8 max-w-6xl mx-auto">
@@ -66,6 +69,38 @@
                     <option value="imperial" ${window.getMeasurementSystem() === 'metric' ? '' : 'selected'}>Imperial (F, mph)</option>
                     <option value="metric" ${window.getMeasurementSystem() === 'metric' ? 'selected' : ''}>Metric (C, km/h)</option>
                   </select>
+                </article>
+
+                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
+                  <button type="button" onclick="resetSettingsCard('layout-font')" title="Reset Font" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+                  <label class="block mb-2 text-sm text-gray-300">Font Preset</label>
+                  <select id="settings-font-preset" onchange="changeNebulaFontPreset(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-4">
+                    ${fontOptionsHtml}
+                  </select>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label class="block mb-2 text-sm text-gray-300">Custom Font CSS/File URL (https)</label>
+                      <input id="settings-font-url" type="url" placeholder="https://fonts.googleapis.com/css2?family=Your+Font" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" />
+                    </div>
+                    <div>
+                      <label class="block mb-2 text-sm text-gray-300">Custom Font Family Name</label>
+                      <input id="settings-font-family" type="text" placeholder="Your Font" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" />
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-2 mb-3">
+                    <button type="button" id="settings-font-apply-url" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Apply URL Font</button>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+                    <div>
+                      <label class="block mb-2 text-sm text-gray-300">Upload Font File (.woff2, .woff, .ttf, .otf)</label>
+                      <input id="settings-font-upload" type="file" accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf" class="w-full bg-black border border-white/20 p-2 rounded-xl text-white outline-none" />
+                    </div>
+                    <div>
+                      <label class="block mb-2 text-sm text-gray-300">Upload Font Family Name</label>
+                      <input id="settings-font-upload-family" type="text" placeholder="My Uploaded Font" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" />
+                    </div>
+                  </div>
+                  <p id="settings-font-status" class="text-sm text-gray-300">Choose a preset, use a custom URL, or upload a local font file.</p>
                 </article>
 
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
@@ -405,6 +440,64 @@
     afterRender: function afterRenderSettingsRoute() {
       if (typeof window.switchSettingsCategory === "function") {
         window.switchSettingsCategory("layout");
+      }
+      const statusNode = document.getElementById("settings-font-status");
+      const applyUrlBtn = document.getElementById("settings-font-apply-url");
+      const uploadInput = document.getElementById("settings-font-upload");
+      const urlInput = document.getElementById("settings-font-url");
+      const familyInput = document.getElementById("settings-font-family");
+      const uploadFamilyInput = document.getElementById("settings-font-upload-family");
+
+      function setFontStatus(text, ok) {
+        if (!statusNode) {
+          return;
+        }
+        statusNode.textContent = text;
+        statusNode.classList.toggle("text-emerald-300", Boolean(ok));
+        statusNode.classList.toggle("text-red-300", !ok);
+      }
+
+      if (applyUrlBtn) {
+        applyUrlBtn.addEventListener("click", () => {
+          if (typeof window.applyNebulaCustomFontUrl !== "function") {
+            setFontStatus("Font engine unavailable.", false);
+            return;
+          }
+          const ok = window.applyNebulaCustomFontUrl(
+            urlInput ? urlInput.value : "",
+            familyInput ? familyInput.value : ""
+          );
+          if (ok) {
+            setFontStatus("Custom URL font applied.", true);
+          } else {
+            setFontStatus("Enter a valid https URL and font family name.", false);
+          }
+        });
+      }
+
+      if (uploadInput) {
+        uploadInput.addEventListener("change", async () => {
+          const file = uploadInput.files && uploadInput.files[0] ? uploadInput.files[0] : null;
+          const familyName = uploadFamilyInput ? uploadFamilyInput.value : "";
+          if (!file) {
+            return;
+          }
+          if (!familyName || !familyName.trim()) {
+            setFontStatus("Enter an upload font family name first.", false);
+            return;
+          }
+          if (typeof window.applyNebulaUploadedFontFile !== "function") {
+            setFontStatus("Font engine unavailable.", false);
+            return;
+          }
+          setFontStatus("Uploading and applying font...", true);
+          const ok = await window.applyNebulaUploadedFontFile(file, familyName);
+          if (ok) {
+            setFontStatus("Uploaded font applied.", true);
+          } else {
+            setFontStatus("Could not apply uploaded font.", false);
+          }
+        });
       }
       if (window.NebulaAuthUI) {
         window.NebulaAuthUI.mountSettingsAuthPanel();

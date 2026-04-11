@@ -43,6 +43,35 @@
   const NOTIFY_OS_KEY = "nebula-notify-os";
   const NOTIFY_MESSAGES_KEY = "nebula-notify-messages";
   const NOTIFY_FRIEND_REQUESTS_KEY = "nebula-notify-friend-requests";
+  const FONT_KEY = "nebula-font";
+  const FONT_MODE_KEY = "nebula-font-mode";
+  const FONT_CUSTOM_URL_KEY = "nebula-font-custom-url";
+  const FONT_CUSTOM_FAMILY_KEY = "nebula-font-custom-family";
+  const FONT_UPLOAD_DATA_KEY = "nebula-font-upload-data";
+  const FONT_UPLOAD_FAMILY_KEY = "nebula-font-upload-family";
+  const FONT_UPLOAD_FORMAT_KEY = "nebula-font-upload-format";
+
+  const FONT_PRESETS = [
+    { id: "geist", label: "Geist", family: "Geist", stack: "'Geist','Montserrat','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" },
+    { id: "montserrat", label: "Montserrat", family: "Montserrat", stack: "'Montserrat','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" },
+    { id: "inter", label: "Inter", family: "Inter", stack: "'Inter','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" },
+    { id: "poppins", label: "Poppins", family: "Poppins", stack: "'Poppins','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" },
+    { id: "outfit", label: "Outfit", family: "Outfit", stack: "'Outfit','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" },
+    { id: "sora", label: "Sora", family: "Sora", stack: "'Sora','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" },
+    { id: "manrope", label: "Manrope", family: "Manrope", stack: "'Manrope','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" },
+    { id: "nunito", label: "Nunito", family: "Nunito", stack: "'Nunito','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" },
+    { id: "rubik", label: "Rubik", family: "Rubik", stack: "'Rubik','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" },
+    { id: "dm-sans", label: "DM Sans", family: "DM Sans", stack: "'DM Sans','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" },
+    { id: "space-grotesk", label: "Space Grotesk", family: "Space Grotesk", stack: "'Space Grotesk','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" },
+    { id: "merriweather", label: "Merriweather", family: "Merriweather", stack: "'Merriweather','Georgia',serif", cssUrl: "https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&display=swap" },
+    { id: "playfair", label: "Playfair Display", family: "Playfair Display", stack: "'Playfair Display','Times New Roman',serif", cssUrl: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700;800&display=swap" },
+    { id: "cormorant", label: "Cormorant Garamond", family: "Cormorant Garamond", stack: "'Cormorant Garamond','Georgia',serif", cssUrl: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap" },
+    { id: "source-code-pro", label: "Source Code Pro", family: "Source Code Pro", stack: "'Source Code Pro','Fira Code',monospace", cssUrl: "https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;700&display=swap" },
+    { id: "fira-code", label: "Fira Code", family: "Fira Code", stack: "'Fira Code','Consolas',monospace", cssUrl: "https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" },
+    { id: "oxanium", label: "Oxanium", family: "Oxanium", stack: "'Oxanium','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&display=swap" },
+    { id: "orbitron", label: "Orbitron", family: "Orbitron", stack: "'Orbitron','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&display=swap" },
+    { id: "system", label: "System", family: "System UI", stack: "system-ui,-apple-system,'Segoe UI',sans-serif" }
+  ];
 
   function escapeHtml(value) {
     return String(value || "")
@@ -62,6 +91,110 @@
       return raw;
     }
     return "/" + raw;
+  }
+
+  function nebulaPresetById(id) {
+    const target = String(id || "").trim();
+    for (let i = 0; i < FONT_PRESETS.length; i += 1) {
+      if (FONT_PRESETS[i].id === target) {
+        return FONT_PRESETS[i];
+      }
+    }
+    return FONT_PRESETS[0];
+  }
+
+  function ensureNebulaFontLink(href, idSuffix) {
+    if (!href) {
+      return;
+    }
+    const id = "nebula-font-link-" + String(idSuffix || "preset");
+    let link = document.getElementById(id);
+    if (!link) {
+      link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    if (link.href !== href) {
+      link.href = href;
+    }
+  }
+
+  function setNebulaFontStyle(cssText) {
+    let style = document.getElementById("nebula-font-style");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "nebula-font-style";
+      document.head.appendChild(style);
+    }
+    style.textContent = cssText;
+  }
+
+  function buildNebulaFontCss(stack, extraFaceCss) {
+    const face = String(extraFaceCss || "");
+    const safeStack = String(stack || "'Geist','Montserrat','Segoe UI',sans-serif");
+    return `${face}
+      :root { --nebula-user-font: ${safeStack}; }
+      body,
+      body *:not(i):not(.fa):not(.fa-solid):not(.fa-regular):not(.fa-brands):not([class^="fa-"]):not([class*=" fa-"])
+      { font-family: var(--nebula-user-font) !important; }
+    `;
+  }
+
+  function applyNebulaFontPreset(presetId) {
+    const preset = nebulaPresetById(presetId);
+    if (preset.cssUrl) {
+      ensureNebulaFontLink(preset.cssUrl, "preset");
+    }
+    setNebulaFontStyle(buildNebulaFontCss(preset.stack, ""));
+  }
+
+  function applyNebulaFontFromUrl(fontUrl, familyName) {
+    const safeUrl = String(fontUrl || "").trim();
+    const safeFamily = String(familyName || "").trim().slice(0, 80);
+    if (!safeUrl || !safeFamily) {
+      return;
+    }
+    const lowerUrl = safeUrl.toLowerCase();
+    if (lowerUrl.endsWith(".css") || lowerUrl.includes("fonts.googleapis.com")) {
+      ensureNebulaFontLink(safeUrl, "custom-url");
+      setNebulaFontStyle(buildNebulaFontCss(`'${safeFamily}','Segoe UI',sans-serif`, ""));
+      return;
+    }
+    setNebulaFontStyle(buildNebulaFontCss(
+      `'NebulaCustomUrlFont','${safeFamily}','Segoe UI',sans-serif`,
+      `@font-face { font-family: 'NebulaCustomUrlFont'; src: url('${safeUrl}'); font-display: swap; }`
+    ));
+  }
+
+  function applyNebulaFontFromUpload(dataUrl, familyName, formatHint) {
+    const safeData = String(dataUrl || "").trim();
+    const safeFamily = String(familyName || "").trim().slice(0, 80);
+    if (!safeData || !safeFamily) {
+      return;
+    }
+    const fmt = String(formatHint || "woff2").replace(/[^a-z0-9]/gi, "").toLowerCase() || "woff2";
+    setNebulaFontStyle(buildNebulaFontCss(
+      `'NebulaUploadFont','${safeFamily}','Segoe UI',sans-serif`,
+      `@font-face { font-family: 'NebulaUploadFont'; src: url('${safeData}') format('${fmt}'); font-display: swap; }`
+    ));
+  }
+
+  function applyNebulaSavedFont() {
+    const mode = localStorage.getItem(FONT_MODE_KEY) || "preset";
+    if (mode === "custom-url") {
+      applyNebulaFontFromUrl(localStorage.getItem(FONT_CUSTOM_URL_KEY) || "", localStorage.getItem(FONT_CUSTOM_FAMILY_KEY) || "");
+      return;
+    }
+    if (mode === "upload") {
+      applyNebulaFontFromUpload(
+        localStorage.getItem(FONT_UPLOAD_DATA_KEY) || "",
+        localStorage.getItem(FONT_UPLOAD_FAMILY_KEY) || "",
+        localStorage.getItem(FONT_UPLOAD_FORMAT_KEY) || "woff2"
+      );
+      return;
+    }
+    applyNebulaFontPreset(localStorage.getItem(FONT_KEY) || "geist");
   }
 
   function withWrappedParam(urlText) {
@@ -488,6 +621,77 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
   };
 
+  window.getNebulaFontChoices = function getNebulaFontChoices() {
+    return FONT_PRESETS.map((item) => ({ id: item.id, label: item.label }));
+  };
+
+  window.getNebulaFontPreset = function getNebulaFontPreset() {
+    const id = localStorage.getItem(FONT_KEY) || "geist";
+    return nebulaPresetById(id).id;
+  };
+
+  window.changeNebulaFontPreset = function changeNebulaFontPreset(presetId) {
+    const preset = nebulaPresetById(presetId);
+    localStorage.setItem(FONT_KEY, preset.id);
+    localStorage.setItem(FONT_MODE_KEY, "preset");
+    applyNebulaFontPreset(preset.id);
+  };
+
+  window.applyNebulaCustomFontUrl = function applyNebulaCustomFontUrl(fontUrl, familyName) {
+    const url = String(fontUrl || "").trim();
+    const family = String(familyName || "").trim();
+    if (!/^https:\/\//i.test(url) || !family) {
+      return false;
+    }
+    localStorage.setItem(FONT_MODE_KEY, "custom-url");
+    localStorage.setItem(FONT_CUSTOM_URL_KEY, url);
+    localStorage.setItem(FONT_CUSTOM_FAMILY_KEY, family);
+    applyNebulaFontFromUrl(url, family);
+    return true;
+  };
+
+  window.applyNebulaUploadedFontFile = function applyNebulaUploadedFontFile(file, familyName) {
+    const upload = file;
+    const family = String(familyName || "").trim();
+    if (!upload || !family) {
+      return Promise.resolve(false);
+    }
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = function onLoad() {
+        const dataUrl = String(reader.result || "");
+        if (!dataUrl.startsWith("data:")) {
+          resolve(false);
+          return;
+        }
+        const type = String(upload.type || "").toLowerCase();
+        const ext = String(upload.name || "").split(".").pop().toLowerCase();
+        const format = type.includes("woff2") || ext === "woff2"
+          ? "woff2"
+          : type.includes("woff") || ext === "woff"
+            ? "woff"
+            : ext === "otf"
+              ? "opentype"
+              : "truetype";
+        try {
+          if (dataUrl.length <= 1800000) {
+            localStorage.setItem(FONT_UPLOAD_DATA_KEY, dataUrl);
+            localStorage.setItem(FONT_UPLOAD_FAMILY_KEY, family);
+            localStorage.setItem(FONT_UPLOAD_FORMAT_KEY, format);
+            localStorage.setItem(FONT_MODE_KEY, "upload");
+          }
+        } catch (_error) {
+        }
+        applyNebulaFontFromUpload(dataUrl, family, format);
+        resolve(true);
+      };
+      reader.onerror = function onError() {
+        resolve(false);
+      };
+      reader.readAsDataURL(upload);
+    });
+  };
+
   window.getDashboardSectionVisibility = function getDashboardSectionVisibility(section) {
     const keyMap = {
       recent: DASHBOARD_SHOW_RECENT_KEY,
@@ -633,6 +837,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       window.changeMeasurementSystem("imperial");
       return;
     }
+    if (cardId === "layout-font") {
+      window.changeNebulaFontPreset("geist");
+      return;
+    }
     if (cardId === "layout-dashboard-recent") {
       window.changeDashboardSectionVisibility("recent", "on");
       return;
@@ -720,7 +928,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   window.resetSettingsCategory = function resetSettingsCategory(category) {
     const map = {
-      layout: ["layout-sidebar", "layout-measurement", "layout-dashboard-recent", "layout-dashboard-favorites", "layout-dashboard-stats", "layout-dashboard-recent-music", "games-pagination"],
+      layout: ["layout-sidebar", "layout-measurement", "layout-font", "layout-dashboard-recent", "layout-dashboard-favorites", "layout-dashboard-stats", "layout-dashboard-recent-music", "games-pagination"],
       games: ["games-pagination"],
       particles: ["particles-enabled", "particles-bonds", "particles-color", "particles-shape", "particles-frequency", "particles-size"],
       shortcut: ["shortcut-main", "shortcut-anticlose"],
@@ -1010,6 +1218,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       return Boolean(user && !user.isAnonymous);
     };
   }
+
+  applyNebulaSavedFont();
 
   saveSidebarPosition(localStorage.getItem("sidebar-pos") || "top");
   bindSidebarSafeAreaTracking();
