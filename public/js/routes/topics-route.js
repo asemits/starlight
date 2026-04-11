@@ -226,6 +226,12 @@
             .nebula-compose-head{padding:12px;border-bottom:1px solid #242424;display:flex;align-items:center;justify-content:space-between;gap:8px}
             .nebula-compose-head strong{font-family:'Geist','Oxanium',sans-serif;color:#f3f3f3;letter-spacing:.04em;text-transform:uppercase;font-size:.9rem}
             .nebula-compose-body{padding:12px;display:grid;gap:8px;overflow:auto}
+            .nebula-topic-compose-modal{position:fixed;inset:0;z-index:64;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:18px}
+            .nebula-topic-compose-modal.open{display:flex}
+            .nebula-topic-compose-card{width:min(620px,100%);border:1px solid #2d2d2d;background:#111;border-radius:14px;display:grid;grid-template-rows:auto minmax(0,1fr);max-height:86vh;overflow:hidden}
+            .nebula-topic-compose-head{padding:12px;border-bottom:1px solid #242424;display:flex;align-items:center;justify-content:space-between;gap:8px}
+            .nebula-topic-compose-head strong{font-family:'Geist','Oxanium',sans-serif;color:#f3f3f3;letter-spacing:.04em;text-transform:uppercase;font-size:.9rem}
+            .nebula-topic-compose-body{padding:12px;display:grid;gap:8px;overflow:auto}
             @media (max-width:1300px){.nebula-topics-shell{grid-template-columns:240px minmax(0,1fr)}.nebula-topics-shell .nebula-thread-window{grid-column:1 / -1;min-height:380px}}
             @media (max-width:900px){.nebula-topics-shell{grid-template-columns:1fr}.nebula-topics-page{min-height:0}.nebula-topics-col{min-height:320px}}
           </style>
@@ -242,19 +248,13 @@
             <aside class="nebula-topics-col nebula-topics-left">
               <div class="nebula-topics-left-head">
                 <strong>Topics</strong>
-                <p id="social-auth-note" class="nebula-social-note">Checking session...</p>
+                <div class="nebula-social-inline">
+                  <button type="button" id="social-open-topic-compose" class="nebula-topics-btn">Create Topic</button>
+                  <p id="social-auth-note" class="nebula-social-note">Checking session...</p>
+                </div>
               </div>
               <div id="social-topic-list" class="nebula-topics-list"></div>
-              <div class="nebula-topics-editor">
-                <input id="social-topic-name" maxlength="32" placeholder="Create topic name" />
-                <textarea id="social-topic-description" rows="2" maxlength="300" placeholder="Topic description"></textarea>
-                <textarea id="social-topic-rules" rows="3" maxlength="800" placeholder="Topic rules"></textarea>
-                <div class="nebula-social-inline">
-                  <button type="button" id="social-create-topic" class="nebula-topics-btn primary">Create Topic</button>
-                  <button type="button" id="social-edit-topic" class="nebula-topics-btn" disabled>Save Topic</button>
-                </div>
-                <p id="social-topic-status" class="nebula-social-note"></p>
-              </div>
+              <div class="nebula-social-empty" style="margin:10px">Select a Topic to browse posts or create one with the button above.</div>
             </aside>
 
             <main class="nebula-topics-col nebula-topics-main">
@@ -308,6 +308,27 @@
               </div>
             </div>
           </div>
+
+          <div id="social-topic-compose-modal" class="nebula-topic-compose-modal" aria-hidden="true">
+            <div class="nebula-topic-compose-card" role="dialog" aria-modal="true" aria-label="Topic settings">
+              <div class="nebula-topic-compose-head">
+                <strong>Topic Settings</strong>
+                <button id="social-close-topic-compose" type="button" class="nebula-topics-btn">Close</button>
+              </div>
+              <div class="nebula-topic-compose-body">
+                <div class="nebula-topics-editor">
+                  <input id="social-topic-name" maxlength="32" placeholder="Create topic name" />
+                  <textarea id="social-topic-description" rows="3" maxlength="300" placeholder="Topic description"></textarea>
+                  <textarea id="social-topic-rules" rows="4" maxlength="800" placeholder="Topic rules"></textarea>
+                  <div class="nebula-social-inline">
+                    <button type="button" id="social-create-topic" class="nebula-topics-btn primary">Create Topic</button>
+                    <button type="button" id="social-edit-topic" class="nebula-topics-btn" disabled>Save Topic</button>
+                  </div>
+                  <p id="social-topic-status" class="nebula-social-note"></p>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
       `;
     },
@@ -331,9 +352,12 @@
       }
 
       const el = {
-        search: root.querySelector("#social-topic-search"),
-        refresh: root.querySelector("#social-refresh-topics"),
+        search: document.querySelector("#social-topic-search"),
+        refresh: document.querySelector("#social-refresh-topics"),
         auth: root.querySelector("#social-auth-note"),
+        openTopicCompose: root.querySelector("#social-open-topic-compose"),
+        topicComposeModal: document.querySelector("#social-topic-compose-modal"),
+        closeTopicCompose: document.querySelector("#social-close-topic-compose"),
         topicList: root.querySelector("#social-topic-list"),
         topicName: root.querySelector("#social-topic-name"),
         topicDescription: root.querySelector("#social-topic-description"),
@@ -465,6 +489,22 @@
         }
         el.threadComposeModal.classList.remove("open");
         el.threadComposeModal.setAttribute("aria-hidden", "true");
+      }
+
+      function openTopicComposer() {
+        if (!el.topicComposeModal) {
+          return;
+        }
+        el.topicComposeModal.classList.add("open");
+        el.topicComposeModal.setAttribute("aria-hidden", "false");
+      }
+
+      function closeTopicComposer() {
+        if (!el.topicComposeModal) {
+          return;
+        }
+        el.topicComposeModal.classList.remove("open");
+        el.topicComposeModal.setAttribute("aria-hidden", "true");
       }
 
       function normalizeTopic(doc) {
@@ -842,6 +882,7 @@
           clearInput(el.topicName);
           clearInput(el.topicDescription);
           clearInput(el.topicRules);
+          closeTopicComposer();
         } catch (error) {
           setStatus(el.topicStatus, "Could not create Topic. " + (error && error.message ? error.message : ""), "error");
         } finally {
@@ -902,6 +943,7 @@
           });
           await batch.commit();
           setStatus(el.topicStatus, "Topic updated.", "success");
+          closeTopicComposer();
         } catch (error) {
           setStatus(el.topicStatus, "Could not update Topic. " + (error && error.message ? error.message : ""), "error");
         } finally {
@@ -1326,13 +1368,31 @@
       });
       state.observer.observe(document.body, { childList: true, subtree: true });
 
-      el.refresh.addEventListener("click", function () {
-        renderTopics();
-      });
+      if (el.refresh) {
+        el.refresh.addEventListener("click", function () {
+          renderTopics();
+        });
+      }
 
-      el.search.addEventListener("input", function () {
-        renderTopics();
-      });
+      if (el.search) {
+        el.search.addEventListener("input", function () {
+          renderTopics();
+        });
+      }
+
+      if (el.openTopicCompose) {
+        el.openTopicCompose.addEventListener("click", openTopicComposer);
+      }
+      if (el.closeTopicCompose) {
+        el.closeTopicCompose.addEventListener("click", closeTopicComposer);
+      }
+      if (el.topicComposeModal) {
+        el.topicComposeModal.addEventListener("click", function (event) {
+          if (event.target === el.topicComposeModal) {
+            closeTopicComposer();
+          }
+        });
+      }
 
       el.createTopic.addEventListener("click", createTopic);
       el.editTopic.addEventListener("click", saveTopicEdits);
