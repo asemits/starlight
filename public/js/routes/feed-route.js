@@ -1184,7 +1184,6 @@
                 <button class="neb-action-btn ${state.likedPosts.has(post.id) ? "active" : ""}" type="button" data-action="like-post" data-post-id="${escapeHtml(post.id)}"><i class="fa-regular fa-heart"></i> ${state.likedPosts.has(post.id) ? "Liked" : "Like"} ${escapeHtml(fmtCount(Number(post.likesCount || 0)))}</button>
                 <button class="neb-action-btn ${state.subscriptions.has(creatorKey(post)) ? "active" : ""}" type="button" data-action="subscribe-creator" data-post-id="${escapeHtml(post.id)}"><i class="fa-regular fa-bell"></i> ${state.subscriptions.has(creatorKey(post)) ? "Subscribed" : "Subscribe"}</button>
                 <button class="neb-action-btn ${state.subscriptions.has(creatorKey(post)) ? "active" : ""}" ...>
-                <button class="neb-action-btn ${state.subscriptions.has(creatorKey(post)) ? "active" : ""}" type="button" data-action="subscribe-creator" data-post-id="${escapeHtml(post.id)}"><i class="fa-regular fa-bell"></i> ${state.subscriptions.has(creatorKey(post)) ? "Subscribed" : "Subscribe"}</button>
                 <button class="neb-ai-btn" type="button" data-action="summarize-post" data-post-id="${escapeHtml(post.id)}"><i class="fa-solid fa-wand-magic-sparkles"></i> Summarize</button>
                 </button>
               </div>

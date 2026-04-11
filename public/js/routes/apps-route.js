@@ -244,6 +244,12 @@
             <p class="card-desc">Timer + stopwatch</p>
             <div class="glow-bar"></div>
           </a>
+          <a href="/feed" class="nav-link tool-card" style="animation-delay: 0.7s;">
+            <i class="fa-regular fa-newspaper" style="font-size: 52px;"></i>
+            <h2>Feed</h2>
+            <p class="card-desc">Get new posts everyday</p>
+            <div class="glow-bar"></div>
+          </a>
         </div>
       `;
     }
