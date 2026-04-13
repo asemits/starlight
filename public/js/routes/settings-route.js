@@ -61,6 +61,9 @@
                     <option value="right" ${localStorage.getItem('sidebar-pos') === 'right' ? 'selected' : ''}>Right</option>
                   </select>
                 </article>
+                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
+                <button id="updateBtn" style="display:none;">Update Desktop App</button>
+                </article>
 
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
                   <button type="button" onclick="resetSettingsCard('layout-measurement')" title="Reset Measurement System" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
@@ -93,11 +96,17 @@
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
                     <div>
                       <label class="block mb-2 text-sm text-gray-300">Upload Font File (.woff2, .woff, .ttf, .otf)</label>
-                      <input id="settings-font-upload" type="file" accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf" class="w-full bg-black border border-white/20 p-2 rounded-xl text-white outline-none" />
+                      <div class="rounded-2xl border border-white/15 bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm p-2 transition hover:border-white/30">
+                        <input id="settings-font-upload" type="file" accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf" class="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-sm text-gray-100 outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/25 file:mr-3 file:rounded-lg file:border-0 file:bg-white/15 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-white/25" />
+                      </div>
+                      <p class="mt-2 text-xs text-gray-400">Best results: upload .woff2 with a unique family name.</p>
                     </div>
                     <div>
                       <label class="block mb-2 text-sm text-gray-300">Upload Font Family Name</label>
+                      <div class="relative">
                       <input id="settings-font-upload-family" type="text" placeholder="My Uploaded Font" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" />
+                        <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs uppercase tracking-wider text-gray-400">Family</span>
+                      </div>
                     </div>
                   </div>
                   <p id="settings-font-status" class="text-sm text-gray-300">Choose a preset, use a custom URL, or upload a local font file.</p>
@@ -441,12 +450,64 @@
       if (typeof window.switchSettingsCategory === "function") {
         window.switchSettingsCategory("layout");
       }
+      const updateBtn = document.getElementById("updateBtn");
       const statusNode = document.getElementById("settings-font-status");
       const applyUrlBtn = document.getElementById("settings-font-apply-url");
       const uploadInput = document.getElementById("settings-font-upload");
       const urlInput = document.getElementById("settings-font-url");
       const familyInput = document.getElementById("settings-font-family");
       const uploadFamilyInput = document.getElementById("settings-font-upload-family");
+
+      const isStandalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+        || window.navigator.standalone === true;
+      const isDesktop = (navigator.userAgentData && typeof navigator.userAgentData.mobile === "boolean")
+        ? navigator.userAgentData.mobile === false
+        : !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent || "");
+
+      if (updateBtn && isStandalone && isDesktop && "serviceWorker" in navigator) {
+        updateBtn.style.display = "inline-flex";
+        updateBtn.className = "px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition text-white";
+        updateBtn.textContent = "Update Desktop App";
+
+        updateBtn.addEventListener("click", async () => {
+          updateBtn.disabled = true;
+          updateBtn.textContent = "Checking for update...";
+
+          try {
+            const registration = await navigator.serviceWorker.getRegistration();
+
+            if (!registration) {
+              updateBtn.textContent = "No app update service found";
+              return;
+            }
+
+            await registration.update();
+
+            if (registration.waiting) {
+              registration.waiting.postMessage({ type: "SKIP_WAITING" });
+              updateBtn.textContent = "Applying update...";
+              let didReload = false;
+              navigator.serviceWorker.addEventListener("controllerchange", () => {
+                if (didReload) {
+                  return;
+                }
+                didReload = true;
+                window.location.reload();
+              }, { once: true });
+              return;
+            }
+
+            updateBtn.textContent = "Already up to date";
+          } catch (_error) {
+            updateBtn.textContent = "Update failed";
+          } finally {
+            setTimeout(() => {
+              updateBtn.disabled = false;
+              updateBtn.textContent = "Update Desktop App";
+            }, 1800);
+          }
+        });
+      }
 
       function setFontStatus(text, ok) {
         if (!statusNode) {

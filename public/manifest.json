@@ -1,0 +1,54 @@
+{
+  "name": "Nebula",
+  "short_name": "Nebula",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "description": "Games, apps, and much more for students",
+  "icons": [
+    {
+      "src": "static/pwa/192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "static/pwa/512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "static/pwa/shot1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Homepage"
+    },
+    {
+      "src": "static/pwa/shot2.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Games"
+    },
+    {
+      "src": "static/pwa/shot3.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Apps"
+    },
+    {
+      "src": "static/pwa/shot4.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Settings"
+    }         
+  ]
+}

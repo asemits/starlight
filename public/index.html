@@ -6,6 +6,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <title>nebula</title>
     <link rel="icon" type="image/x-icon" href="static/logo.png"> 
+    <link rel="manifest" href="manifest.json">
     <!-- fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap" rel="stylesheet">
     <link href="https://fonts.cdnfonts.com/css/minecraft-3" rel="stylesheet">
@@ -79,6 +80,100 @@
         </ul>
     </nav>
     <div id="app-content" class="p-8 pt-24"></div>
+    <script>
+        // ==========================
+// PWA INSTALL SETUP
+// ==========================
+let deferredPrompt;
+const installBtn = document.getElementById("installBtn");
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+
+  if (installBtn) {
+    installBtn.style.display = "block";
+  }
+});
+
+installBtn?.addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+});
+
+
+// ==========================
+// PWA DETECTION
+// ==========================
+function isPWA() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+}
+
+
+// ==========================
+// UPDATE SYSTEM
+// ==========================
+const updateBtn = document.getElementById("updateBtn");
+const LAST_UPDATE_KEY = "lastUpdateTime";
+
+// Show update button ONLY in PWA
+if (isPWA() && updateBtn) {
+  updateBtn.style.display = "block";
+}
+
+// Force update function
+async function updateWebsite() {
+  console.log("Updating website...");
+
+  localStorage.setItem(LAST_UPDATE_KEY, Date.now());
+
+  // Update service worker
+  if ("serviceWorker" in navigator) {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (reg) {
+      await reg.update();
+    }
+  }
+
+  // Clear all caches
+  if ("caches" in window) {
+    const keys = await caches.keys();
+    for (let key of keys) {
+      await caches.delete(key);
+    }
+  }
+
+  // Reload
+  location.reload();
+}
+
+// Button click → manual update
+updateBtn?.addEventListener("click", updateWebsite);
+
+
+// ==========================
+// AUTO UPDATE (5 DAYS)
+// ==========================
+(function autoUpdateCheck() {
+  const last = localStorage.getItem(LAST_UPDATE_KEY);
+  const now = Date.now();
+
+  if (!last) {
+    localStorage.setItem(LAST_UPDATE_KEY, now);
+    return;
+  }
+
+  const diffDays = (now - parseInt(last)) / (1000 * 60 * 60 * 24);
+
+  if (diffDays >= 5) {
+    console.log("Auto updating after 5 days...");
+    updateWebsite();
+  }
+})();
+    </script>
     <!-- routes and other shit idk here -->
     <script src="js/cursor.js"></script>
     <script src="js/app-core.js"></script>
