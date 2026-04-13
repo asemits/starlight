@@ -4,215 +4,226 @@
     render: function renderAppsRoute() {
       return `
         <style>
+          :root {
+            --apps-card-bg: rgba(10, 13, 24, 0.66);
+            --apps-card-border: rgba(184, 200, 255, 0.18);
+            --apps-card-border-hover: rgba(212, 222, 255, 0.52);
+            --apps-card-shadow: 0 24px 60px rgba(0, 0, 0, 0.46);
+            --apps-card-shadow-hover: 0 34px 80px rgba(0, 0, 0, 0.58);
+            --apps-accent: rgba(144, 222, 255, 0.55);
+          }
+
           @keyframes cardReveal {
-            0%   { opacity: 0; transform: translateY(40px) scale(0.94); filter: blur(8px); }
-            60%  { filter: blur(0px); }
-            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
-          }
-
-          @keyframes scanline {
-            0%   { transform: translateY(-100%); opacity: 1; }
-            100% { transform: translateY(350%); opacity: 0; }
-          }
-
-          @keyframes shimmerBorder {
-            0%, 100% { opacity: 0.4; }
-            50%       { opacity: 1; }
+            0% { opacity: 0; transform: translateY(38px) scale(0.96); filter: blur(8px); }
+            65% { filter: blur(0); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
           }
 
           .cards-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 24px;
-            padding: 20px 40px 40px 4%;
-            margin-left: 100px;
+            width: min(1220px, 100% - 2rem);
+            margin: 0 auto;
+            padding: 1rem 0 3rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 1.15rem;
           }
 
           h1.tools-title, .titles {
             display: flex;
             justify-content: center;
+            align-items: center;
+            gap: 0.55rem;
             font-family: 'Cormorant Garamond', 'Georgia', serif;
-            font-weight: 300;
-            letter-spacing: 0.25em;
+            font-weight: 400;
+            letter-spacing: 0.24em;
             text-transform: uppercase;
-            color: rgba(255,255,255,0.9);
-            text-shadow: 0 0 40px rgba(255,255,255,0.2);
-            margin-bottom: 10px;
+            color: rgba(245, 248, 255, 0.95);
+            text-shadow: 0 0 36px rgba(180, 214, 255, 0.28);
+            margin: 0.25rem 0 0.6rem;
             opacity: 0;
-            animation: cardReveal 0.5s ease 0.1s forwards;
+            animation: cardReveal 0.6s ease 0.05s forwards;
           }
 
           .tool-card {
-            width: 220px;
-            height: 280px;
-            background: rgba(255,255,255,0.04);
-            backdrop-filter: blur(24px) saturate(160%);
-            -webkit-backdrop-filter: blur(24px) saturate(160%);
-            border: 0.5px solid rgba(255,255,255,0.12);
-            border-radius: 20px;
+            min-height: 270px;
+            padding: 1.1rem 1rem 1rem;
+            background:
+              radial-gradient(120% 85% at 100% 0%, rgba(129, 219, 255, 0.12), transparent 46%),
+              radial-gradient(110% 90% at 0% 100%, rgba(140, 166, 255, 0.15), transparent 52%),
+              var(--apps-card-bg);
+            backdrop-filter: blur(18px) saturate(160%);
+            -webkit-backdrop-filter: blur(18px) saturate(160%);
+            border: 1px solid var(--apps-card-border);
+            border-radius: 22px;
             text-decoration: none;
-            color: rgba(255,255,255,0.7);
+            color: rgba(240, 246, 255, 0.82);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 0.65rem;
             position: relative;
             overflow: hidden;
             cursor: pointer;
             opacity: 0;
-            animation: cardReveal 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            transition:
-              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.5s ease,
-              border-color 0.4s ease,
-              background 0.4s ease;
+            animation: cardReveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            box-shadow: var(--apps-card-shadow);
+            transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.42s ease, border-color 0.32s ease;
           }
 
+          .tool-card::before,
           .tool-card::after {
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            border-radius: 20px 20px 0 0;
-            transition: opacity 0.4s ease;
+            inset: 0;
+            pointer-events: none;
           }
 
           .tool-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 35%;
-            background: linear-gradient(to bottom, rgba(255,255,255,0.06), transparent);
-            transform: translateY(-100%);
-            pointer-events: none;
-            z-index: 2;
+            background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, 0.26) 50%, transparent 75%);
+            transform: translateX(-135%);
+            transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+            opacity: 0.6;
           }
 
-          .tool-card:hover::before {
-            animation: scanline 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          .tool-card::after {
+            border-radius: 22px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            inset: 2px;
           }
 
           .tool-card:hover {
-            transform: translateY(-12px) scale(1.03);
-            background: rgba(255,255,255,0.08);
-            border-color: rgba(255,255,255,0.28);
-            box-shadow:
-              0 30px 60px rgba(0,0,0,0.7),
-              0 0 0 0.5px rgba(255,255,255,0.1),
-              0 0 40px rgba(255,255,255,0.04),
-              0 1px 0 rgba(255,255,255,0.15) inset;
+            transform: translateY(-10px) scale(1.022);
+            border-color: var(--apps-card-border-hover);
+            box-shadow: var(--apps-card-shadow-hover);
           }
 
-          .tool-card .corner {
-            position: absolute;
-            top: 12px; right: 12px;
-            width: 10px; height: 10px;
-            border-top: 0.5px solid rgba(255,255,255,0.3);
-            border-right: 0.5px solid rgba(255,255,255,0.3);
-            border-radius: 0 4px 0 0;
-            transition: width 0.4s cubic-bezier(0.16,1,0.3,1), height 0.4s cubic-bezier(0.16,1,0.3,1), border-color 0.3s ease;
-          }
-          .tool-card:hover .corner {
-            width: 18px; height: 18px;
-            border-color: rgba(255,255,255,0.7);
+          .tool-card:hover::before {
+            transform: translateX(135%);
           }
 
-          .tool-card .corner-bl {
-            position: absolute;
-            bottom: 12px; left: 12px;
-            width: 10px; height: 10px;
-            border-bottom: 0.5px solid rgba(255,255,255,0.3);
-            border-left: 0.5px solid rgba(255,255,255,0.3);
-            border-radius: 0 0 0 4px;
-            transition: width 0.4s cubic-bezier(0.16,1,0.3,1), height 0.4s cubic-bezier(0.16,1,0.3,1), border-color 0.3s ease;
-          }
-          .tool-card:hover .corner-bl {
-            width: 18px; height: 18px;
-            border-color: rgba(255,255,255,0.7);
-          }
-
-          .tool-card .glow-bar {
-            position: absolute;
-            bottom: 0; left: 20%; right: 20%;
-            height: 1px;
-            background: linear-gradient(to right, transparent, rgba(255,255,255,0.6), transparent);
-            opacity: 0;
-            transition: opacity 0.4s ease, left 0.4s ease, right 0.4s ease;
-            z-index: 3;
-            border-radius: 1px;
-          }
-          .tool-card:hover .glow-bar {
-            opacity: 1;
-            left: 10%;
-            right: 10%;
-          }
-
+          .tool-card i,
           .tool-card img {
-            width: 72px; height: 72px;
+            width: 72px;
+            height: 72px;
+            display: grid;
+            place-items: center;
             object-fit: contain;
-            filter: brightness(0) invert(1) opacity(0.7);
-            transition: transform 0.5s cubic-bezier(0.16,1,0.3,1), filter 0.4s ease;
+            color: rgba(236, 243, 255, 0.84);
+            filter: drop-shadow(0 0 18px rgba(145, 222, 255, 0.2));
+            transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.35s ease, filter 0.35s ease;
             z-index: 1;
-          }
-          .tool-card:hover img {
-            transform: scale(1.15) translateY(-4px);
-            filter: brightness(0) invert(1) opacity(1) drop-shadow(0 0 12px rgba(255,255,255,0.5));
           }
 
-          .tool-card .card-icon-fa {
-            font-size: 52px;
-            color: rgba(255,255,255,0.5);
-            transition: transform 0.5s cubic-bezier(0.16,1,0.3,1), filter 0.4s ease, color 0.4s ease;
-            z-index: 1;
-          }
-          .tool-card:hover .card-icon-fa {
-            transform: scale(1.15) translateY(-4px);
-            color: rgba(255,255,255,0.95);
-            filter: drop-shadow(0 0 14px rgba(255,255,255,0.4));
+          .tool-card:hover i,
+          .tool-card:hover img {
+            transform: translateY(-4px) scale(1.08);
+            color: rgba(255, 255, 255, 1);
+            filter: drop-shadow(0 0 22px rgba(165, 236, 255, 0.45));
           }
 
           .tool-card h2 {
             font-family: 'Geist', 'Segoe UI', sans-serif;
-            font-size: 12px;
-            font-weight: 300;
-            letter-spacing: 0.2em;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
             margin: 0;
             text-align: center;
+            color: rgba(238, 244, 255, 0.86);
+            transition: letter-spacing 0.28s ease, color 0.28s ease;
             z-index: 1;
-            color: rgba(255,255,255,0.6);
-            transition: color 0.3s ease, text-shadow 0.3s ease;
           }
+
           .tool-card:hover h2 {
-            color: rgba(255,255,255,0.95);
-            text-shadow: 0 0 20px rgba(255,255,255,0.3);
+            color: rgba(255, 255, 255, 1);
+            letter-spacing: 0.19em;
           }
 
           .tool-card .card-desc {
             font-family: 'Geist', 'Segoe UI', sans-serif;
-            font-size: 11px;
-            font-weight: 200;
-            color: rgba(255,255,255,0.0);
+            font-size: 0.72rem;
+            font-weight: 300;
             text-align: center;
-            padding: 0 18px;
-            line-height: 1.7;
+            padding: 0 0.7rem;
+            line-height: 1.55;
             letter-spacing: 0.04em;
-            z-index: 1;
+            color: rgba(224, 236, 255, 0.42);
+            transform: translateY(10px);
+            opacity: 0;
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.5s cubic-bezier(0.16,1,0.3,1), color 0.4s ease, opacity 0.4s ease;
-            opacity: 0;
+            transition: transform 0.32s ease, opacity 0.32s ease, max-height 0.32s ease;
+            z-index: 1;
           }
+
           .tool-card:hover .card-desc {
-            max-height: 80px;
-            color: rgba(255,255,255,0.45);
             opacity: 1;
+            transform: translateY(0);
+            max-height: 90px;
+            color: rgba(225, 237, 255, 0.72);
+          }
+
+          .tool-card .glow-bar {
+            position: absolute;
+            bottom: 0;
+            left: 16%;
+            right: 16%;
+            height: 2px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, transparent, var(--apps-accent), transparent);
+            opacity: 0.25;
+            transform: scaleX(0.72);
+            transition: transform 0.34s ease, opacity 0.34s ease;
+            z-index: 1;
+          }
+
+          .tool-card:hover .glow-bar {
+            transform: scaleX(1);
+            opacity: 0.95;
+          }
+
+          @media (max-width: 900px) {
+            .cards-container {
+              width: min(980px, 100% - 1.35rem);
+              grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+              gap: 0.95rem;
+              padding-bottom: 2rem;
+            }
+
+            .tool-card {
+              min-height: 238px;
+              border-radius: 18px;
+            }
+          }
+
+          @media (max-width: 520px) {
+            h1.tools-title, .titles {
+              letter-spacing: 0.16em;
+            }
+
+            .cards-container {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 0.75rem;
+            }
+
+            .tool-card {
+              min-height: 210px;
+              padding: 0.85rem 0.7rem 0.75rem;
+            }
+
+            .tool-card i,
+            .tool-card img {
+              width: 58px;
+              height: 58px;
+            }
+
+            .tool-card h2 {
+              font-size: 0.67rem;
+              letter-spacing: 0.12em;
+            }
           }
         </style>
-        <h1 class="tools-title"><i class="fa-solid fa-shapes"></i>‎ ‎ Apps</h1>
-        <br>
         <div class="cards-container">
           <a href="/soundboard" class="nav-link tool-card" style="animation-delay: 0.2s;">
             <i class="fa-solid fa-volume-high" style="font-size: 52px;"></i>

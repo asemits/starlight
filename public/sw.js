@@ -130,7 +130,7 @@ self.addEventListener("fetch", (event) => {
                 if (cachedPage) {
                     return cachedPage;
                 }
-                return caches.match("/index.html");
+                return caches.match("/index");
             }
         })());
         return;

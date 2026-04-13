@@ -20,7 +20,138 @@
       const fontOptionsHtml = fontChoices.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === fontCurrent ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("");
 
       return `
-        <div class="p-8 max-w-6xl mx-auto">
+        <style>
+          .nebula-settings-shell {
+            --settings-card-bg: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.04));
+            --settings-card-border: rgba(255,255,255,0.16);
+            --settings-card-border-hover: rgba(186, 223, 255, 0.5);
+            --settings-input-bg: rgba(6, 10, 20, 0.66);
+            --settings-input-border: rgba(255,255,255,0.22);
+            --settings-input-focus: rgba(133, 223, 255, 0.62);
+            --settings-accent: rgba(134, 220, 255, 0.38);
+          }
+
+          .nebula-settings-shell h1 {
+            letter-spacing: 0.02em;
+            text-shadow: 0 12px 40px rgba(0,0,0,0.4);
+          }
+
+          .nebula-settings-shell aside,
+          .nebula-settings-shell [data-settings-panel] > article {
+            background: var(--settings-card-bg) !important;
+            border-color: var(--settings-card-border) !important;
+            backdrop-filter: blur(16px) saturate(145%);
+            -webkit-backdrop-filter: blur(16px) saturate(145%);
+            box-shadow: 0 16px 40px rgba(0,0,0,0.26);
+            transition: transform 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
+          }
+
+          .nebula-settings-shell [data-settings-panel] > article:hover {
+            transform: translateY(-2px);
+            border-color: var(--settings-card-border-hover) !important;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.32), 0 0 0 1px rgba(150, 226, 255, 0.12) inset;
+          }
+
+          .nebula-settings-shell [data-settings-tab] {
+            border-color: rgba(255,255,255,0.14) !important;
+            transition: border-color 0.24s ease, background 0.24s ease, transform 0.24s ease;
+          }
+
+          .nebula-settings-shell [data-settings-tab]:hover {
+            border-color: rgba(170, 224, 255, 0.5) !important;
+            background: rgba(255,255,255,0.14);
+            transform: translateX(1px);
+          }
+
+          .nebula-settings-shell label {
+            letter-spacing: 0.02em;
+          }
+
+          .nebula-settings-shell input[type="text"],
+          .nebula-settings-shell input[type="url"],
+          .nebula-settings-shell select {
+            background: var(--settings-input-bg) !important;
+            border: 1px solid var(--settings-input-border) !important;
+            border-radius: 0.9rem !important;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+          }
+
+          .nebula-settings-shell input[type="text"]:focus,
+          .nebula-settings-shell input[type="url"]:focus,
+          .nebula-settings-shell select:focus {
+            border-color: var(--settings-input-focus) !important;
+            box-shadow: 0 0 0 2px rgba(133, 223, 255, 0.22);
+            background: rgba(7, 13, 26, 0.85) !important;
+          }
+
+          .nebula-settings-shell button {
+            border-color: rgba(255,255,255,0.2) !important;
+            transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+          }
+
+          .nebula-settings-shell button:hover {
+            border-color: rgba(170, 226, 255, 0.56) !important;
+            box-shadow: 0 0 0 1px rgba(166, 224, 255, 0.2) inset;
+          }
+
+          .nebula-settings-shell button:active {
+            transform: translateY(1px);
+          }
+
+          .nebula-settings-shell #updateBtn {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            border-radius: 0.9rem;
+            padding: 0.7rem 1rem;
+            background: linear-gradient(180deg, rgba(119, 213, 255, 0.35), rgba(87, 162, 255, 0.22));
+            border: 1px solid rgba(157, 225, 255, 0.62) !important;
+            color: #eaf8ff;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            box-shadow: 0 10px 26px rgba(29, 133, 196, 0.28);
+          }
+
+          .nebula-settings-shell #updateBtn:hover {
+            background: linear-gradient(180deg, rgba(146, 225, 255, 0.44), rgba(96, 177, 255, 0.3));
+            box-shadow: 0 14px 28px rgba(29, 133, 196, 0.35);
+            transform: translateY(-1px);
+          }
+
+          .nebula-settings-shell #settings-font-status {
+            border: 1px solid rgba(255,255,255,0.14);
+            background: rgba(255,255,255,0.04);
+            border-radius: 0.75rem;
+            padding: 0.55rem 0.75rem;
+          }
+
+          .nebula-settings-shell [data-settings-panel]:not(.hidden) > article:hover::after {
+            opacity: 1;
+            animation: shimmerSweep 1s ease forwards;
+          }
+
+          @keyframes shimmerSweep {
+            0% { transform: translateX(-130%); }
+            100% { transform: translateX(130%); }
+          }
+
+          @media (max-width: 900px) {
+            .nebula-settings-shell {
+              padding: 1rem !important;
+            }
+
+            .nebula-settings-shell .md\\:grid-cols-\[220px_1fr\] {
+              gap: 0.75rem !important;
+            }
+
+            .nebula-settings-shell [data-settings-panel] {
+              gap: 0.75rem !important;
+            }
+          }
+        </style>
+        <div class="nebula-settings-shell p-8 max-w-6xl mx-auto">
           <h1 class="text-3xl font-bold font-orbitron mb-6">Settings</h1>
           <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
             <aside class="bg-white/5 p-4 rounded-2xl border border-white/10 h-fit">
@@ -62,7 +193,10 @@
                   </select>
                 </article>
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                <button id="updateBtn" style="display:none;">Update Desktop App</button>
+                <label class="block mb-2 text-sm text-gray-300">Desktop App</label> 
+                <br>
+                <label id="desktopAppLabel" class="flex items-center gap-2 text-sm mb-4">Not available on website. Install App to access</label>
+                <button id="updateBtn" style="display:none;"><i class="fa-solid fa-sync"></i>‎  Update App</button>
                 </article>
 
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
@@ -440,6 +574,11 @@
                     <span>Open Markdown Guide</span>
                   </a>
                 </article>
+                <article class="bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
+                  <h2 class="text-lg font-semibold mb-2">Contributors</h2>
+                  <p class="text-sm text-gray-200 leading-6">A list of people who have contributed to the project.</p>
+                  <p class="text-sm text-gray-200 leading-6">From Los Angeles, California, Anonymous.</p>
+                </article>
               </div>
             </section>
           </div>
@@ -455,6 +594,7 @@
       const applyUrlBtn = document.getElementById("settings-font-apply-url");
       const uploadInput = document.getElementById("settings-font-upload");
       const urlInput = document.getElementById("settings-font-url");
+      const desktopAppLabel = document.getElementById("desktopAppLabel");
       const familyInput = document.getElementById("settings-font-family");
       const uploadFamilyInput = document.getElementById("settings-font-upload-family");
 
@@ -467,8 +607,8 @@
       if (updateBtn && isStandalone && isDesktop && "serviceWorker" in navigator) {
         updateBtn.style.display = "inline-flex";
         updateBtn.className = "px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition text-white";
-        updateBtn.textContent = "Update Desktop App";
-
+        desktopAppLabel.style.display = "none";
+        updateBtn.style.display = "inline-flex";
         updateBtn.addEventListener("click", async () => {
           updateBtn.disabled = true;
           updateBtn.textContent = "Checking for update...";
@@ -503,7 +643,7 @@
           } finally {
             setTimeout(() => {
               updateBtn.disabled = false;
-              updateBtn.textContent = "Update Desktop App";
+              updateBtn.textContent = "Update App";
             }, 1800);
           }
         });
