@@ -4,6 +4,9 @@
     render: function renderSoundboardRoute() {
       return `
         <style>
+          #controls {
+          margin-top: 70px;
+          }
           #searchInput {
             border-radius:5px;
             background-color:Black;

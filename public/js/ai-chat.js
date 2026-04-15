@@ -3,11 +3,21 @@
   const AI_CLOUD_SYNC_KEY = "nebula-sync-ai-conversations";
   const AI_CUSTOM_INSTRUCTIONS_KEY = "nebula-ai-custom-instructions";
   const AI_SERVER_BASE_KEY = "nebula-ai-server-base";
+  const AI_GEMINI_ACTIVE_KEY_INDEX = "nebula-gemini-active-key-index";
+  const AI_GEMINI_KEY_POOL_KEY = "nebula-gemini-key-pool";
+  const AI_DIRECT_MODE_KEY = "nebula-ai-direct-mode";
+  const AI_GEMINI_MODEL = "gemini-2.5-flash";
   const AI_CONVERSATION_LIMIT = 60;
   const AI_MESSAGE_LIMIT = 120;
   const AI_CONTEXT_LIMIT = 30;
   const AI_UPLOAD_LIMIT = 4;
   const AI_UPLOAD_MAX_BYTES = 1500000;
+  const AI_GEMINI_KEY_POOL_DEFAULT = [
+    "AIzaSyC16Erpfb4isBoeOh0LR8GU8Q1qBdQJcZU",
+    "AIzaSyBYpZf2CK24svqhw33zWOq27EC7FcU6dZY",
+    "AIzaSyCyvgsReG7wjmUpg_27AJHtjLxNs3Daj0M",
+    "AIzaSyBKkd2iMtq0e_CqGtNR76RFo3obSs3qKvA"
+  ];
 
   const state = {
     mounted: false,
@@ -242,6 +252,193 @@
     return raw.replace(/\/+$/g, "");
   }
 
+  function directModeEnabled() {
+    const raw = String(localStorage.getItem(AI_DIRECT_MODE_KEY) || "").trim().toLowerCase();
+    if (raw === "off" || raw === "false" || raw === "0") {
+      return false;
+    }
+    if (raw === "on" || raw === "true" || raw === "1") {
+      return true;
+    }
+    return true;
+  }
+
+  function cloudApiEnabled() {
+    return cloudSyncEnabled() && !directModeEnabled();
+  }
+
+  function getGeminiApiKeyPool() {
+    try {
+      const raw = String(localStorage.getItem(AI_GEMINI_KEY_POOL_KEY) || "").trim();
+      if (!raw) {
+        return AI_GEMINI_KEY_POOL_DEFAULT.slice();
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return AI_GEMINI_KEY_POOL_DEFAULT.slice();
+      }
+      const keys = parsed.map((item) => String(item || "").trim()).filter(Boolean);
+      if (!keys.length) {
+        return AI_GEMINI_KEY_POOL_DEFAULT.slice();
+      }
+      return keys;
+    } catch (_error) {
+      return AI_GEMINI_KEY_POOL_DEFAULT.slice();
+    }
+  }
+
+  function getGeminiActiveKeyIndex(poolLength) {
+    const length = clampNumber(poolLength, 1, 1000, 1);
+    const raw = Number.parseInt(String(localStorage.getItem(AI_GEMINI_ACTIVE_KEY_INDEX) || "0"), 10);
+    if (!Number.isFinite(raw)) {
+      return 0;
+    }
+    if (raw < 0) {
+      return 0;
+    }
+    return raw % length;
+  }
+
+  function setGeminiActiveKeyIndex(index) {
+    const next = Math.max(0, Number.parseInt(String(index || 0), 10) || 0);
+    localStorage.setItem(AI_GEMINI_ACTIVE_KEY_INDEX, String(next));
+  }
+
+  function isQuotaErrorPayload(httpStatus, payload) {
+    if (httpStatus === 429) {
+      return true;
+    }
+    const errorObject = payload && payload.error ? payload.error : payload;
+    const codeText = String(errorObject && (errorObject.status || errorObject.code || "") || "").toUpperCase();
+    const message = String(errorObject && errorObject.message || "").toLowerCase();
+    return codeText.includes("RESOURCE_EXHAUSTED")
+      || codeText.includes("RATE_LIMIT")
+      || message.includes("quota")
+      || message.includes("rate limit")
+      || message.includes("resource exhausted");
+  }
+
+  function composeGeminiContents(messages) {
+    const output = [];
+    const list = Array.isArray(messages) ? messages : [];
+    list.forEach((message) => {
+      if (!message || typeof message !== "object") {
+        return;
+      }
+      const parts = [];
+      const text = String(message.content || "");
+      if (text.trim()) {
+        parts.push({ text });
+      }
+      const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+      attachments.forEach((attachment) => {
+        const normalized = normalizeAttachment(attachment);
+        if (!normalized) {
+          return;
+        }
+        if (normalized.kind === "image" && normalized.base64) {
+          parts.push({
+            inline_data: {
+              mime_type: normalized.mimeType || "image/png",
+              data: normalized.base64
+            }
+          });
+          return;
+        }
+        if (normalized.kind === "text" && normalized.text) {
+          parts.push({ text: `[${normalized.name}]\n${String(normalized.text || "").slice(0, 180000)}` });
+        }
+      });
+      if (!parts.length) {
+        return;
+      }
+      output.push({
+        role: message.role === "assistant" ? "model" : "user",
+        parts
+      });
+    });
+    return output;
+  }
+
+  async function requestGeminiWithRotation(payload) {
+    const keyPool = getGeminiApiKeyPool();
+    if (!keyPool.length) {
+      throw new Error("No Gemini API keys configured.");
+    }
+
+    const contents = composeGeminiContents(payload && payload.messages ? payload.messages : []);
+    if (!contents.length) {
+      throw new Error("No valid message content to send.");
+    }
+
+    const customInstructions = String(payload && payload.customInstructions ? payload.customInstructions : "").trim();
+    const startIndex = getGeminiActiveKeyIndex(keyPool.length);
+    let attempted = 0;
+    let lastError = null;
+
+    while (attempted < keyPool.length) {
+      const keyIndex = (startIndex + attempted) % keyPool.length;
+      const key = keyPool[keyIndex];
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(AI_GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(key)}`;
+      const requestBody = {
+        contents,
+        generationConfig: {
+          temperature: 0.6,
+          topP: 0.9,
+          maxOutputTokens: 8192
+        }
+      };
+      if (customInstructions) {
+        requestBody.systemInstruction = {
+          parts: [{ text: customInstructions.slice(0, 4000) }]
+        };
+      }
+
+      let response;
+      let json;
+      try {
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(requestBody)
+        });
+        json = await response.json().catch(() => ({}));
+      } catch (_error) {
+        lastError = new Error("Could not reach Gemini API.");
+        attempted += 1;
+        continue;
+      }
+
+      if (!response.ok) {
+        if (isQuotaErrorPayload(response.status, json)) {
+          attempted += 1;
+          setGeminiActiveKeyIndex((keyIndex + 1) % keyPool.length);
+          lastError = new Error("Current Gemini key is rate-limited. Switching keys...");
+          continue;
+        }
+        const apiMessage = String(json && json.error && json.error.message ? json.error.message : "Gemini request failed.");
+        throw new Error(apiMessage);
+      }
+
+      const candidates = Array.isArray(json && json.candidates) ? json.candidates : [];
+      const first = candidates[0] || null;
+      const parts = first && first.content && Array.isArray(first.content.parts) ? first.content.parts : [];
+      const output = parts.map((part) => String(part && part.text ? part.text : "")).join("\n").trim();
+      if (!output) {
+        throw new Error("Gemini returned an empty response.");
+      }
+      setGeminiActiveKeyIndex(keyIndex);
+      return {
+        assistantMessage: output,
+        title: String(payload && payload.title ? payload.title : "")
+      };
+    }
+
+    throw lastError || new Error("All Gemini API keys are currently unavailable. Try again later.");
+  }
+
   function getCustomInstructions() {
     return String(localStorage.getItem(AI_CUSTOM_INSTRUCTIONS_KEY) || "").slice(0, 4000);
   }
@@ -397,6 +594,49 @@
     if (newButton) {
       newButton.disabled = state.busy;
     }
+  }
+
+  function delayMs(ms) {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, Math.max(0, Number(ms) || 0));
+    });
+  }
+
+  async function animateAssistantTyping(conversation, messageId, finalText) {
+    const text = String(finalText || "");
+    const message = conversation && Array.isArray(conversation.messages)
+      ? conversation.messages.find((item) => item.id === messageId)
+      : null;
+    if (!message) {
+      return;
+    }
+
+    const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion || text.length < 60) {
+      message.content = text;
+      renderMessageList();
+      return;
+    }
+
+    const tokens = text.match(/(\s+|[^\s]+)/g) || [text];
+    const chunkSize = text.length > 1800 ? 6 : text.length > 1000 ? 4 : 2;
+    const stepDelay = text.length > 1800 ? 10 : text.length > 1000 ? 14 : 18;
+
+    message.content = "";
+    renderMessageList();
+
+    for (let i = 0; i < tokens.length; i += chunkSize) {
+      if (!state.mounted || !state.root) {
+        message.content = text;
+        return;
+      }
+      message.content += tokens.slice(i, i + chunkSize).join("");
+      renderMessageList();
+      await delayMs(stepDelay);
+    }
+
+    message.content = text;
+    renderMessageList();
   }
 
   function detectLanguage(code) {
@@ -831,6 +1071,16 @@
   }
 
   async function loadQuota() {
+    if (directModeEnabled()) {
+      state.quota = {
+        limit: 100,
+        used: 0,
+        remaining: 100,
+        dayKey: "local"
+      };
+      renderQuotaPanel();
+      return;
+    }
     try {
       const payload = await apiRequest("/api/ai/quota", { method: "GET" });
       const limit = clampNumber(payload.limit, 1, 100000, 100);
@@ -849,7 +1099,7 @@
   }
 
   async function syncFromCloud() {
-    if (!cloudSyncEnabled()) {
+    if (!cloudApiEnabled()) {
       return;
     }
     try {
@@ -882,7 +1132,7 @@
   }
 
   async function loadConversationMessagesFromCloud(conversationId) {
-    if (!cloudSyncEnabled()) {
+    if (!cloudApiEnabled()) {
       return;
     }
     const conversation = findConversation(conversationId);
@@ -1130,25 +1380,33 @@
       .map(conversationToApiMessage);
 
     try {
-      const payload = await apiRequest("/api/ai/chat", {
-        method: "POST",
-        body: JSON.stringify({
-          model: "gemini-2.5-flash",
-          conversationId: conversation.id,
-          title: conversation.title,
-          messages: contextMessages,
-          customInstructions: getCustomInstructions(),
-          syncConversation,
-          regenerate
-        })
-      });
+      const payload = directModeEnabled()
+        ? await requestGeminiWithRotation({
+            conversationId: conversation.id,
+            title: conversation.title,
+            messages: contextMessages,
+            customInstructions: getCustomInstructions(),
+            regenerate
+          })
+        : await apiRequest("/api/ai/chat", {
+            method: "POST",
+            body: JSON.stringify({
+              model: AI_GEMINI_MODEL,
+              conversationId: conversation.id,
+              title: conversation.title,
+              messages: contextMessages,
+              customInstructions: getCustomInstructions(),
+              syncConversation,
+              regenerate
+            })
+          });
 
       const assistantText = String(payload.assistantMessage || "").trim() || "No response generated.";
       const index = conversation.messages.findIndex((item) => item.id === placeholder.id);
       const assistantMessage = {
         id: placeholder.id,
         role: "assistant",
-        content: assistantText,
+        content: "",
         attachments: [],
         createdAt: nowMs()
       };
@@ -1158,6 +1416,9 @@
       } else {
         conversation.messages.push(assistantMessage);
       }
+
+      renderMessageList();
+      await animateAssistantTyping(conversation, assistantMessage.id, assistantText);
 
       conversation.updatedAt = assistantMessage.createdAt;
       conversation.messageCount = conversation.messages.length;
@@ -1242,7 +1503,7 @@
         renderConversationList();
         render();
 
-        if (cloudSyncEnabled()) {
+        if (cloudApiEnabled()) {
           try {
             await apiRequest(`/api/ai/conversations/${encodeURIComponent(conversation.id)}`, {
               method: "PATCH",
@@ -1281,7 +1542,7 @@
         removeConversation(conversation.id);
         render();
         close();
-        if (cloudSyncEnabled()) {
+        if (cloudApiEnabled()) {
           try {
             await apiRequest(`/api/ai/conversations/${encodeURIComponent(conversation.id)}`, {
               method: "DELETE"

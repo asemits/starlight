@@ -261,6 +261,12 @@
             <p class="card-desc">Live map + GPS</p>
             <div class="glow-bar"></div>
           </a>
+          <a href="/calc" class="nav-link tool-card" style="animation-delay: 0.85s;">
+            <i class="fa-solid fa-calculator" style="font-size: 52px;"></i>
+            <h2>Calculator</h2>
+            <p class="card-desc">Basic and scientific calculations</p>
+            <div class="glow-bar"></div>
+          </a>
         </div>
       `;
     }
