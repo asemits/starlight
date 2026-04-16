@@ -11,7 +11,7 @@
             border-radius:5px;
             background-color:Black;
             border:2px solid white;
-            color:white;
+            color:white;    
           }
           #soundboardVolumeWrap {
             display: inline-flex;
