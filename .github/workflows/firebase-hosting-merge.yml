@@ -1,22 +1,37 @@
-name: Deploy to Firebase Hosting on merge
+name: Deploy to Firebase Hosting
 on:
   push:
     branches:
       - main
+
 jobs:
-  build_and_deploy:
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
+  # Using a matrix allows each site to deploy independently
+  deploy:
+    runs-on: ubuntu-latest # GitHub's ubuntu-latest is Debian-based
+    strategy:
+      fail-fast: false # This ensures if one site fails, others continue
+      matrix:
+        # List all your site IDs/targets here
+        site: [freenotesite2309, clock28, mathsite288, geohomework]
+    
     steps:
       - uses: actions/checkout@v4
-      - name: Fix git identity
-        run: |
-          git config --global user.name "asemits"
-          git config --global user.email ""
 
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      # Caching dependencies makes subsequent runs much faster
+      - name: Cache npm modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Deploy Site
+        uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STARLIGHT_28E40 }}
+          # We target the specific site from the matrix
+          target: ${{ matrix.site }}
           channelId: live
           projectId: starlight-28e40
