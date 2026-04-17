@@ -5,20 +5,20 @@ on:
       - main
 
 jobs:
-  # Using a matrix allows each site to deploy independently
   deploy:
-    runs-on: ubuntu-latest # GitHub's ubuntu-latest is Debian-based
+    # GitHub's ubuntu-latest is Debian-based and highly optimized
+    runs-on: ubuntu-latest
     strategy:
-      fail-fast: false # This ensures if one site fails, others continue
+      fail-fast: false # CRITICAL: If site1 fails, site2 and site3 will continue
       matrix:
-        # List all your site IDs/targets here
-        site: [freenotesite2309, clock28, mathsite288, geohomework]
-    
+        # These must match the "target" names in your firebase.json
+        firebase_target: [main, site1, site2, site3]
+
     steps:
       - uses: actions/checkout@v4
 
-      # Caching dependencies makes subsequent runs much faster
-      - name: Cache npm modules
+      # Faster: Cache npm dependencies so they aren't redownloaded every time
+      - name: Cache dependencies
         uses: actions/cache@v4
         with:
           path: ~/.npm
@@ -26,12 +26,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: Deploy Site
+      - name: Deploy to Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STARLIGHT_28E40 }}
-          # We target the specific site from the matrix
-          target: ${{ matrix.site }}
-          channelId: live
           projectId: starlight-28e40
+          channelId: live
+          # This pulls the target name from the matrix above
+          target: ${{ matrix.firebase_target }}
