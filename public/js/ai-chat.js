@@ -3,21 +3,16 @@
   const AI_CLOUD_SYNC_KEY = "nebula-sync-ai-conversations";
   const AI_CUSTOM_INSTRUCTIONS_KEY = "nebula-ai-custom-instructions";
   const AI_SERVER_BASE_KEY = "nebula-ai-server-base";
-  const AI_GEMINI_ACTIVE_KEY_INDEX = "nebula-gemini-active-key-index";
-  const AI_GEMINI_KEY_POOL_KEY = "nebula-gemini-key-pool";
   const AI_DIRECT_MODE_KEY = "nebula-ai-direct-mode";
-  const AI_GEMINI_MODEL = "gemini-2.5-flash";
+  const AI_GEMINI_MODEL_KEY = "nebula-ai-model";
+  const AI_GEMINI_CONTEXT_LIMIT_KEY = "nebula-ai-context-limit";
+  const AI_GEMINI_MODEL_DEFAULT = "gemini-2.5-flash";
+  const AI_GEMINI_TUNNEL_URL = "https://script.google.com/macros/s/AKfycbyUwrz4n6d58QHC1cnqzrX-c24KhnkRvNLjMbVc-9TDmE2R6kcr5WALWtjIRDGN3at32w/exec";
   const AI_CONVERSATION_LIMIT = 60;
   const AI_MESSAGE_LIMIT = 120;
-  const AI_CONTEXT_LIMIT = 30;
+  const AI_CONTEXT_LIMIT_DEFAULT = 30;
   const AI_UPLOAD_LIMIT = 4;
   const AI_UPLOAD_MAX_BYTES = 1500000;
-  const AI_GEMINI_KEY_POOL_DEFAULT = [
-    "AIzaSyC16Erpfb4isBoeOh0LR8GU8Q1qBdQJcZU",
-    "AIzaSyBYpZf2CK24svqhw33zWOq27EC7FcU6dZY",
-    "AIzaSyCyvgsReG7wjmUpg_27AJHtjLxNs3Daj0M",
-    "AIzaSyBKkd2iMtq0e_CqGtNR76RFo3obSs3qKvA"
-  ];
 
   const state = {
     mounted: false,
@@ -267,42 +262,32 @@
     return cloudSyncEnabled() && !directModeEnabled();
   }
 
-  function getGeminiApiKeyPool() {
-    try {
-      const raw = String(localStorage.getItem(AI_GEMINI_KEY_POOL_KEY) || "").trim();
-      if (!raw) {
-        return AI_GEMINI_KEY_POOL_DEFAULT.slice();
-      }
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) {
-        return AI_GEMINI_KEY_POOL_DEFAULT.slice();
-      }
-      const keys = parsed.map((item) => String(item || "").trim()).filter(Boolean);
-      if (!keys.length) {
-        return AI_GEMINI_KEY_POOL_DEFAULT.slice();
-      }
-      return keys;
-    } catch (_error) {
-      return AI_GEMINI_KEY_POOL_DEFAULT.slice();
+  function getCurrentModel() {
+    const stored = String(localStorage.getItem(AI_GEMINI_MODEL_KEY) || "").trim();
+    if (stored === "gemini-2.5-flash-lite" || stored === "gemini-2.5-flash") {
+      return stored;
     }
+    return AI_GEMINI_MODEL_DEFAULT;
   }
 
-  function getGeminiActiveKeyIndex(poolLength) {
-    const length = clampNumber(poolLength, 1, 1000, 1);
-    const raw = Number.parseInt(String(localStorage.getItem(AI_GEMINI_ACTIVE_KEY_INDEX) || "0"), 10);
-    if (!Number.isFinite(raw)) {
-      return 0;
-    }
-    if (raw < 0) {
-      return 0;
-    }
-    return raw % length;
+  function setCurrentModel(model) {
+    const valid = model === "gemini-2.5-flash-lite" ? "gemini-2.5-flash-lite" : "gemini-2.5-flash";
+    localStorage.setItem(AI_GEMINI_MODEL_KEY, valid);
   }
 
-  function setGeminiActiveKeyIndex(index) {
-    const next = Math.max(0, Number.parseInt(String(index || 0), 10) || 0);
-    localStorage.setItem(AI_GEMINI_ACTIVE_KEY_INDEX, String(next));
+  function getContextLimit() {
+    const stored = Number.parseInt(String(localStorage.getItem(AI_GEMINI_CONTEXT_LIMIT_KEY) || ""), 10);
+    if (Number.isFinite(stored) && stored >= 1 && stored <= 100) {
+      return stored;
+    }
+    return AI_CONTEXT_LIMIT_DEFAULT;
   }
+
+  function setContextLimit(limit) {
+    const valid = clampNumber(limit, 1, 100, AI_CONTEXT_LIMIT_DEFAULT);
+    localStorage.setItem(AI_GEMINI_CONTEXT_LIMIT_KEY, String(valid));
+  }
+
 
   function isQuotaErrorPayload(httpStatus, payload) {
     if (httpStatus === 429) {
@@ -361,82 +346,58 @@
   }
 
   async function requestGeminiWithRotation(payload) {
-    const keyPool = getGeminiApiKeyPool();
-    if (!keyPool.length) {
-      throw new Error("No Gemini API keys configured.");
-    }
-
     const contents = composeGeminiContents(payload && payload.messages ? payload.messages : []);
     if (!contents.length) {
       throw new Error("No valid message content to send.");
     }
 
     const customInstructions = String(payload && payload.customInstructions ? payload.customInstructions : "").trim();
-    const startIndex = getGeminiActiveKeyIndex(keyPool.length);
-    let attempted = 0;
-    let lastError = null;
-
-    while (attempted < keyPool.length) {
-      const keyIndex = (startIndex + attempted) % keyPool.length;
-      const key = keyPool[keyIndex];
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(AI_GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(key)}`;
-      const requestBody = {
-        contents,
-        generationConfig: {
-          temperature: 0.6,
-          topP: 0.9,
-          maxOutputTokens: 8192
-        }
-      };
-      if (customInstructions) {
-        requestBody.systemInstruction = {
-          parts: [{ text: customInstructions.slice(0, 4000) }]
-        };
+    const requestBody = {
+      model: getCurrentModel(),
+      contents,
+      generationConfig: {
+        temperature: 0.6,
+        topP: 0.9,
+        maxOutputTokens: 8192
       }
-
-      let response;
-      let json;
-      try {
-        response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(requestBody)
-        });
-        json = await response.json().catch(() => ({}));
-      } catch (_error) {
-        lastError = new Error("Could not reach Gemini API.");
-        attempted += 1;
-        continue;
-      }
-
-      if (!response.ok) {
-        if (isQuotaErrorPayload(response.status, json)) {
-          attempted += 1;
-          setGeminiActiveKeyIndex((keyIndex + 1) % keyPool.length);
-          lastError = new Error("Current Gemini key is rate-limited. Switching keys...");
-          continue;
-        }
-        const apiMessage = String(json && json.error && json.error.message ? json.error.message : "Gemini request failed.");
-        throw new Error(apiMessage);
-      }
-
-      const candidates = Array.isArray(json && json.candidates) ? json.candidates : [];
-      const first = candidates[0] || null;
-      const parts = first && first.content && Array.isArray(first.content.parts) ? first.content.parts : [];
-      const output = parts.map((part) => String(part && part.text ? part.text : "")).join("\n").trim();
-      if (!output) {
-        throw new Error("Gemini returned an empty response.");
-      }
-      setGeminiActiveKeyIndex(keyIndex);
-      return {
-        assistantMessage: output,
-        title: String(payload && payload.title ? payload.title : "")
+    };
+    if (customInstructions) {
+      requestBody.systemInstruction = {
+        parts: [{ text: customInstructions.slice(0, 4000) }]
       };
     }
 
-    throw lastError || new Error("All Gemini API keys are currently unavailable. Try again later.");
+
+    let response;
+    let json;
+    try {
+      response = await fetch(AI_GEMINI_TUNNEL_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify(requestBody)
+      });
+      json = await response.json();
+    } catch (_error) {
+      throw new Error("Could not reach AI tunnel.");
+    }
+
+    if (!response.ok) {
+      const apiMessage = String(json && json.error && json.error.message ? json.error.message : json && json.error ? json.error : "AI tunnel request failed.");
+      throw new Error(apiMessage);
+    }
+    const candidates = Array.isArray(json && json.candidates) ? json.candidates : [];
+    const first = candidates[0] || null;
+    const parts = first && first.content && Array.isArray(first.content.parts) ? first.content.parts : [];
+    const output = parts.map((part) => String(part && part.text ? part.text : "")).join("\n").trim();
+    if (!output) {
+      throw new Error("AI tunnel returned an empty response.");
+    }
+    return {
+      assistantMessage: output,
+      title: String(payload && payload.title ? payload.title : "")
+    };
   }
 
   function getCustomInstructions() {
@@ -1023,6 +984,12 @@
     }
 
     state.root.innerHTML = `
+            <style>
+              .nebula-ai-header-controls { display: flex; gap: 8px; align-items: center; }
+              .nebula-ai-control { padding: 6px 10px; border: 1px solid #444; border-radius: 4px; background: #222; color: #fff; font-size: 14px; }
+              .nebula-ai-control:focus { outline: none; border-color: #666; }
+              #nebula-ai-context-limit { width: 60px; }
+            </style>
       <section class="nebula-ai-shell">
         <aside class="nebula-ai-sidebar">
           <div class="nebula-ai-sidebar-top">
@@ -1043,7 +1010,14 @@
               <p class="nebula-ai-kicker">AI Chat</p>
               <h1>${escapeHtml((activeConversation() && activeConversation().title) || "New conversation")}</h1>
             </div>
-            <button id="nebula-ai-regenerate" type="button" class="nebula-btn nebula-btn-muted">Regenerate</button>
+            <div class="nebula-ai-header-controls">
+              <select id="nebula-ai-model-select" class="nebula-ai-control">
+                <option value="gemini-2.5-flash" ${getCurrentModel() === "gemini-2.5-flash" ? "selected" : ""}>Flash</option>
+                <option value="gemini-2.5-flash-lite" ${getCurrentModel() === "gemini-2.5-flash-lite" ? "selected" : ""}>Lite</option>
+              </select>
+              <input id="nebula-ai-context-limit" type="number" class="nebula-ai-control" min="1" max="100" value="${getContextLimit()}" title="Context messages" />
+              <button id="nebula-ai-regenerate" type="button" class="nebula-btn nebula-btn-muted">Regenerate</button>
+            </div>
           </header>
 
           <div id="nebula-ai-messages" class="nebula-ai-messages"></div>
@@ -1376,7 +1350,7 @@
     const syncConversation = cloudSyncEnabled();
     const contextMessages = conversation.messages
       .filter((item) => item.id !== placeholder.id)
-      .slice(-AI_CONTEXT_LIMIT)
+      .slice(-getContextLimit())
       .map(conversationToApiMessage);
 
     try {
@@ -1391,7 +1365,7 @@
         : await apiRequest("/api/ai/chat", {
             method: "POST",
             body: JSON.stringify({
-              model: AI_GEMINI_MODEL,
+              model: getCurrentModel(),
               conversationId: conversation.id,
               title: conversation.title,
               messages: contextMessages,
@@ -1712,14 +1686,25 @@
 
     state.root.addEventListener("change", async (event) => {
       const input = event.target;
-      if (!(input instanceof HTMLInputElement)) {
+      if (!(input instanceof HTMLInputElement) && !(input instanceof HTMLSelectElement)) {
         return;
       }
-      if (input.id !== "nebula-ai-upload-input") {
+      if (input.id === "nebula-ai-upload-input") {
+        await handleUpload(input.files || []);
+        input.value = "";
         return;
       }
-      await handleUpload(input.files || []);
-      input.value = "";
+      if (input.id === "nebula-ai-model-select") {
+        setCurrentModel(String(input.value || "gemini-2.5-flash"));
+        return;
+      }
+      if (input.id === "nebula-ai-context-limit") {
+        const limit = Number.parseInt(String(input.value || "30"), 10);
+        if (Number.isFinite(limit)) {
+          setContextLimit(limit);
+        }
+        return;
+      }
     });
 
     state.root.addEventListener("keydown", async (event) => {
