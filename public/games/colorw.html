@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no' />
+    <title>ColorWaterSort3D - UGS Bypass</title>
+    
+    <base href="https://cdn.jsdelivr.net/gh/bubbls/youtube-playables@7c0b0f0a4803764b608f96649e0970d56c2b860a/color-water-sort-3d/">
+    
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #1a1a1a; }
+        canvas { width: 100%; height: 100%; display: block; }
+        #loading-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #26ff9a; font-family: sans-serif; }
+    </style>
+
+<script>
+    // 1. NEUTER ENVIRONMENT
+    window.postMessage = function() { return; };
+    
+    // 2. EXPANDED MOCK (Fixes the .log and .storage crashes)
+    window.ytgame = {
+        IN_PLAYABLES_ENV: true,
+        // The game script is looking for ytgame.log
+        log: {
+            log: console.log,
+            error: console.error,
+            info: console.info,
+            warn: console.warn
+        },
+        game: {
+            firstFrameReady: () => console.log("UGS: Frame Ready"),
+            gameReady: () => console.log("UGS: Game Ready"),
+            saveData: (d) => localStorage.setItem('cws_save', d),
+            loadData: () => Promise.resolve(localStorage.getItem('cws_save'))
+        },
+        // This fixes the "Cannot read properties of undefined (reading 'storage')"
+        system: {
+            isAudioEnabled: () => true,
+            onPause: { add: () => {} },
+            onResume: { add: () => {} },
+            getLanguage: () => 'en',
+            storage: {
+                getItem: (k) => localStorage.getItem(k),
+                setItem: (k, v) => localStorage.setItem(k, v)
+            }
+        },
+        engagement: { sendScore: () => {} }
+    };
+
+    // 3. ASSET LOADER
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+        });
+    }
+
+    async function initGame() {
+        try {
+            console.log("UGS: Starting Manual Inject...");
+            await loadScript("playcanvas-stable.min.js");
+            await loadScript("__settings__.js");
+            
+            // This script contains the game logic that crashed last time
+            await loadScript("__game-scripts.js"); 
+            
+            await loadScript("__start__.js");
+            await loadScript("__loading__.js");
+            
+            if(document.getElementById('loading-text')) {
+                document.getElementById('loading-text').style.display = 'none';
+            }
+            window.ytgame.game.firstFrameReady();
+        } catch (e) {
+            console.error("UGS: Boot Error ->", e);
+        }
+    }
+</script>
+</head>
+<body onload="initGame()">
+    <div id="loading-text">INITIALIZING ENGINE...</div>
+</body>
+</html>

@@ -15,6 +15,9 @@
         
       const tosHtml = escapeHtml(tosText).replaceAll("\n", "<br>");
       const privacyHtml = escapeHtml(privacyText).replaceAll("\n", "<br>");
+      const backgroundMode = typeof window.getGamesBackgroundMode === "function"
+        ? window.getGamesBackgroundMode()
+        : (localStorage.getItem("games-background-mode") || "none");
       const fontChoices = typeof window.getNebulaFontChoices === "function" ? window.getNebulaFontChoices() : [];
       const fontCurrent = typeof window.getNebulaFontPreset === "function" ? window.getNebulaFontPreset() : "geist";
       const fontOptionsHtml = fontChoices.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === fontCurrent ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("");
@@ -160,8 +163,8 @@
                 <button type="button" onclick="resetSettingsCategory('layout')" title="Reset Layout defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
               <div class="flex items-center gap-2 mb-2">
-                <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Particles</span></button>
-                <button type="button" onclick="resetSettingsCategory('particles')" title="Reset Particles defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+                <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Background</span></button>
+                <button type="button" onclick="resetSettingsCategory('particles')" title="Reset Background defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
               <div class="flex items-center gap-2 mb-2">
                 <button type="button" data-settings-tab="shortcut" onclick="switchSettingsCategory('shortcut')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-keyboard"></i><span>Shortcut</span></button>
@@ -345,6 +348,24 @@
                     <option value="medium" ${window.getGamesParticlesSize() === 'medium' ? 'selected' : ''}>Medium</option>
                     <option value="large" ${window.getGamesParticlesSize() === 'large' ? 'selected' : ''}>Large</option>
                   </select>
+                </article>
+
+                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
+                  <button type="button" onclick="resetSettingsCard('particles-background')" title="Reset Background" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+                  <label class="block mb-2 text-sm text-gray-300">Background Mode</label>
+                  <select id="settings-background-mode" onchange="changeGamesBackgroundMode(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-3">
+                    <option value="none" ${backgroundMode === 'none' ? 'selected' : ''}>None (Use Particles)</option>
+                    <option value="preset-flow" ${backgroundMode === 'preset-flow' ? 'selected' : ''}>Flow</option>
+                    <option value="preset-torus" ${backgroundMode === 'preset-torus' ? 'selected' : ''}>Torus</option>
+                    <option value="preset-monochrome" ${backgroundMode === 'preset-monochrome' ? 'selected' : ''}>Monochrome</option>
+                    <option value="live-aurora" ${backgroundMode === 'live-aurora' ? 'selected' : ''}>Live: Aurora Motion</option>
+                    <option value="upload" ${backgroundMode === 'upload' ? 'selected' : ''}>Upload Your Own</option>
+                  </select>
+                  <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mb-3">
+                    <input id="settings-background-upload" type="file" accept="image/*" class="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-sm text-gray-100 outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/25 file:mr-3 file:rounded-lg file:border-0 file:bg-white/15 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-white/25" />
+                    <button type="button" id="settings-background-clear" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Remove Background</button>
+                  </div>
+                  <p id="settings-background-status" class="text-sm text-gray-300">Choose a preset, use live background, or upload an image. Active backgrounds hide particles.</p>
                 </article>
               </div>
 
@@ -597,6 +618,10 @@
       const desktopAppLabel = document.getElementById("desktopAppLabel");
       const familyInput = document.getElementById("settings-font-family");
       const uploadFamilyInput = document.getElementById("settings-font-upload-family");
+      const backgroundModeSelect = document.getElementById("settings-background-mode");
+      const backgroundUploadInput = document.getElementById("settings-background-upload");
+      const backgroundClearBtn = document.getElementById("settings-background-clear");
+      const backgroundStatusNode = document.getElementById("settings-background-status");
 
       const isStandalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
         || window.navigator.standalone === true;
@@ -698,6 +723,75 @@
           } else {
             setFontStatus("Could not apply uploaded font.", false);
           }
+        });
+      }
+
+      function setBackgroundStatus(text, ok) {
+        if (!backgroundStatusNode) {
+          return;
+        }
+        backgroundStatusNode.textContent = text;
+        backgroundStatusNode.classList.toggle("text-emerald-300", Boolean(ok));
+        backgroundStatusNode.classList.toggle("text-red-300", ok === false);
+      }
+
+      if (backgroundModeSelect) {
+        backgroundModeSelect.value = backgroundMode;
+        backgroundModeSelect.addEventListener("change", () => {
+          const selected = backgroundModeSelect.value;
+          if (selected === "none") {
+            setBackgroundStatus("Particles active. No background override.", true);
+            return;
+          }
+          if (selected === "upload") {
+            setBackgroundStatus("Upload an image to apply your custom background.", true);
+            return;
+          }
+          if (selected === "live-aurora") {
+            setBackgroundStatus("Live aurora background applied. Particles hidden.", true);
+            return;
+          }
+          setBackgroundStatus("Preset background applied. Particles hidden.", true);
+        });
+      }
+
+      if (backgroundUploadInput) {
+        backgroundUploadInput.addEventListener("change", async () => {
+          const file = backgroundUploadInput.files && backgroundUploadInput.files[0] ? backgroundUploadInput.files[0] : null;
+          if (!file) {
+            return;
+          }
+          if (typeof window.applyGamesUploadedBackgroundFile !== "function") {
+            setBackgroundStatus("Background engine unavailable.", false);
+            return;
+          }
+          setBackgroundStatus("Uploading background...", true);
+          const ok = await window.applyGamesUploadedBackgroundFile(file);
+          if (ok) {
+            if (backgroundModeSelect) {
+              backgroundModeSelect.value = "upload";
+            }
+            setBackgroundStatus("Custom background applied. Particles hidden.", true);
+          } else {
+            setBackgroundStatus("Could not apply uploaded background.", false);
+          }
+        });
+      }
+
+      if (backgroundClearBtn) {
+        backgroundClearBtn.addEventListener("click", () => {
+          if (typeof window.clearGamesBackground !== "function") {
+            setBackgroundStatus("Background engine unavailable.", false);
+            return;
+          }
+          window.clearGamesBackground();
+          if (backgroundModeSelect) {
+            backgroundModeSelect.value = "none";
+          }
+          if (backgroundUploadInput) {
+            backgroundUploadInput.value = "";
+          }
+          setBackgroundStatus("Background removed. Particles restored.", true);
         });
       }
       if (window.NebulaAuthUI) {

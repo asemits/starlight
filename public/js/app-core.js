@@ -50,6 +50,7 @@
   const FONT_UPLOAD_DATA_KEY = "nebula-font-upload-data";
   const FONT_UPLOAD_FAMILY_KEY = "nebula-font-upload-family";
   const FONT_UPLOAD_FORMAT_KEY = "nebula-font-upload-format";
+  const GAMES_BACKGROUND_UPDATED_AT_KEY = "games-background-updated-at";
 
   const FONT_PRESETS = [
     { id: "geist", label: "Geist", family: "Geist", stack: "'Geist','Montserrat','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" },
@@ -811,6 +812,109 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
   };
 
+  const GAMES_BACKGROUND_PRESETS = {
+    "preset-flow": "static/bg/bg1.webp",
+    "preset-torus": "static/bg/bg2.webp",
+    "preset-monochrome": "static/bg/bg3.webp"
+  };
+
+  function normalizeBackgroundMode(input) {
+    const mode = String(input || "").trim();
+    if (mode === "preset-flow" || mode === "preset-torus" || mode === "preset-monochrome" || mode === "live-aurora" || mode === "upload") {
+      return mode;
+    }
+    return "none";
+  }
+
+  function hasUploadedBackground() {
+    const url = String(localStorage.getItem("games-background-url") || "").trim();
+    return url.startsWith("data:image/");
+  }
+
+  function touchGamesBackgroundUpdatedAt() {
+    localStorage.setItem(GAMES_BACKGROUND_UPDATED_AT_KEY, String(Date.now()));
+  }
+
+  window.getGamesBackgroundMode = function getGamesBackgroundMode() {
+    const mode = normalizeBackgroundMode(localStorage.getItem("games-background-mode") || "none");
+    if (mode === "upload" && !hasUploadedBackground()) {
+      return "none";
+    }
+    return mode;
+  };
+
+  window.changeGamesBackgroundMode = function changeGamesBackgroundMode(nextMode) {
+    const mode = normalizeBackgroundMode(nextMode);
+    if (mode === "none") {
+      localStorage.setItem("games-background-mode", "none");
+      localStorage.removeItem("games-background-url");
+    } else if (mode === "live-aurora") {
+      localStorage.setItem("games-background-mode", mode);
+      localStorage.removeItem("games-background-url");
+    } else if (mode === "upload") {
+      if (!hasUploadedBackground()) {
+        localStorage.setItem("games-background-mode", "none");
+      } else {
+        localStorage.setItem("games-background-mode", "upload");
+      }
+    } else {
+      localStorage.setItem("games-background-mode", mode);
+      localStorage.setItem("games-background-url", GAMES_BACKGROUND_PRESETS[mode] || "");
+    }
+
+    touchGamesBackgroundUpdatedAt();
+
+    if (window.updateGlobalParticlesSettings) {
+      window.updateGlobalParticlesSettings();
+    }
+    if (window.location.pathname === "/games" && window.NebulaGames) {
+      window.NebulaGames.render();
+    }
+  };
+
+  window.applyGamesUploadedBackgroundFile = function applyGamesUploadedBackgroundFile(file) {
+    const upload = file;
+    if (!upload || !String(upload.type || "").startsWith("image/")) {
+      return Promise.resolve(false);
+    }
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = function onLoad() {
+        const dataUrl = String(reader.result || "");
+        if (!dataUrl.startsWith("data:image/")) {
+          resolve(false);
+          return;
+        }
+        localStorage.setItem("games-background-mode", "upload");
+        localStorage.setItem("games-background-url", dataUrl);
+        touchGamesBackgroundUpdatedAt();
+        if (window.updateGlobalParticlesSettings) {
+          window.updateGlobalParticlesSettings();
+        }
+        if (window.location.pathname === "/games" && window.NebulaGames) {
+          window.NebulaGames.render();
+        }
+        resolve(true);
+      };
+      reader.onerror = function onError() {
+        resolve(false);
+      };
+      reader.readAsDataURL(upload);
+    });
+  };
+
+  window.clearGamesBackground = function clearGamesBackground() {
+    localStorage.setItem("games-background-mode", "none");
+    localStorage.removeItem("games-background-url");
+    touchGamesBackgroundUpdatedAt();
+    if (window.updateGlobalParticlesSettings) {
+      window.updateGlobalParticlesSettings();
+    }
+    if (window.location.pathname === "/games" && window.NebulaGames) {
+      window.NebulaGames.render();
+    }
+  };
+
   function refreshSettingsView(preferredCategory) {
     if (window.location.pathname !== "/settings") {
       return;
@@ -883,6 +987,10 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
     if (cardId === "particles-size") {
       window.changeGamesParticlesSize("medium");
+      return;
+    }
+    if (cardId === "particles-background") {
+      window.clearGamesBackground();
       return;
     }
     if (cardId === "shortcut-main") {
@@ -1520,6 +1628,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     if (!canvas) {
       return;
     }
+    const body = document.body;
 
     const ctx = canvas.getContext("2d");
     const particles = [];
@@ -1533,8 +1642,15 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
 
     function currentSettings() {
+      const backgroundMode = typeof window.getGamesBackgroundMode === "function"
+        ? window.getGamesBackgroundMode()
+        : "none";
+      const backgroundUrl = String(localStorage.getItem("games-background-url") || "").trim();
+      const backgroundActive = backgroundMode !== "none";
       return {
-        enabled: localStorage.getItem("games-particles-enabled") !== "off",
+        enabled: localStorage.getItem("games-particles-enabled") !== "off" && !backgroundActive,
+        backgroundMode,
+        backgroundUrl,
         color: ensureHexColor(localStorage.getItem("games-particles-color") || "#ffffff"),
         bondsOn: localStorage.getItem("games-particles-bonds") === "on",
         shape: window.getGamesParticlesShape(),
@@ -1544,6 +1660,42 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
 
     const settings = currentSettings();
+
+    function applyBackground() {
+      if (!body) {
+        return;
+      }
+
+      body.classList.remove("nebula-live-background");
+      body.style.removeProperty("background-image");
+      body.style.removeProperty("background-size");
+      body.style.removeProperty("background-position");
+      body.style.removeProperty("background-repeat");
+      body.style.removeProperty("background-attachment");
+
+      if (settings.backgroundMode === "none") {
+        return;
+      }
+
+      if (settings.backgroundMode === "live-aurora") {
+        body.classList.add("nebula-live-background");
+        return;
+      }
+
+      if (!settings.backgroundUrl) {
+        return;
+      }
+
+      const escapedUrl = settings.backgroundUrl.replace(/\\/g, "\\\\").replace(/"/g, "\\\"").replace(/\n|\r/g, "");
+      body.style.setProperty(
+        "background-image",
+        `linear-gradient(180deg, rgba(3, 8, 20, 0.52), rgba(2, 6, 14, 0.72)), url("${escapedUrl}")`
+      );
+      body.style.setProperty("background-size", "cover");
+      body.style.setProperty("background-position", "center center");
+      body.style.setProperty("background-repeat", "no-repeat");
+      body.style.setProperty("background-attachment", "fixed");
+    }
 
     function toRgba(hex, alpha) {
       const clean = ensureHexColor(hex).slice(1);
@@ -1651,6 +1803,8 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     window.updateGlobalParticlesSettings = function updateGlobalParticlesSettings() {
       const next = currentSettings();
       settings.enabled = next.enabled;
+      settings.backgroundMode = next.backgroundMode;
+      settings.backgroundUrl = next.backgroundUrl;
       settings.color = next.color;
       settings.bondsOn = next.bondsOn;
       settings.shape = next.shape;
@@ -1658,10 +1812,12 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       settings.size = next.size;
       makeParticles();
       canvas.style.display = settings.enabled ? "block" : "none";
+      applyBackground();
     };
 
     resize();
     canvas.style.display = settings.enabled ? "block" : "none";
+    applyBackground();
     draw();
     window.addEventListener("resize", resize);
   })();

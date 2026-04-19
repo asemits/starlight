@@ -16,14 +16,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 999px;
   z-index: 10000000000000000000000000000000000000000000000;
   opacity: 1;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.32);
+  box-shadow: 0 14px 34px rgba(0,0,0,0.3);
   transition: 
     top var(--speed) var(--spring), 
     left var(--speed) var(--spring), 

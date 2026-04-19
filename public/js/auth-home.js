@@ -32,6 +32,7 @@
   const FONT_UPLOAD_DATA_KEY = "nebula-font-upload-data";
   const FONT_UPLOAD_FAMILY_KEY = "nebula-font-upload-family";
   const FONT_UPLOAD_FORMAT_KEY = "nebula-font-upload-format";
+  const GAMES_BACKGROUND_UPDATED_AT_KEY = "games-background-updated-at";
   const NOTIFY_MESSAGES_KEY = "nebula-notify-messages";
   const NOTIFY_FRIEND_REQUESTS_KEY = "nebula-notify-friend-requests";
   const SYNC_SETTINGS_KEYS = [
@@ -43,6 +44,9 @@
     "games-particles-shape",
     "games-particles-frequency",
     "games-particles-size",
+    "games-background-mode",
+    "games-background-url",
+    GAMES_BACKGROUND_UPDATED_AT_KEY,
     "tab-shortcut-combo",
     "tab-shortcut-target",
     "tab-shortcut-enabled",
@@ -1204,8 +1208,17 @@
     if (!snapshot || typeof snapshot !== "object") {
       return;
     }
+    const remoteBackgroundUpdatedAt = Number(snapshot[GAMES_BACKGROUND_UPDATED_AT_KEY] || 0);
+    const localBackgroundUpdatedAt = Number(localStorage.getItem(GAMES_BACKGROUND_UPDATED_AT_KEY) || 0);
+    const skipBackgroundKeys = Number.isFinite(remoteBackgroundUpdatedAt)
+      && Number.isFinite(localBackgroundUpdatedAt)
+      && localBackgroundUpdatedAt > remoteBackgroundUpdatedAt;
+
     SYNC_SETTINGS_KEYS.forEach((key) => {
       if (!Object.prototype.hasOwnProperty.call(snapshot, key)) {
+        return;
+      }
+      if (skipBackgroundKeys && (key === "games-background-mode" || key === "games-background-url")) {
         return;
       }
       const value = snapshot[key];
