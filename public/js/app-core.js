@@ -815,12 +815,16 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   const GAMES_BACKGROUND_PRESETS = {
     "preset-flow": "static/bg/bg1.webp",
     "preset-torus": "static/bg/bg2.webp",
-    "preset-monochrome": "static/bg/bg3.webp"
+    "preset-monochrome": "static/bg/bg3.webp",
+    "preset-glass-plate": "static/bg/bg4.webp",
+    "preset-future-city": "static/bg/bg5.webp",
+    "preset-glint": "static/bg/bg6.webp",
+    "live-car": "static/bg/live1.mp4"
   };
 
   function normalizeBackgroundMode(input) {
     const mode = String(input || "").trim();
-    if (mode === "preset-flow" || mode === "preset-torus" || mode === "preset-monochrome" || mode === "live-aurora" || mode === "upload") {
+    if (mode === "preset-flow" || mode === "preset-torus" || mode === "preset-monochrome" || mode === "preset-glass-plate" || mode === "preset-future-city" || mode === "preset-glint" || mode === "live-car" || mode === "upload") {
       return mode;
     }
     return "none";
@@ -847,9 +851,6 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     const mode = normalizeBackgroundMode(nextMode);
     if (mode === "none") {
       localStorage.setItem("games-background-mode", "none");
-      localStorage.removeItem("games-background-url");
-    } else if (mode === "live-aurora") {
-      localStorage.setItem("games-background-mode", mode);
       localStorage.removeItem("games-background-url");
     } else if (mode === "upload") {
       if (!hasUploadedBackground()) {
@@ -1667,19 +1668,100 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       }
 
       body.classList.remove("nebula-live-background");
+      body.classList.remove("nebula-live-car-background");
       body.style.removeProperty("background-image");
       body.style.removeProperty("background-size");
       body.style.removeProperty("background-position");
       body.style.removeProperty("background-repeat");
       body.style.removeProperty("background-attachment");
 
+      const existingCarFrame = document.getElementById("nebula-live-car-frame");
+
       if (settings.backgroundMode === "none") {
+        if (existingCarFrame) {
+          existingCarFrame.remove();
+        }
         return;
       }
 
       if (settings.backgroundMode === "live-aurora") {
+        if (existingCarFrame) {
+          existingCarFrame.remove();
+        }
         body.classList.add("nebula-live-background");
         return;
+      }
+
+      if (settings.backgroundMode === "live-car") {
+        const videoUrl = settings.backgroundUrl;
+        let carFrame = existingCarFrame;
+        if (!carFrame) {
+          carFrame = document.createElement("iframe");
+          carFrame.id = "nebula-live-car-frame";
+          carFrame.className = "nebula-live-car-frame";
+          carFrame.setAttribute("title", "Live car background");
+          carFrame.setAttribute("aria-hidden", "true");
+          carFrame.setAttribute("tabindex", "-1");
+          carFrame.setAttribute("loading", "eager");
+          carFrame.setAttribute("referrerpolicy", "no-referrer");
+          carFrame.setAttribute("allow", "autoplay; fullscreen");
+          carFrame.setAttribute("sandbox", "allow-scripts");
+          document.body.insertBefore(carFrame, document.body.firstChild);
+        }
+        body.classList.add("nebula-live-car-background");
+
+        const safeVideoUrl = String(videoUrl || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll("\"", "&quot;");
+        const nextSrcdoc = `<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: #000;
+  }
+  body {
+    contain: strict;
+    isolation: isolate;
+  }
+  video {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    object-position: center center;
+    display: block;
+    pointer-events: none;
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+</style>
+</head>
+<body>
+<video autoplay muted loop playsinline preload="auto" disablepictureinpicture src="${safeVideoUrl}"></video>
+</body>
+</html>`;
+
+        if (carFrame.getAttribute("srcdoc") !== nextSrcdoc) {
+          carFrame.setAttribute("srcdoc", nextSrcdoc);
+        }
+        if (carFrame.contentWindow) {
+          try {
+            carFrame.contentWindow.focus();
+          } catch (_error) {
+          }
+        }
+        return;
+      }
+
+      if (existingCarFrame) {
+        existingCarFrame.remove();
       }
 
       if (!settings.backgroundUrl) {

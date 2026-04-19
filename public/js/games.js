@@ -1548,7 +1548,7 @@
 				background: rgba(0,0,0,0.45);
 				color: var(--ink);
 				border-radius: 999px;
-				padding: 4px 8px;
+				padding: 4px 4px;
 				font-size: 11px;
 				display: inline-flex;
 				align-items: center;

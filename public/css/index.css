@@ -49,6 +49,7 @@ body {
 #app-content :is([class*="shell"], [class*="card"], [class*="panel"], [class*="modal"], [class*="wrap"], [class*="box"]) {
 background-color: rgba(9, 13, 24, 0.04);
 border-radius: 20px;
+padding:10px;
 border: 1px solid rgba(255, 255, 255, 0.1);
 backdrop-filter: blur(14px) saturate(140%);
 -webkit-backdrop-filter: blur(14px) saturate(140%);
@@ -67,6 +68,41 @@ body.nebula-live-background {
   background-repeat: no-repeat;
   background-attachment: fixed;
   animation: nebula-live-background-shift 16s ease-in-out infinite alternate;
+}
+
+body.nebula-live-car-background {
+  background: #000 !important;
+}
+
+#nebula-video-background.nebula-live-car-video {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  object-fit: cover;
+  object-position: center center;
+  z-index: 0;
+  pointer-events: none;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+  contain: strict;
+  image-rendering: auto;
+}
+
+#nebula-live-car-frame.nebula-live-car-frame {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  border: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: #000;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+  contain: strict;
 }
 
 @keyframes nebula-live-background-shift {

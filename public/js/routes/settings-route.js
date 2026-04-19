@@ -18,6 +18,45 @@
       const backgroundMode = typeof window.getGamesBackgroundMode === "function"
         ? window.getGamesBackgroundMode()
         : (localStorage.getItem("games-background-mode") || "none");
+      const storedBackgroundUrl = String(localStorage.getItem("games-background-url") || "");
+      const uploadedBackgroundUrl = storedBackgroundUrl.startsWith("data:image/") ? storedBackgroundUrl : "";
+      const backgroundChoices = [
+        { id: "none", label: "None", preview: "none" },
+        { id: "preset-flow", label: "Flow", preview: "static/bg/bg1.webp" },
+        { id: "preset-torus", label: "Torus", preview: "static/bg/bg2.webp" },
+        { id: "preset-monochrome", label: "Monochrome", preview: "static/bg/bg3.webp" },
+        { id: "preset-glass-plate", label: "Glass Plate", preview: "static/bg/bg4.webp" },
+        { id: "preset-future-city", label: "Future City", preview: "static/bg/bg5.webp" },
+        { id: "preset-glint", label: "Glint", preview: "static/bg/bg6.webp" },
+        { id: "live-car", label: "Live Car (Laggy)", preview: "video", videoUrl: "static/bg/live1.mp4" },
+        { id: "upload", label: "Uploaded", preview: uploadedBackgroundUrl || "" }
+      ];
+      const backgroundChoicesHtml = backgroundChoices.map((choice) => {
+        const selectedClass = backgroundMode === choice.id ? " ring-2 ring-cyan-300/70 border-cyan-300/60" : "";
+        let thumbnailHtml = "";
+        if (choice.preview === "live") {
+          thumbnailHtml = `<div class="nebula-aurora-preview w-full h-full"><span class="nebula-aurora-glow"></span></div>`;
+        } else if (choice.preview === "video") {
+          thumbnailHtml = `<video src="${escapeHtml(choice.videoUrl || "")}" class="w-full h-full object-cover" autoplay muted loop playsinline></video>`;
+        } else if (choice.preview === "none") {
+          thumbnailHtml = `<div class="nebula-none-preview w-full h-full"><span class="nebula-none-symbol" aria-hidden="true"></span></div>`;
+        } else if (choice.preview) {
+          thumbnailHtml = `<img src="${escapeHtml(choice.preview)}" alt="${escapeHtml(choice.label)}" class="w-full h-full object-cover">`;
+        } else {
+          thumbnailHtml = `<div class="w-full h-full grid place-items-center text-xs text-gray-300 bg-gradient-to-br from-black/40 via-black/20 to-black/50">Upload an image</div>`;
+        }
+        return `
+          <button
+            type="button"
+            data-background-choice="${escapeHtml(choice.id)}"
+            class="nebula-background-choice relative overflow-hidden rounded-xl border border-white/20 bg-black/30 hover:bg-black/20 transition focus:outline-none focus:ring-2 focus:ring-cyan-300/60${selectedClass}"
+            aria-pressed="${backgroundMode === choice.id ? "true" : "false"}"
+          >
+            <div class="h-32">${thumbnailHtml}</div>
+            <div class="px-3 py-2 text-sm text-gray-100 text-left">${escapeHtml(choice.label)}</div>
+          </button>
+        `;
+      }).join("");
       const fontChoices = typeof window.getNebulaFontChoices === "function" ? window.getNebulaFontChoices() : [];
       const fontCurrent = typeof window.getNebulaFontPreset === "function" ? window.getNebulaFontPreset() : "geist";
       const fontOptionsHtml = fontChoices.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === fontCurrent ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("");
@@ -128,6 +167,103 @@
             background: rgba(255,255,255,0.04);
             border-radius: 0.75rem;
             padding: 0.55rem 0.75rem;
+          }
+
+          .nebula-settings-shell .nebula-background-choice img {
+            transform: scale(1);
+            transition: transform 0.28s ease;
+          }
+
+          .nebula-settings-shell .nebula-background-choice:hover img {
+            transform: scale(1.04);
+          }
+
+          .nebula-settings-shell .nebula-background-choice.is-active {
+            border-color: rgba(133, 223, 255, 0.75) !important;
+            box-shadow: 0 0 0 2px rgba(133, 223, 255, 0.35);
+          }
+
+          .nebula-settings-shell .nebula-aurora-preview {
+            position: relative;
+            overflow: hidden;
+            background:
+              radial-gradient(120px 70px at 15% 75%, rgba(220, 220, 220, 0.85), transparent 60%),
+              radial-gradient(140px 80px at 78% 20%, rgba(180, 180, 180, 0.75), transparent 65%),
+              linear-gradient(160deg, rgba(10, 10, 10, 1), rgba(30, 30, 30, 0.98));
+          }
+
+          .nebula-settings-shell .nebula-aurora-preview::before,
+          .nebula-settings-shell .nebula-aurora-preview::after {
+            content: "";
+            position: absolute;
+            inset: -22%;
+            background: conic-gradient(from 120deg, rgba(255, 255, 255, 0.8), rgba(200, 200, 200, 0.6), rgba(150, 150, 150, 0.7), rgba(255, 255, 255, 0.8));
+            filter: blur(18px) brightness(1.3) contrast(1.6);
+            animation: auroraSpin 8.2s linear infinite, metallicShimmer 3.5s ease-in-out infinite;
+          }
+
+          .nebula-settings-shell .nebula-aurora-preview::after {
+            animation-duration: 10.4s, 4.2s;
+            animation-direction: reverse, normal;
+            opacity: 0.75;
+          }
+
+          .nebula-settings-shell .nebula-aurora-glow {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05));
+            animation: auroraHighlight 2.8s ease-in-out infinite;
+          }
+
+          .nebula-settings-shell .nebula-none-preview {
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            place-items: center;
+            background: #020406;
+          }
+
+          .nebula-settings-shell .nebula-none-preview::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 55%);
+          }
+
+          .nebula-settings-shell .nebula-none-symbol {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border: 15px solid rgba(242, 246, 250, 0.97);
+            border-radius: 9999px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.18);
+          }
+
+          .nebula-settings-shell .nebula-none-symbol::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 15px;
+            height: 90px;
+            background: rgba(242, 246, 250, 0.97);
+            border-radius: 9999px;
+            transform: translate(-50%, -50%) rotate(-45deg);
+          }
+
+          @keyframes auroraSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+
+          @keyframes metallicShimmer {
+            0%, 100% { opacity: 0.7; filter: blur(18px) brightness(1.1) contrast(1.5); }
+            50% { opacity: 1; filter: blur(16px) brightness(1.5) contrast(1.8); }
+          }
+
+          @keyframes auroraHighlight {
+            0%, 100% { opacity: 0.15; }
+            50% { opacity: 0.35; }
           }
 
           .nebula-settings-shell [data-settings-panel]:not(.hidden) > article:hover::after {
@@ -352,20 +488,10 @@
 
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
                   <button type="button" onclick="resetSettingsCard('particles-background')" title="Reset Background" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                  <label class="block mb-2 text-sm text-gray-300">Background Mode</label>
-                  <select id="settings-background-mode" onchange="changeGamesBackgroundMode(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-3">
-                    <option value="none" ${backgroundMode === 'none' ? 'selected' : ''}>None (Use Particles)</option>
-                    <option value="preset-flow" ${backgroundMode === 'preset-flow' ? 'selected' : ''}>Flow</option>
-                    <option value="preset-torus" ${backgroundMode === 'preset-torus' ? 'selected' : ''}>Torus</option>
-                    <option value="preset-monochrome" ${backgroundMode === 'preset-monochrome' ? 'selected' : ''}>Monochrome</option>
-                    <option value="live-aurora" ${backgroundMode === 'live-aurora' ? 'selected' : ''}>Live: Aurora Motion</option>
-                    <option value="upload" ${backgroundMode === 'upload' ? 'selected' : ''}>Upload Your Own</option>
-                  </select>
-                  <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mb-3">
-                    <input id="settings-background-upload" type="file" accept="image/*" class="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-sm text-gray-100 outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/25 file:mr-3 file:rounded-lg file:border-0 file:bg-white/15 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-white/25" />
-                    <button type="button" id="settings-background-clear" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Remove Background</button>
+                  <label class="block mb-2 text-sm text-gray-300">Background Images</label>
+                  <div id="settings-background-choice-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+                    ${backgroundChoicesHtml}
                   </div>
-                  <p id="settings-background-status" class="text-sm text-gray-300">Choose a preset, use live background, or upload an image. Active backgrounds hide particles.</p>
                 </article>
               </div>
 
@@ -618,10 +744,13 @@
       const desktopAppLabel = document.getElementById("desktopAppLabel");
       const familyInput = document.getElementById("settings-font-family");
       const uploadFamilyInput = document.getElementById("settings-font-upload-family");
-      const backgroundModeSelect = document.getElementById("settings-background-mode");
+      const backgroundChoiceButtons = Array.from(document.querySelectorAll("[data-background-choice]"));
       const backgroundUploadInput = document.getElementById("settings-background-upload");
       const backgroundClearBtn = document.getElementById("settings-background-clear");
       const backgroundStatusNode = document.getElementById("settings-background-status");
+      const currentBackgroundMode = typeof window.getGamesBackgroundMode === "function"
+        ? window.getGamesBackgroundMode()
+        : (localStorage.getItem("games-background-mode") || "none");
 
       const isStandalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
         || window.navigator.standalone === true;
@@ -735,23 +864,53 @@
         backgroundStatusNode.classList.toggle("text-red-300", ok === false);
       }
 
-      if (backgroundModeSelect) {
-        backgroundModeSelect.value = backgroundMode;
-        backgroundModeSelect.addEventListener("change", () => {
-          const selected = backgroundModeSelect.value;
-          if (selected === "none") {
-            setBackgroundStatus("Particles active. No background override.", true);
+      function setActiveBackgroundChoice(mode) {
+        backgroundChoiceButtons.forEach((button) => {
+          const isActive = button.getAttribute("data-background-choice") === mode;
+          button.classList.toggle("is-active", isActive);
+          button.setAttribute("aria-pressed", isActive ? "true" : "false");
+        });
+      }
+
+      function applyBackgroundChoice(mode) {
+        if (typeof window.changeGamesBackgroundMode !== "function") {
+          setBackgroundStatus("Background engine unavailable.", false);
+          return;
+        }
+        if (mode === "upload") {
+          const url = String(localStorage.getItem("games-background-url") || "");
+          if (!url.startsWith("data:image/")) {
+            setBackgroundStatus("Upload an image first to use this option.", false);
+            if (backgroundUploadInput) {
+              backgroundUploadInput.click();
+            }
             return;
           }
-          if (selected === "upload") {
-            setBackgroundStatus("Upload an image to apply your custom background.", true);
-            return;
-          }
-          if (selected === "live-aurora") {
-            setBackgroundStatus("Live aurora background applied. Particles hidden.", true);
-            return;
-          }
-          setBackgroundStatus("Preset background applied. Particles hidden.", true);
+        }
+        window.changeGamesBackgroundMode(mode);
+        setActiveBackgroundChoice(mode);
+        if (mode === "none") {
+          setBackgroundStatus("Particles active. No background override.", true);
+          return;
+        }
+        if (mode === "upload") {
+          setBackgroundStatus("Uploaded image applied. Particles hidden.", true);
+          return;
+        }
+        if (mode === "live-aurora") {
+          setBackgroundStatus("Live aurora background applied. Particles hidden.", true);
+          return;
+        }
+        setBackgroundStatus("Preset background applied. Particles hidden.", true);
+      }
+
+      if (backgroundChoiceButtons.length > 0) {
+        setActiveBackgroundChoice(currentBackgroundMode);
+        backgroundChoiceButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            const selected = String(button.getAttribute("data-background-choice") || "none");
+            applyBackgroundChoice(selected);
+          });
         });
       }
 
@@ -768,9 +927,7 @@
           setBackgroundStatus("Uploading background...", true);
           const ok = await window.applyGamesUploadedBackgroundFile(file);
           if (ok) {
-            if (backgroundModeSelect) {
-              backgroundModeSelect.value = "upload";
-            }
+            setActiveBackgroundChoice("upload");
             setBackgroundStatus("Custom background applied. Particles hidden.", true);
           } else {
             setBackgroundStatus("Could not apply uploaded background.", false);
@@ -785,9 +942,7 @@
             return;
           }
           window.clearGamesBackground();
-          if (backgroundModeSelect) {
-            backgroundModeSelect.value = "none";
-          }
+          setActiveBackgroundChoice("none");
           if (backgroundUploadInput) {
             backgroundUploadInput.value = "";
           }
