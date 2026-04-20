@@ -32,21 +32,7 @@ body {
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-#app-content > * {
-  position: relative;
-  isolation: isolate;
-}
-
-#app-content > *::before {
-  content: "";
-  position: absolute; 
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-}
-
-#app-content :is([class*="shell"], [class*="card"], [class*="panel"], [class*="modal"], [class*="wrap"], [class*="box"]) {
+#app-content :is([class*="shell"], [class*="panel"], [class*="modal"], [class*="wrap"], [class*="box"]) {
 background-color: rgba(9, 13, 24, 0.04);
 border-radius: 20px;
 padding:10px;

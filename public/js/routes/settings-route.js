@@ -299,7 +299,7 @@
                 <button type="button" onclick="resetSettingsCategory('layout')" title="Reset Layout defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
               <div class="flex items-center gap-2 mb-2">
-                <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Background</span></button>
+                <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-wand-magic-sparkles"></i><span class="text-sm">Background</span></button>
                 <button type="button" onclick="resetSettingsCategory('particles')" title="Reset Background defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
               <div class="flex items-center gap-2 mb-2">
@@ -310,7 +310,7 @@
                 <button type="button" data-settings-tab="cloak" onclick="switchSettingsCategory('cloak')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-user-secret"></i><span>Tab Cloak</span></button>
                 <button type="button" onclick="resetSettingsCategory('cloak')" title="Reset Tab Cloak defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2"> 
                 <button type="button" data-settings-tab="widget" onclick="switchSettingsCategory('widget')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-table-cells-large"></i><span>Widget</span></button>
                 <button type="button" onclick="resetSettingsCategory('widget')" title="Reset Widget defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
