@@ -229,27 +229,15 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Nebula</title>
+<title>loading...</title>
 <style>
-html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
-iframe { width: 100%; height: 100%; border: 0; display: block; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+body { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #f0f0f0; }
+iframe { width: 100vw; height: 100vh; border: none; }
 </style>
 </head>
 <body>
-<iframe id="nebulaFrame" src="${escaped}" allow="fullscreen"></iframe>
-<script>
-(function () {
-  var frame = document.getElementById('nebulaFrame');
-  window.addEventListener('message', function (event) {
-    var data = event && event.data ? event.data : null;
-    if (!data || data.type !== 'nebula-unwrapper') {
-      return;
-    }
-    var nextUrl = data.target || (frame ? frame.src : '/');
-    window.location.replace(nextUrl);
-  });
-})();
-<\/script>
+<iframe src="${escaped}" frameborder="0" allow="fullscreen"></iframe>
 </body>
 </html>`;
   }
@@ -276,7 +264,7 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
       return true;
     }
 
-    const win = window.open("about:blank", "_blank", "noopener");
+    const win = window.open("", "_blank");
     if (!win) {
       return false;
     }
@@ -287,7 +275,14 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
   }
 
   function isWrappedInnerPage() {
-    return new URLSearchParams(window.location.search).get("nebulaWrapped") === "1";
+    if (new URLSearchParams(window.location.search).get("nebulaWrapped") === "1") {
+      return true;
+    }
+    try {
+      return window.top !== window.self && localStorage.getItem(WRAP_ENABLED_KEY) === "on";
+    } catch (_error) {
+      return true;
+    }
   }
 
   let sidebarSafeAreaResizeObserver = null;
@@ -1204,14 +1199,20 @@ iframe { width: 100%; height: 100%; border: 0; display: block; }
     }
 
     if (enabled === "on" && !isWrappedInnerPage()) {
-      launchWrapped(window.getWrapMode(), window.location.href, true);
+      const didOpen = launchWrapped(window.getWrapMode(), window.location.href, false);
+      if (!didOpen) {
+        launchWrapped(window.getWrapMode(), window.location.href, true);
+      }
     }
   };
 
   window.openWrappedNow = function openWrappedNow(mode) {
     const nextMode = mode === "blob" ? "blob" : "about-blank";
     localStorage.setItem(WRAP_MODE_KEY, nextMode);
-    launchWrapped(nextMode, window.location.href, true);
+    const didOpen = launchWrapped(nextMode, window.location.href, false);
+    if (!didOpen) {
+      launchWrapped(nextMode, window.location.href, true);
+    }
   };
 
   window.getInfoWidgetEnabled = function getInfoWidgetEnabled() {
