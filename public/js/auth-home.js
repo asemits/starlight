@@ -128,6 +128,7 @@
     verifyTimerId: 0,
     autoSyncTimerId: 0
   };
+  let homeAppsListenerBound = false;
 
   function escapeHtml(value) {
     return String(value)
@@ -1522,6 +1523,45 @@
     }
   }
 
+  function renderInstalledAppsHomeSection() {
+    const catalog = typeof window.getNebulaAppCatalog === "function" ? window.getNebulaAppCatalog() : [];
+    const installedIds = typeof window.getNebulaInstalledApps === "function" ? window.getNebulaInstalledApps() : [];
+    const installedSet = new Set(Array.isArray(installedIds) ? installedIds : []);
+    const installedApps = (Array.isArray(catalog) ? catalog : []).filter((item) => installedSet.has(String(item && item.id ? item.id : "")));
+
+    if (!installedApps.length) {
+      return `
+        <section class="nebula-dashboard-section">
+          <div class="nebula-dashboard-head">
+            <h2>Home Screen Apps</h2>
+          </div>
+          <p class="nebula-dashboard-empty">No installed apps yet. Open Apps and click Install.</p>
+        </section>
+      `;
+    }
+
+    const cards = installedApps.map((app) => `
+      <a href="${escapeHtml(app.href || "/apps")}" class="nebula-home-feature nav-link">
+        <div class="nebula-home-feature-inner">
+          <div class="nebula-home-feature-icon"><i class="${escapeHtml(app.icon || "fa-solid fa-shapes")}"></i></div>
+          <h3>${escapeHtml(app.title || "App")}</h3>
+          <p>${escapeHtml(app.description || "Installed app")}</p>
+        </div>
+      </a>
+    `).join("");
+
+    return `
+      <section class="nebula-dashboard-section">
+        <div class="nebula-dashboard-head">
+          <h2>Home Screen Apps</h2>
+        </div>
+        <div class="nebula-home-grid">
+          ${cards}
+        </div>
+      </section>
+    `;
+  }
+
   function renderHome(selector) {
     const root = document.querySelector(selector);
     if (!root) {
@@ -1545,6 +1585,8 @@
       `;
     }).join("");
 
+    const installedAppsSection = renderInstalledAppsHomeSection();
+
     if (isLoggedIn()) {
       const showRecent = dashboardSectionEnabled("recent");
       const showFavorites = dashboardSectionEnabled("favorites");
@@ -1557,6 +1599,8 @@
             <h1>${escapeHtml(config.siteName)}</h1>
             <p class="nebula-home-tagline">welcome back</p>
           </header>
+
+          ${installedAppsSection}
 
           ${showRecent ? `<section class="nebula-dashboard-section">
             <div class="nebula-dashboard-head">
@@ -1599,6 +1643,7 @@
           <p class="nebula-home-tagline">${escapeHtml(config.heroTagline)}</p>
           <p class="nebula-home-subtext">${escapeHtml(config.heroSubtext)}</p>
         </header>
+        ${installedAppsSection}
         <section class="nebula-home-grid">
           ${featureCards}
         </section>
@@ -1618,6 +1663,15 @@
     const signupBtn = document.getElementById("nebula-signup");
     if (signupBtn) {
       signupBtn.addEventListener("click", openSignupTosModal);
+    }
+
+    if (!homeAppsListenerBound) {
+      homeAppsListenerBound = true;
+      window.addEventListener("nebula:apps-installed-changed", () => {
+        if (window.location.pathname === "/") {
+          renderHome(selector);
+        }
+      });
     }
 
   }

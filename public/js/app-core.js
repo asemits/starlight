@@ -51,6 +51,17 @@
   const FONT_UPLOAD_FAMILY_KEY = "nebula-font-upload-family";
   const FONT_UPLOAD_FORMAT_KEY = "nebula-font-upload-format";
   const GAMES_BACKGROUND_UPDATED_AT_KEY = "games-background-updated-at";
+  const APPS_INSTALLS_KEY = "nebula-installed-apps";
+
+  const APPS_CATALOG = [
+    { id: "soundboard", title: "Soundboard", description: "Play sound effects", icon: "fa-solid fa-volume-high", href: "/soundboard" },
+    { id: "weather", title: "Weather", description: "Forecast and alerts", icon: "fa-solid fa-cloud-sun-rain", href: "/weather" },
+    { id: "music", title: "Music", description: "Listen to your favorite tracks", icon: "fa-solid fa-music", href: "/music" },
+    { id: "notepad", title: "Notepad", description: "Write down stuff", icon: "fa-regular fa-clipboard", href: "/notepad" },
+    { id: "timer", title: "Timer", description: "Timer + stopwatch", icon: "fa-regular fa-clock", href: "/timer" },
+    { id: "maps", title: "Maps", description: "Live map + GPS", icon: "fa-solid fa-map-location-dot", href: "/maps" },
+    { id: "calc", title: "Calculator", description: "Basic and scientific calculations", icon: "fa-solid fa-calculator", href: "/calc" }
+  ];
 
   const FONT_PRESETS = [
     { id: "geist", label: "Geist", family: "Geist", stack: "'Geist','Montserrat','Segoe UI',sans-serif", cssUrl: "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" },
@@ -83,6 +94,52 @@
       .replaceAll("'", "&#39;");
   }
 
+  function getAppCatalogMap() {
+    const map = new Map();
+    for (let i = 0; i < APPS_CATALOG.length; i += 1) {
+      map.set(APPS_CATALOG[i].id, APPS_CATALOG[i]);
+    }
+    return map;
+  }
+
+  function getStoredInstalledAppIds() {
+    let parsed = [];
+    try {
+      const raw = localStorage.getItem(APPS_INSTALLS_KEY) || "[]";
+      parsed = JSON.parse(raw);
+    } catch (_error) {
+      parsed = [];
+    }
+    const catalogMap = getAppCatalogMap();
+    const unique = new Set();
+    if (Array.isArray(parsed)) {
+      parsed.forEach((id) => {
+        const safeId = String(id || "").trim();
+        if (safeId && catalogMap.has(safeId)) {
+          unique.add(safeId);
+        }
+      });
+    }
+    return Array.from(unique);
+  }
+
+  function setStoredInstalledAppIds(ids) {
+    const catalogMap = getAppCatalogMap();
+    const next = [];
+    const seen = new Set();
+    (Array.isArray(ids) ? ids : []).forEach((id) => {
+      const safeId = String(id || "").trim();
+      if (!safeId || seen.has(safeId) || !catalogMap.has(safeId)) {
+        return;
+      }
+      seen.add(safeId);
+      next.push(safeId);
+    });
+    localStorage.setItem(APPS_INSTALLS_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent("nebula:apps-installed-changed", { detail: { ids: next.slice() } }));
+    return next;
+  }
+
   function normalizeTarget(input) {
     const raw = String(input || "").trim();
     if (!raw) {
@@ -93,6 +150,44 @@
     }
     return "/" + raw;
   }
+
+  window.getNebulaAppCatalog = function getNebulaAppCatalog() {
+    return APPS_CATALOG.map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      icon: item.icon,
+      href: item.href
+    }));
+  };
+
+  window.getNebulaInstalledApps = function getNebulaInstalledApps() {
+    return getStoredInstalledAppIds();
+  };
+
+  window.isNebulaAppInstalled = function isNebulaAppInstalled(appId) {
+    const target = String(appId || "").trim();
+    if (!target) {
+      return false;
+    }
+    const ids = getStoredInstalledAppIds();
+    return ids.includes(target);
+  };
+
+  window.toggleNebulaAppInstalled = function toggleNebulaAppInstalled(appId, install) {
+    const target = String(appId || "").trim();
+    if (!target) {
+      return getStoredInstalledAppIds();
+    }
+    const ids = getStoredInstalledAppIds();
+    const set = new Set(ids);
+    if (install === false) {
+      set.delete(target);
+    } else {
+      set.add(target);
+    }
+    return setStoredInstalledAppIds(Array.from(set));
+  };
 
   function nebulaPresetById(id) {
     const target = String(id || "").trim();

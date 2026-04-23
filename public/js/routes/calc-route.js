@@ -929,6 +929,7 @@
 
 							<div class="calc-tabs">
 								<button type="button" class="calc-tab active" data-calc-tab="scientific">Scientific</button>
+								<button type="button" class="calc-tab" data-calc-tab="simple">Simple</button>
 								<button type="button" class="calc-tab" data-calc-tab="algebra">Algebra</button>
 								<button type="button" class="calc-tab" data-calc-tab="pi">Pi Tools</button>
 								<button type="button" class="calc-tab" data-calc-tab="history">History</button>
@@ -987,6 +988,35 @@
 									<button type="button" class="calc-btn" data-calc-action="memory-store">MS</button>
 									<button type="button" class="calc-btn" data-calc-action="memory-recall">MR</button>
 									<button type="button" class="calc-btn" data-calc-action="memory-add">M+</button>
+								</div>
+							</div>
+
+							<div class="calc-panel hidden" data-calc-panel="simple">
+								<input id="calc-simple-expression" class="calc-input" type="text" placeholder="Enter calculation" autocomplete="off" spellcheck="false" />
+								<div class="calc-keypad">
+									<button type="button" class="calc-btn danger" data-calc-action="clear-simple">C</button>
+									<button type="button" class="calc-btn" data-calc-action="backspace-simple">⌫</button>
+									<button type="button" class="calc-btn" style="visibility: hidden;"></button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="/">÷</button>
+
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="7">7</button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="8">8</button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="9">9</button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="*">×</button>
+
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="4">4</button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="5">5</button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="6">6</button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="-">−</button>
+
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="1">1</button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="2">2</button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="3">3</button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value="+">+</button>
+
+									<button type="button" class="calc-btn wide" data-calc-action="insert-simple" data-calc-value="0">0</button>
+									<button type="button" class="calc-btn" data-calc-action="insert-simple" data-calc-value=".">.</button>
+									<button type="button" class="calc-btn primary" data-calc-action="solve-simple">=</button>
 								</div>
 							</div>
 
@@ -1146,12 +1176,16 @@
 
 	function handleAction(action, value) {
 		const scientific = state.root ? state.root.querySelector("#calc-expression") : null;
+		const simple = state.root ? state.root.querySelector("#calc-simple-expression") : null;
 		const algebra = state.root ? state.root.querySelector("#calc-algebra-input") : null;
 		const activePanel = state.mode;
 
 		switch (action) {
 			case "insert":
 				insertAtCursor(scientific, value);
+				return;
+			case "insert-simple":
+				insertAtCursor(simple, value);
 				return;
 			case "insert-fn":
 				insertAtCursor(scientific, `${value}(`);
@@ -1165,12 +1199,54 @@
 			case "clear":
 				clearInput();
 				return;
+			case "clear-simple":
+				if (simple) {
+					simple.value = "";
+					simple.focus();
+				}
+				setOutput("0", true);
+				return;
 			case "backspace":
 				backspaceInput();
+				return;
+			case "backspace-simple":
+				if (!simple) {
+					return;
+				}
+				const text = String(simple.value || "");
+				const start = Number.isFinite(simple.selectionStart) ? simple.selectionStart : text.length;
+				const end = Number.isFinite(simple.selectionEnd) ? simple.selectionEnd : text.length;
+				if (start !== end) {
+					simple.value = `${text.slice(0, start)}${text.slice(end)}`;
+					simple.setSelectionRange(start, start);
+				} else if (start > 0) {
+					simple.value = `${text.slice(0, start - 1)}${text.slice(end)}`;
+					simple.setSelectionRange(start - 1, start - 1);
+				}
+				simple.focus();
 				return;
 			case "solve":
 				if (activePanel === "scientific") {
 					solveScientific();
+				}
+				return;
+			case "solve-simple":
+				try {
+					const expr = String(simple ? simple.value : "").trim();
+					if (!expr) {
+						setOutput("0", true);
+						return;
+					}
+					const answer = evaluateExpression(expr);
+					state.lastAnswer = answer;
+					const formatted = formatNumber(answer);
+					setOutput(formatted, true);
+					setHistoryEntry(expr, formatted);
+					if (simple) {
+						simple.value = formatted;
+					}
+				} catch (error) {
+					setOutput(error && error.message ? error.message : "Invalid calculation", false);
 				}
 				return;
 			case "solve-algebra":
@@ -1282,6 +1358,10 @@
 				if (node.id === "calc-expression") {
 					event.preventDefault();
 					solveScientific();
+				}
+				if (node.id === "calc-simple-expression") {
+					event.preventDefault();
+					handleAction("solve-simple");
 				}
 				if (node.id === "calc-algebra-input") {
 					event.preventDefault();

@@ -38,6 +38,43 @@
   const appContent = document.getElementById("app-content");
   const routes = window.NebulaRouteModules || {};
 
+  function getInstalledAppRouteSet() {
+    if (typeof window.getNebulaAppCatalog !== "function" || typeof window.getNebulaInstalledApps !== "function") {
+      return new Set();
+    }
+    const catalog = window.getNebulaAppCatalog();
+    const installed = new Set(window.getNebulaInstalledApps());
+    const routeSet = new Set();
+    (Array.isArray(catalog) ? catalog : []).forEach((item) => {
+      const id = String(item && item.id ? item.id : "").trim();
+      const href = String(item && item.href ? item.href : "").trim();
+      if (!id || !href) {
+        return;
+      }
+      if (installed.has(id)) {
+        routeSet.add(href);
+      }
+    });
+    return routeSet;
+  }
+
+  function isAppRouteBlocked(path) {
+    const target = String(path || "").trim();
+    if (!target || target === "/apps") {
+      return false;
+    }
+    if (typeof window.getNebulaAppCatalog !== "function" || typeof window.getNebulaInstalledApps !== "function") {
+      return false;
+    }
+    const catalog = window.getNebulaAppCatalog();
+    const installedRoutes = getInstalledAppRouteSet();
+    const existsInCatalog = (Array.isArray(catalog) ? catalog : []).some((item) => String(item && item.href ? item.href : "").trim() === target);
+    if (!existsInCatalog) {
+      return false;
+    }
+    return !installedRoutes.has(target);
+  }
+
   let routeToken = 0;
   async function router() {
     let path = window.location.pathname;
@@ -52,6 +89,13 @@
     if (window.NebulaAuthUI) {
       path = window.NebulaAuthUI.guardedPath(path);
       window.NebulaAuthUI.syncLockedState(path);
+    }
+
+    if (isAppRouteBlocked(path)) {
+      if (window.location.pathname !== "/apps") {
+        window.history.replaceState({}, "", "/apps");
+      }
+      path = "/apps";
     }
 
     if (path !== "/private-chat" && path !== "/chat" && window.NebulaPrivateChat && typeof window.NebulaPrivateChat.unmount === "function") {
@@ -126,6 +170,11 @@
       if (window.NebulaAuthUI && !window.NebulaAuthUI.isLoggedIn() && url !== "/") {
         window.NebulaAuthUI.showLockedMessage();
         window.history.replaceState({}, "", "/");
+        router();
+        return;
+      }
+      if (isAppRouteBlocked(nextUrl)) {
+        window.history.replaceState({}, "", "/apps");
         router();
         return;
       }
