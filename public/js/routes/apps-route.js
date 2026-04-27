@@ -276,30 +276,6 @@
             color: rgba(214, 255, 236, 0.98);
           }
 
-          .nebula-store-install.is-installing {
-            position: relative;
-            overflow: hidden;
-            border-color: rgba(140, 222, 255, 0.7);
-            color: rgba(229, 247, 255, 0.98);
-            background: rgba(100, 194, 255, 0.16);
-            cursor: default;
-          }
-
-          .nebula-store-install.is-installing::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            width: var(--install-progress, 0%);
-            background: linear-gradient(90deg, rgba(110, 206, 255, 0.38), rgba(159, 232, 255, 0.42));
-            transition: width 0.1s linear;
-            z-index: 0;
-          }
-
-          .nebula-store-install.is-installing span {
-            position: relative;
-            z-index: 1;
-          }
-
           .nebula-store-card .glow-bar {
             position: absolute;
             bottom: 0;
@@ -399,34 +375,7 @@
         actions.classList.remove("has-open");
       }
 
-      function animateInstall(button, onComplete) {
-        const durationMs = 2200;
-        const start = performance.now();
-        button.classList.add("is-installing");
-        button.disabled = true;
 
-        function step(now) {
-          const elapsed = Math.max(0, now - start);
-          const ratio = Math.min(1, elapsed / durationMs);
-          const percent = Math.max(1, Math.min(100, Math.floor(ratio * 100)));
-          button.style.setProperty("--install-progress", `${percent}%`);
-          button.innerHTML = `<span>Installing ${percent}%</span>`;
-
-          if (ratio < 1) {
-            window.requestAnimationFrame(step);
-            return;
-          }
-
-          button.classList.remove("is-installing");
-          button.classList.add("is-installed");
-          button.disabled = false;
-          button.style.removeProperty("--install-progress");
-          button.textContent = "Installed";
-          onComplete();
-        }
-
-        window.requestAnimationFrame(step);
-      }
 
       const buttons = Array.from(document.querySelectorAll("[data-install-app]"));
       buttons.forEach((button) => {
@@ -441,10 +390,10 @@
 
           const isInstalled = button.classList.contains("is-installed");
           if (!isInstalled) {
-            animateInstall(button, () => {
-              setInstalled(appId, true);
-              setOpenVisibility(button, true);
-            });
+            button.classList.add("is-installed");
+            button.textContent = "Installed";
+            setInstalled(appId, true);
+            setOpenVisibility(button, true);
             return;
           }
 
