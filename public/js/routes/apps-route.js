@@ -53,26 +53,26 @@
     render: function renderAppsRoute() {
       const catalog = getCatalog();
       const installed = new Set(getInstalled());
-      const cards = catalog.map((app, index) => {
-        const isInstalled = installed.has(String(app.id || ""));
-        const installLabel = isInstalled ? "Installed" : "Install";
-        const installClass = isInstalled ? " is-installed" : "";
-        const openAction = isInstalled
-          ? `<a href="${String(app.href || "/apps")}" class="nav-link nebula-store-open">Open</a>`
-          : "";
-        return `
-          <article class="nebula-store-card" style="animation-delay:${(0.08 * (index + 1)).toFixed(2)}s;">
-            <div class="nebula-store-icon"><i class="${String(app.icon || "fa-solid fa-shapes")}"></i></div>
-            <h2>${String(app.title || "App")}</h2>
-            <p class="nebula-store-desc">${String(app.description || "Install this app to add it to your home screen.")}</p>
-            <div class="nebula-store-actions">
-              <button type="button" data-install-app="${String(app.id || "")}" data-app-href="${String(app.href || "/apps")}" class="nebula-store-install${installClass}">${installLabel}</button>
-              ${openAction}
-            </div>
-            <div class="glow-bar"></div>
-          </article>
-        `;
-      }).join("");
+const cards = catalog.map((app, index) => {
+  const isInstalled = installed.has(String(app.id || ""));
+  const installLabel = isInstalled ? "Installed" : "Install";
+  const installClass = isInstalled ? " is-installed" : "";
+  
+  return `
+    <article class="nebula-store-card" style="animation-delay:${(0.08 * (index + 1)).toFixed(2)}s;" data-app-id="${app.id}">
+      <button type="button" class="nebula-store-pin${installClass}" data-pin-app="${app.id}" title="${installLabel}">
+        <i class="fa-solid fa-thumbtack"></i>
+      </button>
+      <div class="nebula-store-icon"><i class="${app.icon || "fa-solid fa-shapes"}"></i></div>
+      <h2>${app.title || "App"}</h2>
+      <p class="nebula-store-desc">${app.description || "Install this app to add it to your home screen."}</p>
+      
+      <a href="${app.href}" class="nav-link nebula-store-open">Open</a>
+      
+      <div class="glow-bar"></div>
+    </article>
+  `;
+}).join("");
 
       return `
         <style>
@@ -151,6 +151,41 @@
             animation: cardReveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             box-shadow: var(--apps-card-shadow);
             transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.42s ease, border-color 0.32s ease;
+          }
+
+          .nebula-store-pin {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            width: 36px;
+            height: 36px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(239, 246, 255, 0.7);
+            cursor: pointer;
+            z-index: 10;
+            transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, color 0.2s ease;
+          }
+
+          .nebula-store-pin:hover {
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.44);
+            color: rgba(255, 255, 255, 0.9);
+            transform: scale(1.05);
+          }
+
+          .nebula-store-pin.is-installed {
+            background: rgba(122, 238, 181, 0.18);
+            border-color: rgba(122, 238, 181, 0.56);
+            color: rgba(214, 255, 236, 0.98);
+          }
+
+          .nebula-store-pin.is-installed:hover {
+            background: rgba(122, 238, 181, 0.28);
+            border-color: rgba(122, 238, 181, 0.7);
           }
 
           .nebula-store-card::before,
@@ -232,25 +267,12 @@
             z-index: 1;
           }
 
-          .nebula-store-actions {
-            width: 100%;
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 0.55rem;
-            margin-top: 0.25rem;
-            z-index: 1;
-          }
-
-          .nebula-store-actions.has-open {
-            grid-template-columns: 1fr 1fr;
-          }
-
-          .nebula-store-install,
           .nebula-store-open {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             min-height: 38px;
+            padding: 0 1.2rem;
             border-radius: 11px;
             border: 1px solid rgba(255, 255, 255, 0.24);
             background: rgba(255, 255, 255, 0.08);
@@ -261,43 +283,13 @@
             text-transform: uppercase;
             cursor: pointer;
             transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+            margin-top: 0.4rem;
           }
 
-          .nebula-store-install:hover,
           .nebula-store-open:hover {
             background: rgba(255, 255, 255, 0.16);
             border-color: rgba(255, 255, 255, 0.44);
             transform: translateY(-1px);
-          }
-
-          .nebula-store-install.is-installed {
-            background: rgba(122, 238, 181, 0.18);
-            border-color: rgba(122, 238, 181, 0.56);
-            color: rgba(214, 255, 236, 0.98);
-          }
-
-          .nebula-store-install.is-installing {
-            position: relative;
-            overflow: hidden;
-            border-color: rgba(140, 222, 255, 0.7);
-            color: rgba(229, 247, 255, 0.98);
-            background: rgba(100, 194, 255, 0.16);
-            cursor: default;
-          }
-
-          .nebula-store-install.is-installing::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            width: var(--install-progress, 0%);
-            background: linear-gradient(90deg, rgba(110, 206, 255, 0.38), rgba(159, 232, 255, 0.42));
-            transition: width 0.1s linear;
-            z-index: 0;
-          }
-
-          .nebula-store-install.is-installing span {
-            position: relative;
-            z-index: 1;
           }
 
           .nebula-store-card .glow-bar {
@@ -366,7 +358,7 @@
         <section class="nebula-appstore">
           <header class="nebula-store-head">
             <h1>App Store</h1>
-            <p>Install apps to pin them to your home screen. Stored on this device.</p>
+            <p>Use apps and pin apps to your home screen. Stored on this device.</p>
           </header>
           <div class="nebula-store-grid">
             ${cards}
@@ -374,91 +366,53 @@
         </section>
       `;
     },
-    afterRender: function afterRenderAppsRoute() {
-      function setOpenVisibility(button, show) {
-        const actions = button.closest(".nebula-store-actions");
-        if (!actions) {
-          return;
-        }
-        const appHref = String(button.getAttribute("data-app-href") || "/apps").trim() || "/apps";
-        const existingOpen = actions.querySelector(".nebula-store-open");
-        if (show) {
-          if (!existingOpen) {
-            const openLink = document.createElement("a");
-            openLink.href = appHref;
-            openLink.className = "nav-link nebula-store-open";
-            openLink.textContent = "Open";
-            actions.appendChild(openLink);
-          }
-          actions.classList.add("has-open");
-          return;
-        }
-        if (existingOpen) {
-          existingOpen.remove();
-        }
-        actions.classList.remove("has-open");
+ afterRender: function afterRenderAppsRoute() {
+  const buttons = document.querySelectorAll("[data-pin-app]");
+  buttons.forEach((button) => {
+    button.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const appId = button.getAttribute("data-pin-app");
+      const isCurrentlyInstalled = button.classList.contains("is-installed");
+
+      if (!isCurrentlyInstalled) {
+        // Mark as installed
+        button.classList.add("is-installed");
+        button.setAttribute("title", "Installed");
+        setInstalled(appId, true);
+      } else {
+        // Mark as uninstalled
+        button.classList.remove("is-installed");
+        button.setAttribute("title", "Install");
+        setInstalled(appId, false);
       }
+    });
+  });
 
-      function animateInstall(button, onComplete) {
-        const durationMs = 2200;
-        const start = performance.now();
-        button.classList.add("is-installing");
-        button.disabled = true;
-
-        function step(now) {
-          const elapsed = Math.max(0, now - start);
-          const ratio = Math.min(1, elapsed / durationMs);
-          const percent = Math.max(1, Math.min(100, Math.floor(ratio * 100)));
-          button.style.setProperty("--install-progress", `${percent}%`);
-          button.innerHTML = `<span>Installing ${percent}%</span>`;
-
-          if (ratio < 1) {
-            window.requestAnimationFrame(step);
-            return;
-          }
-
-          button.classList.remove("is-installing");
-          button.classList.add("is-installed");
-          button.disabled = false;
-          button.style.removeProperty("--install-progress");
-          button.textContent = "Installed";
-          onComplete();
-        }
-
-        window.requestAnimationFrame(step);
+  const cards = document.querySelectorAll(".nebula-store-card");
+  cards.forEach((card) => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest("[data-pin-app]")) {
+        return;
       }
+      const appId = card.getAttribute("data-app-id");
+      const catalog = typeof window.getNebulaAppCatalog === "function" ? window.getNebulaAppCatalog() : [
+        { id: "soundboard", href: "/soundboard" },
+        { id: "weather", href: "/weather" },
+        { id: "music", href: "/music" },
+        { id: "notepad", href: "/notepad" },
+        { id: "timer", href: "/timer" },
+        { id: "maps", href: "/maps" },
+        { id: "calc", href: "/calc" }
+      ];
+      const app = catalog.find((a) => a.id === appId);
+      if (app && app.href) {
+        window.location.href = app.href;
+      }
+    });
+  });
+}
 
-      const buttons = Array.from(document.querySelectorAll("[data-install-app]"));
-      buttons.forEach((button) => {
-        button.addEventListener("click", () => {
-          const appId = String(button.getAttribute("data-install-app") || "").trim();
-          if (!appId) {
-            return;
-          }
-          if (button.classList.contains("is-installing")) {
-            return;
-          }
-
-          const isInstalled = button.classList.contains("is-installed");
-          if (!isInstalled) {
-            animateInstall(button, () => {
-              setInstalled(appId, true);
-              setOpenVisibility(button, true);
-            });
-            return;
-          }
-
-          setInstalled(appId, false);
-          button.classList.remove("is-installed");
-          button.textContent = "Install";
-          setOpenVisibility(button, false);
-        });
-
-        const actions = button.closest(".nebula-store-actions");
-        if (actions) {
-          actions.classList.toggle("has-open", Boolean(actions.querySelector(".nebula-store-open")));
-        }
-      });
-    }
   };
 })();
