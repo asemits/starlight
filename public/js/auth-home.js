@@ -1535,7 +1535,7 @@
           <div class="nebula-dashboard-head">
             <h2>Home Screen Apps</h2>
           </div>
-          <p class="nebula-dashboard-empty">No installed apps yet. Open Apps and click Install.</p>
+          <p class="nebula-dashboard-empty">No pinned apps yet. Open Apps and click the pin icon.</p>
         </section>
       `;
     }
@@ -1545,7 +1545,7 @@
         <div class="nebula-home-feature-inner">
           <div class="nebula-home-feature-icon"><i class="${escapeHtml(app.icon || "fa-solid fa-shapes")}"></i></div>
           <h3>${escapeHtml(app.title || "App")}</h3>
-          <p>${escapeHtml(app.description || "Installed app")}</p>
+          <p>${escapeHtml(app.description || "Pinned app")}</p>
         </div>
       </a>
     `).join("");
