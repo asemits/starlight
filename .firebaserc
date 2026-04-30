@@ -7,8 +7,7 @@
       "hosting": {
         "main": ["freenotesite2309"],
         "site1": ["clock28"],
-        "site2": ["mathsite288"],
-        "site3": ["geohomework"]
+        "site2": ["mathsite288"]
       }
     }
   }
