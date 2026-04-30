@@ -244,6 +244,12 @@
             <p class="card-desc">Timer + stopwatch</p>
             <div class="glow-bar"></div>
           </a>
+          <a href="/maps" class="nav-link tool-card" style="animation-delay: 0.7s;">
+            <i class="fa-regular fa-map" style="font-size: 52px;"></i>
+            <h2>Maps</h2>
+            <p class="card-desc">Maps</p>
+            <div class="glow-bar"></div>
+          </a>
         </div>
       `;
     }

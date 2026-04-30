@@ -6,6 +6,7 @@
   const AI_DIRECT_MODE_KEY = "nebula-ai-direct-mode";
   const AI_GEMINI_MODEL_KEY = "nebula-ai-model";
   const AI_GEMINI_CONTEXT_LIMIT_KEY = "nebula-ai-context-limit";
+  const AI_QUOTA_KEY = "nebula-ai-quota-v1";
   const AI_GEMINI_MODEL_DEFAULT = "gemini-2.5-flash";
   const AI_GEMINI_TUNNEL_URL = "https://script.google.com/macros/s/AKfycbyUwrz4n6d58QHC1cnqzrX-c24KhnkRvNLjMbVc-9TDmE2R6kcr5WALWtjIRDGN3at32w/exec";
   const AI_CONVERSATION_LIMIT = 60;
@@ -111,13 +112,17 @@
       return null;
     }
     if (attachment.kind === "image") {
-      return {
+      const imageAttachment = {
         id: attachment.id,
         name: attachment.name,
         mimeType: attachment.mimeType,
         kind: "image",
         size: attachment.size
       };
+      if (attachment.base64) {
+        imageAttachment.base64 = String(attachment.base64);
+      }
+      return imageAttachment;
     }
     return {
       id: attachment.id,
@@ -286,6 +291,55 @@
   function setContextLimit(limit) {
     const valid = clampNumber(limit, 1, 100, AI_CONTEXT_LIMIT_DEFAULT);
     localStorage.setItem(AI_GEMINI_CONTEXT_LIMIT_KEY, String(valid));
+  }
+
+  function getTodayKey() {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function readQuotaStore() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(AI_QUOTA_KEY) || "{}");
+      const today = getTodayKey();
+      const dayKey = String(parsed.dayKey || "");
+      if (dayKey !== today) {
+        return {
+          limit: 100,
+          used: 0,
+          remaining: 100,
+          dayKey: today
+        };
+      }
+      return {
+        limit: clampNumber(parsed.limit, 1, 100000, 100),
+        used: clampNumber(parsed.used, 0, 100000, 0),
+        remaining: clampNumber(parsed.remaining, 0, 100000, 100),
+        dayKey: today
+      };
+    } catch (_error) {
+      return {
+        limit: 100,
+        used: 0,
+        remaining: 100,
+        dayKey: getTodayKey()
+      };
+    }
+  }
+
+  function writeQuotaStore() {
+    try {
+      localStorage.setItem(AI_QUOTA_KEY, JSON.stringify(state.quota));
+    } catch (_error) {
+    }
+  }
+
+  function decrementQuota() {
+    if (state.quota.remaining > 0) {
+      state.quota.remaining = Math.max(0, state.quota.remaining - 1);
+      state.quota.used = Math.min(state.quota.limit, state.quota.used + 1);
+      writeQuotaStore();
+    }
   }
 
 
@@ -898,6 +952,16 @@
 
     strip.classList.remove("hidden");
     strip.innerHTML = state.pendingAttachments.map((attachment) => {
+      if (attachment.kind === "image" && attachment.base64) {
+        const dataUrl = `data:${attachment.mimeType};base64,${attachment.base64}`;
+        return `
+          <div class="nebula-ai-attachment-chip nebula-ai-image-chip">
+            <img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(attachment.name)}" />
+            <span>${escapeHtml(attachment.name)}</span>
+            <button type="button" aria-label="Remove upload" data-remove-upload="${escapeHtml(attachment.id)}"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        `;
+      }
       return `
         <div class="nebula-ai-attachment-chip">
           <span>${escapeHtml(attachment.name)}</span>
@@ -955,7 +1019,13 @@
       const roleClass = message.role === "assistant" ? "assistant" : "user";
       const timeText = new Date(message.createdAt || nowMs()).toLocaleTimeString();
       const attachmentsHtml = message.attachments && message.attachments.length
-        ? `<div class="nebula-ai-message-attachments">${message.attachments.map((attachment) => `<span>${escapeHtml(attachment.name)}</span>`).join("")}</div>`
+        ? `<div class="nebula-ai-message-attachments">${message.attachments.map((attachment) => {
+            if (attachment.kind === "image" && attachment.base64) {
+              const dataUrl = `data:${attachment.mimeType};base64,${attachment.base64}`;
+              return `<img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(attachment.name)}" title="${escapeHtml(attachment.name)}" />`;
+            }
+            return `<span>${escapeHtml(attachment.name)}</span>`;
+          }).join("")}</div>`
         : "";
       const contentHtml = message.role === "assistant"
         ? `<div class="nebula-ai-markdown">${renderMarkdown(message.content)}</div>`
@@ -988,7 +1058,6 @@
               .nebula-ai-header-controls { display: flex; gap: 8px; align-items: center; }
               .nebula-ai-control { padding: 6px 10px; border: 1px solid #444; border-radius: 4px; background: #222; color: #fff; font-size: 14px; }
               .nebula-ai-control:focus { outline: none; border-color: #666; }
-              #nebula-ai-context-limit { width: 60px; }
             </style>
       <section class="nebula-ai-shell">
         <aside class="nebula-ai-sidebar">
@@ -1015,7 +1084,6 @@
                 <option value="gemini-2.5-flash" ${getCurrentModel() === "gemini-2.5-flash" ? "selected" : ""}>Flash</option>
                 <option value="gemini-2.5-flash-lite" ${getCurrentModel() === "gemini-2.5-flash-lite" ? "selected" : ""}>Lite</option>
               </select>
-              <input id="nebula-ai-context-limit" type="number" class="nebula-ai-control" min="1" max="100" value="${getContextLimit()}" title="Context messages" />
               <button id="nebula-ai-regenerate" type="button" class="nebula-btn nebula-btn-muted">Regenerate</button>
             </div>
           </header>
@@ -1046,12 +1114,7 @@
 
   async function loadQuota() {
     if (directModeEnabled()) {
-      state.quota = {
-        limit: 100,
-        used: 0,
-        remaining: 100,
-        dayKey: "local"
-      };
+      state.quota = readQuotaStore();
       renderQuotaPanel();
       return;
     }
@@ -1286,6 +1349,10 @@
       return;
     }
     const regenerate = Boolean(options && options.regenerate);
+    if (!regenerate && state.quota.remaining <= 0) {
+      setStatus("Daily message limit reached. Try again tomorrow.", false);
+      return;
+    }
     const input = state.root ? state.root.querySelector("#nebula-ai-input") : null;
     const conversation = ensureConversation();
 
@@ -1407,6 +1474,10 @@
         state.quota.used = clampNumber(payload.quota.used, 0, state.quota.limit, state.quota.used);
         state.quota.remaining = clampNumber(payload.quota.remaining, 0, state.quota.limit, state.quota.remaining);
         state.quota.dayKey = String(payload.quota.dayKey || state.quota.dayKey || "");
+        writeQuotaStore();
+      } else if (directModeEnabled()) {
+        decrementQuota();
+        renderQuotaPanel();
       }
 
       state.store.conversations = state.store.conversations
@@ -1435,7 +1506,9 @@
       setStatus(error && error.message ? error.message : "Request failed.", false);
     } finally {
       setBusy(false);
-      loadQuota();
+      if (!directModeEnabled()) {
+        loadQuota();
+      }
     }
   }
 
@@ -1563,7 +1636,7 @@
 
     state.root.addEventListener("click", async (event) => {
       const target = event.target;
-      if (!(target instanceof Element)) {
+      if (!(target instanceof Element)) { 
         return;
       }
 
@@ -1573,6 +1646,16 @@
         state.pendingAttachments = [];
         writeStore();
         render();
+        bindEvents();
+        const newInput = state.root ? state.root.querySelector("#nebula-ai-input") : null;
+        if (newInput) {
+          newInput.value = "";
+          newInput.focus();
+        }
+        const messageList = state.root ? state.root.querySelector("#nebula-ai-messages") : null;
+        if (messageList) {
+          messageList.scrollTop = 0;
+        }
         return;
       }
 
@@ -1698,13 +1781,7 @@
         setCurrentModel(String(input.value || "gemini-2.5-flash"));
         return;
       }
-      if (input.id === "nebula-ai-context-limit") {
-        const limit = Number.parseInt(String(input.value || "30"), 10);
-        if (Number.isFinite(limit)) {
-          setContextLimit(limit);
-        }
-        return;
-      }
+
     });
 
     state.root.addEventListener("keydown", async (event) => {
@@ -1742,6 +1819,7 @@
     state.statusText = "";
     state.statusOk = true;
     state.store = readStore();
+    state.quota = readQuotaStore();
 
     if (!state.root) {
       return;
