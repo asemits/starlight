@@ -19,25 +19,6 @@ service cloud.firestore {
       return v is string && v.size() > 0 && v.size() <= maxLen;
     }
 
-    function isStringMax(v, maxLen) {
-      return v is string && v.size() <= maxLen;
-    }
-
-    function hasKey(data, key) {
-      return data.keys().hasAny([key]);
-    }
-
-    function isHandle(v) {
-      return v is string
-        && v.size() >= 2
-        && v.size() <= 40
-        && v.matches('^@[a-z0-9_]+$');
-    }
-
-    function intOrZero(v) {
-      return v is int ? v : 0;
-    }
-
     function isTopicName(v) {
       return v is string
         && v.size() >= 3
@@ -286,93 +267,6 @@ service cloud.firestore {
         && request.resource.data.updatedAt is timestamp;
 
       allow delete: if isOwner(uid);
-    }
-
-    match /feedPosts/{postId} {
-      allow read: if isSignedIn();
-
-      allow create: if isSignedIn()
-        && request.resource.data.title is string
-        && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() <= 300
-        && request.resource.data.body is string
-        && request.resource.data.body.size() <= 4000
-        && request.resource.data.community is string
-        && request.resource.data.community.size() > 0
-        && request.resource.data.community.size() <= 48
-        && request.resource.data.flair is string
-        && request.resource.data.flair.size() > 0
-        && request.resource.data.flair.size() <= 32
-        && request.resource.data.authorId == request.auth.uid
-        && request.resource.data.authorName is string
-        && request.resource.data.authorName.size() > 0
-        && request.resource.data.authorName.size() <= 80
-        && request.resource.data.authorHandle is string
-        && request.resource.data.authorHandle.size() > 0
-        && request.resource.data.authorHandle.size() <= 40
-        && request.resource.data.commentCount == 0
-        && (!('likesCount' in request.resource.data) || (request.resource.data.likesCount is int && request.resource.data.likesCount >= 0))
-        && request.resource.data.createdAt is timestamp
-        && request.resource.data.lastActivityAt is timestamp;
-
-      allow update: if isSignedIn()
-        && hasOnlyKeys(request.resource.data, [
-          'title', 'body', 'community', 'flair',
-          'authorId', 'authorName', 'authorHandle',
-          'commentCount', 'likesCount', 'createdAt', 'lastActivityAt'
-        ])
-        && request.resource.data.title == resource.data.title
-        && request.resource.data.body == resource.data.body
-        && request.resource.data.community == resource.data.community
-        && request.resource.data.flair == resource.data.flair
-        && request.resource.data.authorId == resource.data.authorId
-        && request.resource.data.authorName == resource.data.authorName
-        && request.resource.data.authorHandle == resource.data.authorHandle
-        && request.resource.data.createdAt == resource.data.createdAt
-        && (
-          (
-            request.resource.data.commentCount is int
-            && resource.data.commentCount is int
-            && request.resource.data.commentCount == resource.data.commentCount + 1
-            && request.resource.data.lastActivityAt is timestamp
-            && request.resource.data.likesCount == resource.data.likesCount
-          )
-          ||
-          (
-            request.resource.data.commentCount == resource.data.commentCount
-            && request.resource.data.lastActivityAt == resource.data.lastActivityAt
-            && request.resource.data.likesCount is int
-            && request.resource.data.likesCount >= 0
-            && (
-              request.resource.data.likesCount == intOrZero(resource.data.likesCount) + 1
-              || request.resource.data.likesCount == intOrZero(resource.data.likesCount) - 1
-            )
-          )
-        );
-
-      allow delete: if false;
-    }
-
-    match /feedPosts/{postId}/comments/{commentId} {
-      allow read: if isSignedIn();
-
-      allow create: if isSignedIn()
-        && hasOnlyKeys(request.resource.data, [
-          'parentId', 'authorId', 'authorName', 'authorHandle', 'body', 'createdAt'
-        ])
-        && request.resource.data.authorId == request.auth.uid
-        && isNonEmptyString(request.resource.data.authorName, 80)
-        && isHandle(request.resource.data.authorHandle)
-        && request.resource.data.parentId is string
-        && request.resource.data.parentId.size() <= 200
-        && isNonEmptyString(request.resource.data.body, 2000)
-        && request.resource.data.createdAt is timestamp
-        && (
-          request.resource.data.parentId == ''
-          || exists(/databases/$(database)/documents/feedPosts/$(postId)/comments/$(request.resource.data.parentId))
-        );
-
-      allow update, delete: if false;
     }
 
     match /{document=**} {

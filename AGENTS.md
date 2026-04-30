@@ -1,4 +1,3 @@
-# STOP. CHANGING. THIS.
 Before writing your response, ALWAYS say 'I have read the Copilot instructions and will follow them.' at the beginning of your response (NOT PARAGRAPH) ONE TIME ONLY.
 Do not generate comments. Any added UI should ALWAYS aesthetically match the rest of the site, and if a design picture is attached, it should match the design and shape of it. Follow established conventions around authorization checks, style, database access, and error handling.
 If the user says that what you are doing is wrong, do not try and use it again and always consider what they think is wrong and verify if it is the issue or not.

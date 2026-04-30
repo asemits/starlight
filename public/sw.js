@@ -1,6 +1,4 @@
 const CACHE_PREFIX = "nebula-cache-";
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
-const PRECACHE_URLS = ["/", "/index.html"];
 const notificationPreferences = {
     inApp: true,
     os: true,
@@ -9,19 +7,13 @@ const notificationPreferences = {
 };
 
 self.addEventListener("install", (event) => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(PRECACHE_URLS);
-    await self.skipWaiting();
-  })());
+    event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
     event.waitUntil((async () => {
         const names = await caches.keys();
-    await Promise.all(names
-      .filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
-      .map((name) => caches.delete(name)));
+        await Promise.all(names.filter((name) => name.startsWith(CACHE_PREFIX)).map((name) => caches.delete(name)));
         await self.clients.claim();
     })());
 });
@@ -30,11 +22,6 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("message", (event) => {
     const payload = event && event.data ? event.data : null;
     if (!payload) return;
-
-  if (payload.type === "SKIP_WAITING") {
-    self.skipWaiting();
-    return;
-  }
 
     // 1. Handle original Nebula Preferences
     if (payload.type === "nebula-notification-preferences") {
@@ -98,64 +85,5 @@ self.addEventListener("notificationclick", (event) => {
         }
         // If no windows are open, open a new one to the specific route
         await self.clients.openWindow(route);
-    })());
-});
-
-self.addEventListener("fetch", (event) => {
-    const req = event.request;
-    if (!req || req.method !== "GET") {
-        return;
-    }
-
-    let url;
-    try {
-        url = new URL(req.url);
-    } catch (_error) {
-        return;
-    }
-
-    if (url.origin !== self.location.origin) {
-        return;
-    }
-
-    if (req.mode === "navigate") {
-        event.respondWith((async () => {
-            try {
-                const networkResponse = await fetch(req);
-                const cache = await caches.open(CACHE_NAME);
-                await cache.put(req, networkResponse.clone());
-                return networkResponse;
-            } catch (_error) {
-                const cachedPage = await caches.match(req);
-                if (cachedPage) {
-                    return cachedPage;
-                }
-                return caches.match("/index");
-            }
-        })());
-        return;
-    }
-
-    event.respondWith((async () => {
-        const cache = await caches.open(CACHE_NAME);
-        const cached = await cache.match(req);
-        const networkPromise = fetch(req).then(async (response) => {
-            if (response && response.ok) {
-                await cache.put(req, response.clone());
-            }
-            return response;
-        }).catch(() => null);
-
-        if (cached) {
-            event.waitUntil(networkPromise);
-            return cached;
-        }
-
-        const network = await networkPromise;
-        if (network) {
-            return network;
-        }
-
-        return Response.error();
     })());
 });

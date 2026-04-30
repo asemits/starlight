@@ -15,282 +15,9 @@
         
       const tosHtml = escapeHtml(tosText).replaceAll("\n", "<br>");
       const privacyHtml = escapeHtml(privacyText).replaceAll("\n", "<br>");
-      const backgroundMode = typeof window.getGamesBackgroundMode === "function"
-        ? window.getGamesBackgroundMode()
-        : (localStorage.getItem("games-background-mode") || "none");
-      const storedBackgroundUrl = String(localStorage.getItem("games-background-url") || "");
-      const uploadedBackgroundUrl = storedBackgroundUrl.startsWith("data:image/") ? storedBackgroundUrl : "";
-      const backgroundChoices = [
-        { id: "none", label: "None", preview: "none" },
-        { id: "preset-flow", label: "Flow", preview: "static/bg/bg1.webp" },
-        { id: "preset-torus", label: "Torus", preview: "static/bg/bg2.webp" },
-        { id: "preset-monochrome", label: "Monochrome", preview: "static/bg/bg3.webp" },
-        { id: "preset-glass-plate", label: "Glass Plate", preview: "static/bg/bg4.webp" },
-        { id: "preset-future-city", label: "Future City", preview: "static/bg/bg5.webp" },
-        { id: "preset-glint", label: "Glint", preview: "static/bg/bg6.webp" },
-        { id: "live-car", label: "Live Car (Laggy)", preview: "video", videoUrl: "static/bg/live1.mp4" },
-        { id: "upload", label: "Uploaded", preview: uploadedBackgroundUrl || "" }
-      ];
-      const backgroundChoicesHtml = backgroundChoices.map((choice) => {
-        const selectedClass = backgroundMode === choice.id ? " ring-2 ring-cyan-300/70 border-cyan-300/60" : "";
-        let thumbnailHtml = "";
-        if (choice.preview === "live") {
-          thumbnailHtml = `<div class="nebula-aurora-preview w-full h-full"><span class="nebula-aurora-glow"></span></div>`;
-        } else if (choice.preview === "video") {
-          thumbnailHtml = `<video src="${escapeHtml(choice.videoUrl || "")}" class="w-full h-full object-cover" autoplay muted loop playsinline></video>`;
-        } else if (choice.preview === "none") {
-          thumbnailHtml = `<div class="nebula-none-preview w-full h-full"><span class="nebula-none-symbol" aria-hidden="true"></span></div>`;
-        } else if (choice.preview) {
-          thumbnailHtml = `<img src="${escapeHtml(choice.preview)}" alt="${escapeHtml(choice.label)}" class="w-full h-full object-cover">`;
-        } else {
-          thumbnailHtml = `<div class="w-full h-full grid place-items-center text-xs text-gray-300 bg-gradient-to-br from-black/40 via-black/20 to-black/50">Upload an image</div>`;
-        }
-        return `
-          <button
-            type="button"
-            data-background-choice="${escapeHtml(choice.id)}"
-            class="nebula-background-choice relative overflow-hidden rounded-xl border border-white/20 bg-black/30 hover:bg-black/20 transition focus:outline-none focus:ring-2 focus:ring-cyan-300/60${selectedClass}"
-            aria-pressed="${backgroundMode === choice.id ? "true" : "false"}"
-          >
-            <div class="h-32">${thumbnailHtml}</div>
-            <div class="px-3 py-2 text-sm text-gray-100 text-left">${escapeHtml(choice.label)}</div>
-          </button>
-        `;
-      }).join("");
-      const fontChoices = typeof window.getNebulaFontChoices === "function" ? window.getNebulaFontChoices() : [];
-      const fontCurrent = typeof window.getNebulaFontPreset === "function" ? window.getNebulaFontPreset() : "geist";
-      const fontOptionsHtml = fontChoices.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === fontCurrent ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("");
 
       return `
-        <style>
-          .nebula-settings-shell {
-            --settings-card-bg: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.04));
-            --settings-card-border: rgba(255,255,255,0.16);
-            --settings-card-border-hover: rgba(186, 223, 255, 0.5);
-            --settings-input-bg: rgba(6, 10, 20, 0.66);
-            --settings-input-border: rgba(255,255,255,0.22);
-            --settings-input-focus: rgba(133, 223, 255, 0.62);
-            --settings-accent: rgba(134, 220, 255, 0.38);
-          }
-
-          .nebula-settings-shell h1 {
-            letter-spacing: 0.02em;
-            text-shadow: 0 12px 40px rgba(0,0,0,0.4);
-          }
-
-          .nebula-settings-shell aside,
-          .nebula-settings-shell [data-settings-panel] > article {
-            background: var(--settings-card-bg) !important;
-            border-color: var(--settings-card-border) !important;
-            backdrop-filter: blur(16px) saturate(145%);
-            -webkit-backdrop-filter: blur(16px) saturate(145%);
-            box-shadow: 0 16px 40px rgba(0,0,0,0.26);
-            transition: transform 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
-          }
-
-          .nebula-settings-shell [data-settings-panel] > article:hover {
-            transform: translateY(-2px);
-            border-color: var(--settings-card-border-hover) !important;
-            box-shadow: 0 24px 48px rgba(0,0,0,0.32), 0 0 0 1px rgba(150, 226, 255, 0.12) inset;
-          }
-
-          .nebula-settings-shell [data-settings-tab] {
-            border-color: rgba(255,255,255,0.14) !important;
-            transition: border-color 0.24s ease, background 0.24s ease, transform 0.24s ease;
-          }
-
-          .nebula-settings-shell [data-settings-tab]:hover {
-            border-color: rgba(170, 224, 255, 0.5) !important;
-            background: rgba(255,255,255,0.14);
-            transform: translateX(1px);
-          }
-
-          .nebula-settings-shell label {
-            letter-spacing: 0.02em;
-          }
-
-          .nebula-settings-shell input[type="text"],
-          .nebula-settings-shell input[type="url"],
-          .nebula-settings-shell select {
-            background: var(--settings-input-bg) !important;
-            border: 1px solid var(--settings-input-border) !important;
-            border-radius: 0.9rem !important;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-          }
-
-          .nebula-settings-shell input[type="text"]:focus,
-          .nebula-settings-shell input[type="url"]:focus,
-          .nebula-settings-shell select:focus {
-            border-color: var(--settings-input-focus) !important;
-            box-shadow: 0 0 0 2px rgba(133, 223, 255, 0.22);
-            background: rgba(7, 13, 26, 0.85) !important;
-          }
-
-          .nebula-settings-shell button {
-            border-color: rgba(255,255,255,0.2) !important;
-            transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-          }
-
-          .nebula-settings-shell button:hover {
-            border-color: rgba(170, 226, 255, 0.56) !important;
-            box-shadow: 0 0 0 1px rgba(166, 224, 255, 0.2) inset;
-          }
-
-          .nebula-settings-shell button:active {
-            transform: translateY(1px);
-          }
-
-          .nebula-settings-shell #updateBtn {
-            display: none;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            width: 100%;
-            border-radius: 0.9rem;
-            padding: 0.7rem 1rem;
-            background: linear-gradient(180deg, rgba(119, 213, 255, 0.35), rgba(87, 162, 255, 0.22));
-            border: 1px solid rgba(157, 225, 255, 0.62) !important;
-            color: #eaf8ff;
-            font-weight: 600;
-            letter-spacing: 0.02em;
-            box-shadow: 0 10px 26px rgba(29, 133, 196, 0.28);
-          }
-
-          .nebula-settings-shell #updateBtn:hover {
-            background: linear-gradient(180deg, rgba(146, 225, 255, 0.44), rgba(96, 177, 255, 0.3));
-            box-shadow: 0 14px 28px rgba(29, 133, 196, 0.35);
-            transform: translateY(-1px);
-          }
-
-          .nebula-settings-shell #settings-font-status {
-            border: 1px solid rgba(255,255,255,0.14);
-            background: rgba(255,255,255,0.04);
-            border-radius: 0.75rem;
-            padding: 0.55rem 0.75rem;
-          }
-
-          .nebula-settings-shell .nebula-background-choice img {
-            transform: scale(1);
-            transition: transform 0.28s ease;
-          }
-
-          .nebula-settings-shell .nebula-background-choice:hover img {
-            transform: scale(1.04);
-          }
-
-          .nebula-settings-shell .nebula-background-choice.is-active {
-            border-color: rgba(133, 223, 255, 0.75) !important;
-            box-shadow: 0 0 0 2px rgba(133, 223, 255, 0.35);
-          }
-
-          .nebula-settings-shell .nebula-aurora-preview {
-            position: relative;
-            overflow: hidden;
-            background:
-              radial-gradient(120px 70px at 15% 75%, rgba(220, 220, 220, 0.85), transparent 60%),
-              radial-gradient(140px 80px at 78% 20%, rgba(180, 180, 180, 0.75), transparent 65%),
-              linear-gradient(160deg, rgba(10, 10, 10, 1), rgba(30, 30, 30, 0.98));
-          }
-
-          .nebula-settings-shell .nebula-aurora-preview::before,
-          .nebula-settings-shell .nebula-aurora-preview::after {
-            content: "";
-            position: absolute;
-            inset: -22%;
-            background: conic-gradient(from 120deg, rgba(255, 255, 255, 0.8), rgba(200, 200, 200, 0.6), rgba(150, 150, 150, 0.7), rgba(255, 255, 255, 0.8));
-            filter: blur(18px) brightness(1.3) contrast(1.6);
-            animation: auroraSpin 8.2s linear infinite, metallicShimmer 3.5s ease-in-out infinite;
-          }
-
-          .nebula-settings-shell .nebula-aurora-preview::after {
-            animation-duration: 10.4s, 4.2s;
-            animation-direction: reverse, normal;
-            opacity: 0.75;
-          }
-
-          .nebula-settings-shell .nebula-aurora-glow {
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05));
-            animation: auroraHighlight 2.8s ease-in-out infinite;
-          }
-
-          .nebula-settings-shell .nebula-none-preview {
-            position: relative;
-            overflow: hidden;
-            display: grid;
-            place-items: center;
-            background: #020406;
-          }
-
-          .nebula-settings-shell .nebula-none-preview::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 55%);
-          }
-
-          .nebula-settings-shell .nebula-none-symbol {
-            position: absolute;
-            width: 100px;
-            height: 100px;
-            border: 15px solid rgba(242, 246, 250, 0.97);
-            border-radius: 9999px;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.18);
-          }
-
-          .nebula-settings-shell .nebula-none-symbol::before {
-            content: "";
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            width: 15px;
-            height: 90px;
-            background: rgba(242, 246, 250, 0.97);
-            border-radius: 9999px;
-            transform: translate(-50%, -50%) rotate(-45deg);
-          }
-
-          @keyframes auroraSpin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-
-          @keyframes metallicShimmer {
-            0%, 100% { opacity: 0.7; filter: blur(18px) brightness(1.1) contrast(1.5); }
-            50% { opacity: 1; filter: blur(16px) brightness(1.5) contrast(1.8); }
-          }
-
-          @keyframes auroraHighlight {
-            0%, 100% { opacity: 0.15; }
-            50% { opacity: 0.35; }
-          }
-
-          .nebula-settings-shell [data-settings-panel]:not(.hidden) > article:hover::after {
-            opacity: 1;
-            animation: shimmerSweep 1s ease forwards;
-          }
-
-          @keyframes shimmerSweep {
-            0% { transform: translateX(-130%); }
-            100% { transform: translateX(130%); }
-          }
-
-          @media (max-width: 900px) {
-            .nebula-settings-shell {
-              padding: 1rem !important;
-            }
-
-            .nebula-settings-shell .md\\:grid-cols-\[220px_1fr\] {
-              gap: 0.75rem !important;
-            }
-
-            .nebula-settings-shell [data-settings-panel] {
-              gap: 0.75rem !important;
-            }
-          }
-        </style>
-        <div class="nebula-settings-shell p-8 max-w-6xl mx-auto">
+        <div class="p-8 max-w-6xl mx-auto">
           <h1 class="text-3xl font-bold font-orbitron mb-6">Settings</h1>
           <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
             <aside class="bg-white/5 p-4 rounded-2xl border border-white/10 h-fit">
@@ -299,8 +26,8 @@
                 <button type="button" onclick="resetSettingsCategory('layout')" title="Reset Layout defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
               <div class="flex items-center gap-2 mb-2">
-                <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-wand-magic-sparkles"></i><span class="text-sm">Background</span></button>
-                <button type="button" onclick="resetSettingsCategory('particles')" title="Reset Background defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+                <button type="button" data-settings-tab="particles" onclick="switchSettingsCategory('particles')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Particles</span></button>
+                <button type="button" onclick="resetSettingsCategory('particles')" title="Reset Particles defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
               <div class="flex items-center gap-2 mb-2">
                 <button type="button" data-settings-tab="shortcut" onclick="switchSettingsCategory('shortcut')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-keyboard"></i><span>Shortcut</span></button>
@@ -310,7 +37,7 @@
                 <button type="button" data-settings-tab="cloak" onclick="switchSettingsCategory('cloak')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-user-secret"></i><span>Tab Cloak</span></button>
                 <button type="button" onclick="resetSettingsCategory('cloak')" title="Reset Tab Cloak defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
-              <div class="flex items-center gap-2"> 
+              <div class="flex items-center gap-2">
                 <button type="button" data-settings-tab="widget" onclick="switchSettingsCategory('widget')" class="flex-1 flex items-center gap-2 text-left px-4 py-3 rounded-xl border border-white/10 text-gray-300 transition"><i class="fa-solid fa-table-cells-large"></i><span>Widget</span></button>
                 <button type="button" onclick="resetSettingsCategory('widget')" title="Reset Widget defaults" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
               </div>
@@ -331,12 +58,6 @@
                     <option value="right" ${localStorage.getItem('sidebar-pos') === 'right' ? 'selected' : ''}>Right</option>
                   </select>
                 </article>
-                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                <label class="block mb-2 text-sm text-gray-300">Desktop App</label> 
-                <br>
-                <label id="desktopAppLabel" class="flex items-center gap-2 text-sm mb-4">Not available on website. Install App to access</label>
-                <button id="updateBtn" style="display:none;"><i class="fa-solid fa-sync"></i>‎  Update App</button>
-                </article>
 
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
                   <button type="button" onclick="resetSettingsCard('layout-measurement')" title="Reset Measurement System" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
@@ -345,44 +66,6 @@
                     <option value="imperial" ${window.getMeasurementSystem() === 'metric' ? '' : 'selected'}>Imperial (F, mph)</option>
                     <option value="metric" ${window.getMeasurementSystem() === 'metric' ? 'selected' : ''}>Metric (C, km/h)</option>
                   </select>
-                </article>
-
-                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
-                  <button type="button" onclick="resetSettingsCard('layout-font')" title="Reset Font" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                  <label class="block mb-2 text-sm text-gray-300">Font Preset</label>
-                  <select id="settings-font-preset" onchange="changeNebulaFontPreset(this.value)" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none mb-4">
-                    ${fontOptionsHtml}
-                  </select>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <label class="block mb-2 text-sm text-gray-300">Custom Font CSS/File URL (https)</label>
-                      <input id="settings-font-url" type="url" placeholder="https://fonts.googleapis.com/css2?family=Your+Font" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" />
-                    </div>
-                    <div>
-                      <label class="block mb-2 text-sm text-gray-300">Custom Font Family Name</label>
-                      <input id="settings-font-family" type="text" placeholder="Your Font" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" />
-                    </div>
-                  </div>
-                  <div class="flex flex-wrap gap-2 mb-3">
-                    <button type="button" id="settings-font-apply-url" class="px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition">Apply URL Font</button>
-                  </div>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
-                    <div>
-                      <label class="block mb-2 text-sm text-gray-300">Upload Font File (.woff2, .woff, .ttf, .otf)</label>
-                      <div class="rounded-2xl border border-white/15 bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm p-2 transition hover:border-white/30">
-                        <input id="settings-font-upload" type="file" accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf" class="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-sm text-gray-100 outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/25 file:mr-3 file:rounded-lg file:border-0 file:bg-white/15 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-white/25" />
-                      </div>
-                      <p class="mt-2 text-xs text-gray-400">Best results: upload .woff2 with a unique family name.</p>
-                    </div>
-                    <div>
-                      <label class="block mb-2 text-sm text-gray-300">Upload Font Family Name</label>
-                      <div class="relative">
-                      <input id="settings-font-upload-family" type="text" placeholder="My Uploaded Font" class="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none" />
-                        <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs uppercase tracking-wider text-gray-400">Family</span>
-                      </div>
-                    </div>
-                  </div>
-                  <p id="settings-font-status" class="text-sm text-gray-300">Choose a preset, use a custom URL, or upload a local font file.</p>
                 </article>
 
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
@@ -484,14 +167,6 @@
                     <option value="medium" ${window.getGamesParticlesSize() === 'medium' ? 'selected' : ''}>Medium</option>
                     <option value="large" ${window.getGamesParticlesSize() === 'large' ? 'selected' : ''}>Large</option>
                   </select>
-                </article>
-
-                <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
-                  <button type="button" onclick="resetSettingsCard('particles-background')" title="Reset Background" class="absolute top-4 right-4 w-9 h-9 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
-                  <label class="block mb-2 text-sm text-gray-300">Background Images</label>
-                  <div id="settings-background-choice-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-                    ${backgroundChoicesHtml}
-                  </div>
                 </article>
               </div>
 
@@ -721,11 +396,6 @@
                     <span>Open Markdown Guide</span>
                   </a>
                 </article>
-                <article class="bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
-                  <h2 class="text-lg font-semibold mb-2">Contributors</h2>
-                  <p class="text-sm text-gray-200 leading-6">A list of people who have contributed to the project.</p>
-                  <p class="text-sm text-gray-200 leading-6">From Los Angeles, California, Anonymous.</p>
-                </article>
               </div>
             </section>
           </div>
@@ -735,219 +405,6 @@
     afterRender: function afterRenderSettingsRoute() {
       if (typeof window.switchSettingsCategory === "function") {
         window.switchSettingsCategory("layout");
-      }
-      const updateBtn = document.getElementById("updateBtn");
-      const statusNode = document.getElementById("settings-font-status");
-      const applyUrlBtn = document.getElementById("settings-font-apply-url");
-      const uploadInput = document.getElementById("settings-font-upload");
-      const urlInput = document.getElementById("settings-font-url");
-      const desktopAppLabel = document.getElementById("desktopAppLabel");
-      const familyInput = document.getElementById("settings-font-family");
-      const uploadFamilyInput = document.getElementById("settings-font-upload-family");
-      const backgroundChoiceButtons = Array.from(document.querySelectorAll("[data-background-choice]"));
-      const backgroundUploadInput = document.getElementById("settings-background-upload");
-      const backgroundClearBtn = document.getElementById("settings-background-clear");
-      const backgroundStatusNode = document.getElementById("settings-background-status");
-      const currentBackgroundMode = typeof window.getGamesBackgroundMode === "function"
-        ? window.getGamesBackgroundMode()
-        : (localStorage.getItem("games-background-mode") || "none");
-
-      const isStandalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
-        || window.navigator.standalone === true;
-      const isDesktop = (navigator.userAgentData && typeof navigator.userAgentData.mobile === "boolean")
-        ? navigator.userAgentData.mobile === false
-        : !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent || "");
-
-      if (updateBtn && isStandalone && isDesktop && "serviceWorker" in navigator) {
-        updateBtn.style.display = "inline-flex";
-        updateBtn.className = "px-4 py-3 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 transition text-white";
-        desktopAppLabel.style.display = "none";
-        updateBtn.style.display = "inline-flex";
-        updateBtn.addEventListener("click", async () => {
-          updateBtn.disabled = true;
-          updateBtn.textContent = "Checking for update...";
-
-          try {
-            const registration = await navigator.serviceWorker.getRegistration();
-
-            if (!registration) {
-              updateBtn.textContent = "No app update service found";
-              return;
-            }
-
-            await registration.update();
-
-            if (registration.waiting) {
-              registration.waiting.postMessage({ type: "SKIP_WAITING" });
-              updateBtn.textContent = "Applying update...";
-              let didReload = false;
-              navigator.serviceWorker.addEventListener("controllerchange", () => {
-                if (didReload) {
-                  return;
-                }
-                didReload = true;
-                window.location.reload();
-              }, { once: true });
-              return;
-            }
-
-            updateBtn.textContent = "Already up to date";
-          } catch (_error) {
-            updateBtn.textContent = "Update failed";
-          } finally {
-            setTimeout(() => {
-              updateBtn.disabled = false;
-              updateBtn.textContent = "Update App";
-            }, 1800);
-          }
-        });
-      }
-
-      function setFontStatus(text, ok) {
-        if (!statusNode) {
-          return;
-        }
-        statusNode.textContent = text;
-        statusNode.classList.toggle("text-emerald-300", Boolean(ok));
-        statusNode.classList.toggle("text-red-300", !ok);
-      }
-
-      if (applyUrlBtn) {
-        applyUrlBtn.addEventListener("click", () => {
-          if (typeof window.applyNebulaCustomFontUrl !== "function") {
-            setFontStatus("Font engine unavailable.", false);
-            return;
-          }
-          const ok = window.applyNebulaCustomFontUrl(
-            urlInput ? urlInput.value : "",
-            familyInput ? familyInput.value : ""
-          );
-          if (ok) {
-            setFontStatus("Custom URL font applied.", true);
-          } else {
-            setFontStatus("Enter a valid https URL and font family name.", false);
-          }
-        });
-      }
-
-      if (uploadInput) {
-        uploadInput.addEventListener("change", async () => {
-          const file = uploadInput.files && uploadInput.files[0] ? uploadInput.files[0] : null;
-          const familyName = uploadFamilyInput ? uploadFamilyInput.value : "";
-          if (!file) {
-            return;
-          }
-          if (!familyName || !familyName.trim()) {
-            setFontStatus("Enter an upload font family name first.", false);
-            return;
-          }
-          if (typeof window.applyNebulaUploadedFontFile !== "function") {
-            setFontStatus("Font engine unavailable.", false);
-            return;
-          }
-          setFontStatus("Uploading and applying font...", true);
-          const ok = await window.applyNebulaUploadedFontFile(file, familyName);
-          if (ok) {
-            setFontStatus("Uploaded font applied.", true);
-          } else {
-            setFontStatus("Could not apply uploaded font.", false);
-          }
-        });
-      }
-
-      function setBackgroundStatus(text, ok) {
-        if (!backgroundStatusNode) {
-          return;
-        }
-        backgroundStatusNode.textContent = text;
-        backgroundStatusNode.classList.toggle("text-emerald-300", Boolean(ok));
-        backgroundStatusNode.classList.toggle("text-red-300", ok === false);
-      }
-
-      function setActiveBackgroundChoice(mode) {
-        backgroundChoiceButtons.forEach((button) => {
-          const isActive = button.getAttribute("data-background-choice") === mode;
-          button.classList.toggle("is-active", isActive);
-          button.setAttribute("aria-pressed", isActive ? "true" : "false");
-        });
-      }
-
-      function applyBackgroundChoice(mode) {
-        if (typeof window.changeGamesBackgroundMode !== "function") {
-          setBackgroundStatus("Background engine unavailable.", false);
-          return;
-        }
-        if (mode === "upload") {
-          const url = String(localStorage.getItem("games-background-url") || "");
-          if (!url.startsWith("data:image/")) {
-            setBackgroundStatus("Upload an image first to use this option.", false);
-            if (backgroundUploadInput) {
-              backgroundUploadInput.click();
-            }
-            return;
-          }
-        }
-        window.changeGamesBackgroundMode(mode);
-        setActiveBackgroundChoice(mode);
-        if (mode === "none") {
-          setBackgroundStatus("Particles active. No background override.", true);
-          return;
-        }
-        if (mode === "upload") {
-          setBackgroundStatus("Uploaded image applied. Particles hidden.", true);
-          return;
-        }
-        if (mode === "live-aurora") {
-          setBackgroundStatus("Live aurora background applied. Particles hidden.", true);
-          return;
-        }
-        setBackgroundStatus("Preset background applied. Particles hidden.", true);
-      }
-
-      if (backgroundChoiceButtons.length > 0) {
-        setActiveBackgroundChoice(currentBackgroundMode);
-        backgroundChoiceButtons.forEach((button) => {
-          button.addEventListener("click", () => {
-            const selected = String(button.getAttribute("data-background-choice") || "none");
-            applyBackgroundChoice(selected);
-          });
-        });
-      }
-
-      if (backgroundUploadInput) {
-        backgroundUploadInput.addEventListener("change", async () => {
-          const file = backgroundUploadInput.files && backgroundUploadInput.files[0] ? backgroundUploadInput.files[0] : null;
-          if (!file) {
-            return;
-          }
-          if (typeof window.applyGamesUploadedBackgroundFile !== "function") {
-            setBackgroundStatus("Background engine unavailable.", false);
-            return;
-          }
-          setBackgroundStatus("Uploading background...", true);
-          const ok = await window.applyGamesUploadedBackgroundFile(file);
-          if (ok) {
-            setActiveBackgroundChoice("upload");
-            setBackgroundStatus("Custom background applied. Particles hidden.", true);
-          } else {
-            setBackgroundStatus("Could not apply uploaded background.", false);
-          }
-        });
-      }
-
-      if (backgroundClearBtn) {
-        backgroundClearBtn.addEventListener("click", () => {
-          if (typeof window.clearGamesBackground !== "function") {
-            setBackgroundStatus("Background engine unavailable.", false);
-            return;
-          }
-          window.clearGamesBackground();
-          setActiveBackgroundChoice("none");
-          if (backgroundUploadInput) {
-            backgroundUploadInput.value = "";
-          }
-          setBackgroundStatus("Background removed. Particles restored.", true);
-        });
       }
       if (window.NebulaAuthUI) {
         window.NebulaAuthUI.mountSettingsAuthPanel();

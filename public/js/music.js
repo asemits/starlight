@@ -1148,10 +1148,6 @@ async function playTrack(apiUrl, title, artist, img) {
     saveRecentMusic(currentTrackData);
     document.getElementById('now-playing-title').textContent = title;
     document.getElementById('now-playing-artist').textContent = artist;
-    const heroTitle = document.getElementById('hero-title');
-    const heroArtist = document.getElementById('hero-artist');
-    if (heroTitle) heroTitle.textContent = String(title || 'Music');
-    if (heroArtist) heroArtist.textContent = String(artist || '');
     document.getElementById('status-msg').textContent = "Connecting...";
     updateFavUI();
 

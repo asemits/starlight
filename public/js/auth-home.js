@@ -26,13 +26,6 @@
   const NOTIFY_INAPP_KEY = "nebula-notify-inapp";
   const NOTIFY_OS_KEY = "nebula-notify-os";
   const FONT_KEY = "nebula-font";
-  const FONT_MODE_KEY = "nebula-font-mode";
-  const FONT_CUSTOM_URL_KEY = "nebula-font-custom-url";
-  const FONT_CUSTOM_FAMILY_KEY = "nebula-font-custom-family";
-  const FONT_UPLOAD_DATA_KEY = "nebula-font-upload-data";
-  const FONT_UPLOAD_FAMILY_KEY = "nebula-font-upload-family";
-  const FONT_UPLOAD_FORMAT_KEY = "nebula-font-upload-format";
-  const GAMES_BACKGROUND_UPDATED_AT_KEY = "games-background-updated-at";
   const NOTIFY_MESSAGES_KEY = "nebula-notify-messages";
   const NOTIFY_FRIEND_REQUESTS_KEY = "nebula-notify-friend-requests";
   const SYNC_SETTINGS_KEYS = [
@@ -44,9 +37,6 @@
     "games-particles-shape",
     "games-particles-frequency",
     "games-particles-size",
-    "games-background-mode",
-    "games-background-url",
-    GAMES_BACKGROUND_UPDATED_AT_KEY,
     "tab-shortcut-combo",
     "tab-shortcut-target",
     "tab-shortcut-enabled",
@@ -69,12 +59,6 @@
     "nebula-measurement-system",
     MUSIC_VOLUME_KEY,
     FONT_KEY,
-    FONT_MODE_KEY,
-    FONT_CUSTOM_URL_KEY,
-    FONT_CUSTOM_FAMILY_KEY,
-    FONT_UPLOAD_DATA_KEY,
-    FONT_UPLOAD_FAMILY_KEY,
-    FONT_UPLOAD_FORMAT_KEY,
     SOUNDBOARD_VOLUME_KEY,
     NOTIFY_INAPP_KEY,
     NOTIFY_OS_KEY,
@@ -128,7 +112,6 @@
     verifyTimerId: 0,
     autoSyncTimerId: 0
   };
-  let homeAppsListenerBound = false;
 
   function escapeHtml(value) {
     return String(value)
@@ -1209,17 +1192,8 @@
     if (!snapshot || typeof snapshot !== "object") {
       return;
     }
-    const remoteBackgroundUpdatedAt = Number(snapshot[GAMES_BACKGROUND_UPDATED_AT_KEY] || 0);
-    const localBackgroundUpdatedAt = Number(localStorage.getItem(GAMES_BACKGROUND_UPDATED_AT_KEY) || 0);
-    const skipBackgroundKeys = Number.isFinite(remoteBackgroundUpdatedAt)
-      && Number.isFinite(localBackgroundUpdatedAt)
-      && localBackgroundUpdatedAt > remoteBackgroundUpdatedAt;
-
     SYNC_SETTINGS_KEYS.forEach((key) => {
       if (!Object.prototype.hasOwnProperty.call(snapshot, key)) {
-        return;
-      }
-      if (skipBackgroundKeys && (key === "games-background-mode" || key === "games-background-url")) {
         return;
       }
       const value = snapshot[key];
@@ -1523,45 +1497,6 @@
     }
   }
 
-  function renderInstalledAppsHomeSection() {
-    const catalog = typeof window.getNebulaAppCatalog === "function" ? window.getNebulaAppCatalog() : [];
-    const installedIds = typeof window.getNebulaInstalledApps === "function" ? window.getNebulaInstalledApps() : [];
-    const installedSet = new Set(Array.isArray(installedIds) ? installedIds : []);
-    const installedApps = (Array.isArray(catalog) ? catalog : []).filter((item) => installedSet.has(String(item && item.id ? item.id : "")));
-
-    if (!installedApps.length) {
-      return `
-        <section class="nebula-dashboard-section">
-          <div class="nebula-dashboard-head">
-            <h2>Home Screen Apps</h2>
-          </div>
-          <p class="nebula-dashboard-empty">No pinned apps yet. Open Apps and click the pin icon.</p>
-        </section>
-      `;
-    }
-
-    const cards = installedApps.map((app) => `
-      <a href="${escapeHtml(app.href || "/apps")}" class="nebula-home-feature nav-link">
-        <div class="nebula-home-feature-inner">
-          <div class="nebula-home-feature-icon"><i class="${escapeHtml(app.icon || "fa-solid fa-shapes")}"></i></div>
-          <h3>${escapeHtml(app.title || "App")}</h3>
-          <p>${escapeHtml(app.description || "Pinned app")}</p>
-        </div>
-      </a>
-    `).join("");
-
-    return `
-      <section class="nebula-dashboard-section">
-        <div class="nebula-dashboard-head">
-          <h2>Home Screen Apps</h2>
-        </div>
-        <div class="nebula-home-grid">
-          ${cards}
-        </div>
-      </section>
-    `;
-  }
-
   function renderHome(selector) {
     const root = document.querySelector(selector);
     if (!root) {
@@ -1585,8 +1520,6 @@
       `;
     }).join("");
 
-    const installedAppsSection = renderInstalledAppsHomeSection();
-
     if (isLoggedIn()) {
       const showRecent = dashboardSectionEnabled("recent");
       const showFavorites = dashboardSectionEnabled("favorites");
@@ -1599,8 +1532,6 @@
             <h1>${escapeHtml(config.siteName)}</h1>
             <p class="nebula-home-tagline">welcome back</p>
           </header>
-
-          ${installedAppsSection}
 
           ${showRecent ? `<section class="nebula-dashboard-section">
             <div class="nebula-dashboard-head">
@@ -1643,7 +1574,6 @@
           <p class="nebula-home-tagline">${escapeHtml(config.heroTagline)}</p>
           <p class="nebula-home-subtext">${escapeHtml(config.heroSubtext)}</p>
         </header>
-        ${installedAppsSection}
         <section class="nebula-home-grid">
           ${featureCards}
         </section>
@@ -1663,15 +1593,6 @@
     const signupBtn = document.getElementById("nebula-signup");
     if (signupBtn) {
       signupBtn.addEventListener("click", openSignupTosModal);
-    }
-
-    if (!homeAppsListenerBound) {
-      homeAppsListenerBound = true;
-      window.addEventListener("nebula:apps-installed-changed", () => {
-        if (window.location.pathname === "/") {
-          renderHome(selector);
-        }
-      });
     }
 
   }

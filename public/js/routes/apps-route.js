@@ -1,418 +1,251 @@
 (function () {
   const modules = window.NebulaRouteModules = window.NebulaRouteModules || {};
-
-  const FALLBACK_CATALOG = [
-    { id: "soundboard", title: "Soundboard", description: "Play sound effects", icon: "fa-solid fa-volume-high", href: "/soundboard" },
-    { id: "weather", title: "Weather", description: "Forecast and alerts", icon: "fa-solid fa-cloud-sun-rain", href: "/weather" },
-    { id: "music", title: "Music", description: "Listen to your favorite tracks", icon: "fa-solid fa-music", href: "/music" },
-    { id: "notepad", title: "Notepad", description: "Write down stuff", icon: "fa-regular fa-clipboard", href: "/notepad" },
-    { id: "timer", title: "Timer", description: "Timer + stopwatch", icon: "fa-regular fa-clock", href: "/timer" },
-    { id: "maps", title: "Maps", description: "Live map + GPS", icon: "fa-solid fa-map-location-dot", href: "/maps" },
-    { id: "calc", title: "Calculator", description: "Basic and scientific calculations", icon: "fa-solid fa-calculator", href: "/calc" }
-  ];
-
-  function getCatalog() {
-    if (typeof window.getNebulaAppCatalog === "function") {
-      const catalog = window.getNebulaAppCatalog();
-      if (Array.isArray(catalog) && catalog.length) {
-        return catalog;
-      }
-    }
-    return FALLBACK_CATALOG;
-  }
-
-  function getInstalled() {
-    if (typeof window.getNebulaInstalledApps === "function") {
-      return window.getNebulaInstalledApps();
-    }
-    try {
-      const parsed = JSON.parse(localStorage.getItem("nebula-installed-apps") || "[]");
-      return Array.isArray(parsed) ? parsed.map((id) => String(id || "").trim()).filter(Boolean) : [];
-    } catch (_error) {
-      return [];
-    }
-  }
-
-  function setInstalled(appId, install) {
-    if (typeof window.toggleNebulaAppInstalled === "function") {
-      return window.toggleNebulaAppInstalled(appId, install);
-    }
-    const set = new Set(getInstalled());
-    if (install) {
-      set.add(String(appId || "").trim());
-    } else {
-      set.delete(String(appId || "").trim());
-    }
-    const next = Array.from(set);
-    localStorage.setItem("nebula-installed-apps", JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent("nebula:apps-installed-changed", { detail: { ids: next.slice() } }));
-    return next;
-  }
-
   modules["/apps"] = {
     render: function renderAppsRoute() {
-      const catalog = getCatalog();
-      const installed = new Set(getInstalled());
-const cards = catalog.map((app, index) => {
-  const isInstalled = installed.has(String(app.id || ""));
-  const installLabel = isInstalled ? "Installed" : "Install";
-  const installClass = isInstalled ? " is-installed" : "";
-  
-  return `
-    <article class="nebula-store-card" style="animation-delay:${(0.08 * (index + 1)).toFixed(2)}s;" data-app-id="${app.id}">
-      <button type="button" class="nebula-store-pin${installClass}" data-pin-app="${app.id}" title="${installLabel}">
-        <i class="fa-solid fa-thumbtack"></i>
-      </button>
-      <div class="nebula-store-icon"><i class="${app.icon || "fa-solid fa-shapes"}"></i></div>
-      <h2>${app.title || "App"}</h2>
-      <p class="nebula-store-desc">${app.description || "Install this app to add it to your home screen."}</p>
-      
-      <a href="${app.href}" class="nav-link nebula-store-open">Open</a>
-      
-      <div class="glow-bar"></div>
-    </article>
-  `;
-}).join("");
-
       return `
         <style>
-          .nebula-appstore {
-            --apps-card-bg: rgba(10, 13, 24, 0.66);
-            --apps-card-border: rgba(184, 200, 255, 0.18);
-            --apps-card-border-hover: rgba(212, 222, 255, 0.52);
-            --apps-card-shadow: 0 24px 60px rgba(0, 0, 0, 0.46);
-            --apps-card-shadow-hover: 0 34px 80px rgba(0, 0, 0, 0.58);
-            --apps-accent: rgba(144, 222, 255, 0.55);
-          }
-
           @keyframes cardReveal {
-            0% { opacity: 0; transform: translateY(38px) scale(0.96); filter: blur(8px); }
-            65% { filter: blur(0); }
-            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+            0%   { opacity: 0; transform: translateY(40px) scale(0.94); filter: blur(8px); }
+            60%  { filter: blur(0px); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
           }
 
-          .nebula-appstore {
-            width: min(1220px, 100% - 2rem);
-            margin: 0 auto;
-            padding: 0.75rem 0 3rem;
+          @keyframes scanline {
+            0%   { transform: translateY(-100%); opacity: 1; }
+            100% { transform: translateY(350%); opacity: 0; }
           }
 
-          .nebula-store-head {
-            margin: 0 0 1rem;
-            padding: 1rem 1rem 0.35rem;
+          @keyframes shimmerBorder {
+            0%, 100% { opacity: 0.4; }
+            50%       { opacity: 1; }
           }
 
-          .nebula-store-head h1 {
-            margin: 0;
+          .cards-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            padding: 20px 40px 40px 4%;
+            margin-left: 100px;
+          }
+
+          h1.tools-title, .titles {
+            display: flex;
+            justify-content: center;
             font-family: 'Cormorant Garamond', 'Georgia', serif;
-            font-weight: 500;
-            letter-spacing: 0.18em;
+            font-weight: 300;
+            letter-spacing: 0.25em;
             text-transform: uppercase;
-            color: rgba(245, 248, 255, 0.95);
-            text-shadow: 0 0 36px rgba(180, 214, 255, 0.28);
+            color: rgba(255,255,255,0.9);
+            text-shadow: 0 0 40px rgba(255,255,255,0.2);
+            margin-bottom: 10px;
+            opacity: 0;
+            animation: cardReveal 0.5s ease 0.1s forwards;
           }
 
-          .nebula-store-head p {
-            margin: 0.45rem 0 0;
-            font-size: 0.85rem;
-            color: rgba(218, 233, 255, 0.66);
-            letter-spacing: 0.06em;
-          }
-
-          .nebula-store-grid {
-            width: min(1220px, 100% - 2rem);
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-            gap: 1.15rem;
-          }
-
-          .nebula-store-card {
-            min-height: 270px;
-            padding: 1.1rem 1rem 1rem;
-            background:
-              radial-gradient(120% 85% at 100% 0%, rgba(129, 219, 255, 0.12), transparent 46%),
-              radial-gradient(110% 90% at 0% 100%, rgba(140, 166, 255, 0.15), transparent 52%),
-              var(--apps-card-bg);
-            backdrop-filter: blur(18px) saturate(160%);
-            -webkit-backdrop-filter: blur(18px) saturate(160%);
-            border: 1px solid var(--apps-card-border);
-            border-radius: 22px;
-            color: rgba(240, 246, 255, 0.82);
+          .tool-card {
+            width: 220px;
+            height: 280px;
+            background: rgba(255,255,255,0.04);
+            backdrop-filter: blur(24px) saturate(160%);
+            -webkit-backdrop-filter: blur(24px) saturate(160%);
+            border: 0.5px solid rgba(255,255,255,0.12);
+            border-radius: 20px;
+            text-decoration: none;
+            color: rgba(255,255,255,0.7);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 0.65rem;
+            gap: 10px;
             position: relative;
             overflow: hidden;
             cursor: pointer;
             opacity: 0;
-            animation: cardReveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            box-shadow: var(--apps-card-shadow);
-            transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.42s ease, border-color 0.32s ease;
+            animation: cardReveal 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            transition:
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.5s ease,
+              border-color 0.4s ease,
+              background 0.4s ease;
           }
 
-          .nebula-store-pin {
-            position: absolute;
-            top: 0.75rem;
-            right: 0.75rem;
-            width: 36px;
-            height: 36px;
-            display: grid;
-            place-items: center;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(239, 246, 255, 0.7);
-            cursor: pointer;
-            z-index: 10;
-            transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, color 0.2s ease;
-          }
-
-          .nebula-store-pin:hover {
-            background: rgba(255, 255, 255, 0.16);
-            border-color: rgba(255, 255, 255, 0.44);
-            color: rgba(255, 255, 255, 0.9);
-            transform: scale(1.05);
-          }
-
-          .nebula-store-pin.is-installed {
-            background: rgba(122, 238, 181, 0.18);
-            border-color: rgba(122, 238, 181, 0.56);
-            color: rgba(214, 255, 236, 0.98);
-          }
-
-          .nebula-store-pin.is-installed:hover {
-            background: rgba(122, 238, 181, 0.28);
-            border-color: rgba(122, 238, 181, 0.7);
-          }
-
-          .nebula-store-card::before,
-          .nebula-store-card::after {
+          .tool-card::after {
             content: '';
             position: absolute;
-            inset: 0;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            border-radius: 20px 20px 0 0;
+            transition: opacity 0.4s ease;
+          }
+
+          .tool-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 35%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.06), transparent);
+            transform: translateY(-100%);
             pointer-events: none;
+            z-index: 2;
           }
 
-          .nebula-store-card::before {
-            background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, 0.26) 50%, transparent 75%);
-            transform: translateX(-135%);
-            transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-            opacity: 0.6;
+          .tool-card:hover::before {
+            animation: scanline 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           }
 
-          .nebula-store-card::after {
-            border-radius: 22px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            inset: 2px;
+          .tool-card:hover {
+            transform: translateY(-12px) scale(1.03);
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.28);
+            box-shadow:
+              0 30px 60px rgba(0,0,0,0.7),
+              0 0 0 0.5px rgba(255,255,255,0.1),
+              0 0 40px rgba(255,255,255,0.04),
+              0 1px 0 rgba(255,255,255,0.15) inset;
           }
 
-          .nebula-store-card:hover {
-            transform: translateY(-10px) scale(1.022);
-            border-color: var(--apps-card-border-hover);
-            box-shadow: var(--apps-card-shadow-hover);
+          .tool-card .corner {
+            position: absolute;
+            top: 12px; right: 12px;
+            width: 10px; height: 10px;
+            border-top: 0.5px solid rgba(255,255,255,0.3);
+            border-right: 0.5px solid rgba(255,255,255,0.3);
+            border-radius: 0 4px 0 0;
+            transition: width 0.4s cubic-bezier(0.16,1,0.3,1), height 0.4s cubic-bezier(0.16,1,0.3,1), border-color 0.3s ease;
+          }
+          .tool-card:hover .corner {
+            width: 18px; height: 18px;
+            border-color: rgba(255,255,255,0.7);
           }
 
-          .nebula-store-card:hover::before {
-            transform: translateX(135%);
+          .tool-card .corner-bl {
+            position: absolute;
+            bottom: 12px; left: 12px;
+            width: 10px; height: 10px;
+            border-bottom: 0.5px solid rgba(255,255,255,0.3);
+            border-left: 0.5px solid rgba(255,255,255,0.3);
+            border-radius: 0 0 0 4px;
+            transition: width 0.4s cubic-bezier(0.16,1,0.3,1), height 0.4s cubic-bezier(0.16,1,0.3,1), border-color 0.3s ease;
+          }
+          .tool-card:hover .corner-bl {
+            width: 18px; height: 18px;
+            border-color: rgba(255,255,255,0.7);
           }
 
-          .nebula-store-icon i {
-            width: 72px;
-            height: 72px;
-            display: grid;
-            place-items: center;
+          .tool-card .glow-bar {
+            position: absolute;
+            bottom: 0; left: 20%; right: 20%;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.6), transparent);
+            opacity: 0;
+            transition: opacity 0.4s ease, left 0.4s ease, right 0.4s ease;
+            z-index: 3;
+            border-radius: 1px;
+          }
+          .tool-card:hover .glow-bar {
+            opacity: 1;
+            left: 10%;
+            right: 10%;
+          }
+
+          .tool-card img {
+            width: 72px; height: 72px;
             object-fit: contain;
-            color: rgba(236, 243, 255, 0.84);
-            filter: drop-shadow(0 0 18px rgba(145, 222, 255, 0.2));
-            transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.35s ease, filter 0.35s ease;
+            filter: brightness(0) invert(1) opacity(0.7);
+            transition: transform 0.5s cubic-bezier(0.16,1,0.3,1), filter 0.4s ease;
             z-index: 1;
           }
-
-          .nebula-store-card:hover .nebula-store-icon i {
-            transform: translateY(-4px) scale(1.08);
-            color: rgba(255, 255, 255, 1);
-            filter: drop-shadow(0 0 22px rgba(165, 236, 255, 0.45));
+          .tool-card:hover img {
+            transform: scale(1.15) translateY(-4px);
+            filter: brightness(0) invert(1) opacity(1) drop-shadow(0 0 12px rgba(255,255,255,0.5));
           }
 
-          .nebula-store-card h2 {
+          .tool-card .card-icon-fa {
+            font-size: 52px;
+            color: rgba(255,255,255,0.5);
+            transition: transform 0.5s cubic-bezier(0.16,1,0.3,1), filter 0.4s ease, color 0.4s ease;
+            z-index: 1;
+          }
+          .tool-card:hover .card-icon-fa {
+            transform: scale(1.15) translateY(-4px);
+            color: rgba(255,255,255,0.95);
+            filter: drop-shadow(0 0 14px rgba(255,255,255,0.4));
+          }
+
+          .tool-card h2 {
             font-family: 'Geist', 'Segoe UI', sans-serif;
-            font-size: 0.78rem;
-            font-weight: 500;
-            letter-spacing: 0.16em;
+            font-size: 12px;
+            font-weight: 300;
+            letter-spacing: 0.2em;
             text-transform: uppercase;
             margin: 0;
             text-align: center;
-            color: rgba(238, 244, 255, 0.86);
-            transition: letter-spacing 0.28s ease, color 0.28s ease;
             z-index: 1;
+            color: rgba(255,255,255,0.6);
+            transition: color 0.3s ease, text-shadow 0.3s ease;
+          }
+          .tool-card:hover h2 {
+            color: rgba(255,255,255,0.95);
+            text-shadow: 0 0 20px rgba(255,255,255,0.3);
           }
 
-          .nebula-store-card:hover h2 {
-            color: rgba(255, 255, 255, 1);
-            letter-spacing: 0.19em;
-          }
-
-          .nebula-store-desc {
+          .tool-card .card-desc {
             font-family: 'Geist', 'Segoe UI', sans-serif;
-            font-size: 0.72rem;
-            font-weight: 300;
+            font-size: 11px;
+            font-weight: 200;
+            color: rgba(255,255,255,0.0);
             text-align: center;
-            padding: 0 0.7rem;
-            line-height: 1.55;
+            padding: 0 18px;
+            line-height: 1.7;
             letter-spacing: 0.04em;
-            color: rgba(225, 237, 255, 0.72);
             z-index: 1;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s cubic-bezier(0.16,1,0.3,1), color 0.4s ease, opacity 0.4s ease;
+            opacity: 0;
           }
-
-          .nebula-store-open {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 38px;
-            padding: 0 1.2rem;
-            border-radius: 11px;
-            border: 1px solid rgba(255, 255, 255, 0.24);
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(239, 246, 255, 0.92);
-            text-decoration: none;
-            font-size: 0.72rem;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-            margin-top: 0.4rem;
-          }
-
-          .nebula-store-open:hover {
-            background: rgba(255, 255, 255, 0.16);
-            border-color: rgba(255, 255, 255, 0.44);
-            transform: translateY(-1px);
-          }
-
-          .nebula-store-card .glow-bar {
-            position: absolute;
-            bottom: 0;
-            left: 16%;
-            right: 16%;
-            height: 2px;
-            border-radius: 999px;
-            background: linear-gradient(90deg, transparent, var(--apps-accent), transparent);
-            opacity: 0.25;
-            transform: scaleX(0.72);
-            transition: transform 0.34s ease, opacity 0.34s ease;
-            z-index: 1;
-          }
-
-          .nebula-store-card:hover .glow-bar {
-            transform: scaleX(1);
-            opacity: 0.95;
-          }
-
-          @media (max-width: 900px) {
-            .nebula-appstore {
-              width: min(980px, 100% - 1.35rem);
-            }
-
-            .nebula-store-grid {
-              width: min(980px, 100% - 1.35rem);
-              grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-              gap: 0.95rem;
-              padding-bottom: 2rem;
-            }
-
-            .nebula-store-card {
-              min-height: 238px;
-              border-radius: 18px;
-            }
-          }
-
-          @media (max-width: 520px) {
-            .nebula-store-grid {
-              grid-template-columns: repeat(2, minmax(0, 1fr));
-              gap: 0.75rem;
-            }
-
-            .nebula-store-card {
-              min-height: 210px;
-              padding: 0.85rem 0.7rem 0.75rem;
-            }
-
-            .nebula-store-icon i {
-              width: 58px;
-              height: 58px;
-            }
-
-            .nebula-store-card h2 {
-              font-size: 0.67rem;
-              letter-spacing: 0.12em;
-            }
-
-            .nebula-store-actions {
-              grid-template-columns: 1fr;
-            }
+          .tool-card:hover .card-desc {
+            max-height: 80px;
+            color: rgba(255,255,255,0.45);
+            opacity: 1;
           }
         </style>
-        <section class="nebula-appstore">
-          <header class="nebula-store-head">
-            <h1>App Store</h1>
-            <p>Use apps and pin apps to your home screen. Stored on this device.</p>
-          </header>
-          <div class="nebula-store-grid">
-            ${cards}
-          </div>
-        </section>
+        <h1 class="tools-title"><i class="fa-solid fa-shapes"></i>‎ ‎ Apps</h1>
+        <br>
+        <div class="cards-container">
+          <a href="/soundboard" class="nav-link tool-card" style="animation-delay: 0.2s;">
+            <i class="fa-solid fa-volume-high" style="font-size: 52px;"></i>
+            <h2>Soundboard</h2>
+            <p class="card-desc">Play sound effects</p>
+            <div class="glow-bar"></div>
+          </a>
+          <a href="/weather" class="nav-link tool-card" style="animation-delay: 0.35s;">
+            <i class="fa-solid fa-cloud-sun-rain" style="font-size: 52px;"></i>
+            <h2>Weather</h2>
+            <p class="card-desc">Forecast and alerts</p>
+            <div class="glow-bar"></div>
+          </a>
+          <a href="/music" class="nav-link tool-card" style="animation-delay: 0.5s;">
+            <i class="fa-solid fa-music" style="font-size: 52px;"></i>
+            <h2>Music</h2>
+            <p class="card-desc">Listen to your favorite tracks</p>
+            <div class="glow-bar"></div>
+          </a>
+          <a href="/notepad" class="nav-link tool-card" style="animation-delay: 0.7s;">
+            <i class="fa-regular fa-clipboard" style="font-size: 52px;"></i>
+            <h2>Notepad</h2>
+            <p class="card-desc">Write down stuff</p>
+            <div class="glow-bar"></div>
+          </a>
+          <a href="/timer" class="nav-link tool-card" style="animation-delay: 0.7s;">
+            <i class="fa-regular fa-clock" style="font-size: 52px;"></i>
+            <h2>Timer</h2>
+            <p class="card-desc">Timer + stopwatch</p>
+            <div class="glow-bar"></div>
+          </a>
+        </div>
       `;
-    },
- afterRender: function afterRenderAppsRoute() {
-  const buttons = document.querySelectorAll("[data-pin-app]");
-  buttons.forEach((button) => {
-    button.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const appId = button.getAttribute("data-pin-app");
-      const isCurrentlyInstalled = button.classList.contains("is-installed");
-
-      if (!isCurrentlyInstalled) {
-        // Mark as installed
-        button.classList.add("is-installed");
-        button.setAttribute("title", "Installed");
-        setInstalled(appId, true);
-      } else {
-        // Mark as uninstalled
-        button.classList.remove("is-installed");
-        button.setAttribute("title", "Install");
-        setInstalled(appId, false);
-      }
-    });
-  });
-
-  const cards = document.querySelectorAll(".nebula-store-card");
-  cards.forEach((card) => {
-    card.addEventListener("click", (e) => {
-      if (e.target.closest("[data-pin-app]")) {
-        return;
-      }
-      const appId = card.getAttribute("data-app-id");
-      const catalog = typeof window.getNebulaAppCatalog === "function" ? window.getNebulaAppCatalog() : [
-        { id: "soundboard", href: "/soundboard" },
-        { id: "weather", href: "/weather" },
-        { id: "music", href: "/music" },
-        { id: "notepad", href: "/notepad" },
-        { id: "timer", href: "/timer" },
-        { id: "maps", href: "/maps" },
-        { id: "calc", href: "/calc" }
-      ];
-      const app = catalog.find((a) => a.id === appId);
-      if (app && app.href) {
-        window.location.href = app.href;
-      }
-    });
-  });
-}
-
+    }
   };
 })();

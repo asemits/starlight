@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <title>Nebula</title>
+    <title>nebula</title>
     <link rel="icon" type="image/x-icon" href="static/logo.png"> 
-    <link rel="manifest" href="manifest.json">
     <!-- fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap" rel="stylesheet">
     <link href="https://fonts.cdnfonts.com/css/minecraft-3" rel="stylesheet">
@@ -25,7 +24,7 @@
     <!-- css -->
     <link rel="stylesheet" href="css/sidebar.css">
     <link rel="stylesheet" href="css/index.css">
-    <link rel="stylesheet" href="css/cursor.css">
+    <link rel=""stylesheet" href="css/cursor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/gh/genizy/soundboard@main/style.css" rel="stylesheet">
   </head>
@@ -80,39 +79,6 @@
         </ul>
     </nav>
     <div id="app-content" class="p-8 pt-24"></div>
-    <script>
-        // ==========================
-// PWA INSTALL SETUP
-// ==========================
-let deferredPrompt;
-const installBtn = document.getElementById("installBtn");
-
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-
-  if (installBtn) {
-    installBtn.style.display = "block";
-  }
-});
-
-installBtn?.addEventListener("click", async () => {
-  if (!deferredPrompt) return;
-
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-  deferredPrompt = null;
-});
-
-
-// ==========================
-// PWA DETECTION
-// ==========================
-function isPWA() {
-  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-}
-
-    </script>
     <!-- routes and other shit idk here -->
     <script src="js/cursor.js"></script>
     <script src="js/app-core.js"></script>
@@ -122,7 +88,6 @@ function isPWA() {
     <script src="js/private-chat.js"></script>
     <script src="js/ai-chat.js"></script>
     <script src="js/routes/home-route.js"></script>
-    <script src="js/routes/feed-route.js"></script>
     <script src="js/routes/games-route.js"></script>
     <script src="js/routes/proxy-route.js"></script>
     <script src="js/routes/timer-route.js"></script>
@@ -135,8 +100,6 @@ function isPWA() {
     <script src="js/routes/settings-route.js"></script>
     <script src="js/routes/music-route.js"></script>    
     <script src="js/routes/apps-route.js"></script>
-    <script src="js/routes/maps-route.js"></script>
-    <script src="js/routes/calc-route.js"></script>
     <script src="js/routes/soundboard-route.js"></script>
     <script src="js/routes/markdown-guide-route.js"></script>
     <script src="js/routes/notfound-route.js"></script>
