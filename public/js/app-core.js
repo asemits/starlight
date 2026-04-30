@@ -909,12 +909,14 @@ iframe { width: 100vw; height: 100vh; border: none; }
     "preset-glass-plate": "static/bg/bg4.webp",
     "preset-future-city": "static/bg/bg5.webp",
     "preset-glint": "static/bg/bg6.webp",
-    "live-car": "static/bg/live1.mp4"
+    "live-car": "static/bg/live1.mp4",
+    "live-nebula": "static/bg/live2.mp4",
+    "live-rain": "static/bg/live3.mp4"
   };
 
   function normalizeBackgroundMode(input) {
     const mode = String(input || "").trim();
-    if (mode === "preset-flow" || mode === "preset-torus" || mode === "preset-monochrome" || mode === "preset-glass-plate" || mode === "preset-future-city" || mode === "preset-glint" || mode === "live-car" || mode === "upload") {
+    if (mode === "preset-flow" || mode === "preset-torus" || mode === "preset-monochrome" || mode === "preset-glass-plate" || mode === "preset-future-city" || mode === "preset-glint" || mode === "live-car" || mode === "live-nebula" || mode === "live-rain" || mode === "upload") {
       return mode;
     }
     return "none";
@@ -1772,10 +1774,14 @@ iframe { width: 100vw; height: 100vh; border: none; }
       body.style.removeProperty("background-attachment");
 
       const existingCarFrame = document.getElementById("nebula-live-car-frame");
+      const existingCarVideo = document.getElementById("nebula-video-background");
 
       if (settings.backgroundMode === "none") {
         if (existingCarFrame) {
           existingCarFrame.remove();
+        }
+        if (existingCarVideo) {
+          existingCarVideo.remove();
         }
         return;
       }
@@ -1784,80 +1790,54 @@ iframe { width: 100vw; height: 100vh; border: none; }
         if (existingCarFrame) {
           existingCarFrame.remove();
         }
+        if (existingCarVideo) {
+          existingCarVideo.remove();
+        }
         body.classList.add("nebula-live-background");
         return;
       }
 
-      if (settings.backgroundMode === "live-car") {
+      if (settings.backgroundMode === "live-car" || settings.backgroundMode === "live-nebula" || settings.backgroundMode === "live-rain") {
         const videoUrl = settings.backgroundUrl;
-        let carFrame = existingCarFrame;
-        if (!carFrame) {
-          carFrame = document.createElement("iframe");
-          carFrame.id = "nebula-live-car-frame";
-          carFrame.className = "nebula-live-car-frame";
-          carFrame.setAttribute("title", "Live car background");
-          carFrame.setAttribute("aria-hidden", "true");
-          carFrame.setAttribute("tabindex", "-1");
-          carFrame.setAttribute("loading", "eager");
-          carFrame.setAttribute("referrerpolicy", "no-referrer");
-          carFrame.setAttribute("allow", "autoplay; fullscreen");
-          carFrame.setAttribute("sandbox", "allow-scripts");
-          document.body.insertBefore(carFrame, document.body.firstChild);
+        if (existingCarFrame) {
+          existingCarFrame.remove();
         }
-        body.classList.add("nebula-live-car-background");
-
-        const safeVideoUrl = String(videoUrl || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll("\"", "&quot;");
-        const nextSrcdoc = `<!doctype html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  html, body {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    overflow: hidden;
-    background: #000;
-  }
-  body {
-    contain: strict;
-    isolation: isolate;
-  }
-  video {
-    position: fixed;
-    inset: 0;
-    width: 100vw;
-    height: 100vh;
-    object-fit: cover;
-    object-position: center center;
-    display: block;
-    pointer-events: none;
-    transform: translateZ(0);
-    will-change: transform;
-    backface-visibility: hidden;
-  }
-</style>
-</head>
-<body>
-<video autoplay muted loop playsinline preload="auto" disablepictureinpicture src="${safeVideoUrl}"></video>
-</body>
-</html>`;
-
-        if (carFrame.getAttribute("srcdoc") !== nextSrcdoc) {
-          carFrame.setAttribute("srcdoc", nextSrcdoc);
+        let carVideo = existingCarVideo;
+        if (!carVideo) {
+          carVideo = document.createElement("video");
+          carVideo.id = "nebula-video-background";
+          carVideo.className = "nebula-live-car-video";
+          carVideo.setAttribute("autoplay", "");
+          carVideo.setAttribute("muted", "");
+          carVideo.setAttribute("loop", "");
+          carVideo.setAttribute("playsinline", "");
+          carVideo.setAttribute("preload", "auto");
+          carVideo.setAttribute("disablepictureinpicture", "");
+          carVideo.muted = true;
+          document.body.insertBefore(carVideo, document.body.firstChild);
         }
-        if (carFrame.contentWindow) {
+
+        if (carVideo.getAttribute("src") !== videoUrl) {
+          carVideo.setAttribute("src", videoUrl);
           try {
-            carFrame.contentWindow.focus();
+            carVideo.load();
           } catch (_error) {
           }
         }
+
+        const playPromise = carVideo.play();
+        if (playPromise && typeof playPromise.catch === "function") {
+          playPromise.catch(() => {});
+        }
+        body.classList.add("nebula-live-car-background");
         return;
       }
 
       if (existingCarFrame) {
         existingCarFrame.remove();
+      }
+      if (existingCarVideo) {
+        existingCarVideo.remove();
       }
 
       if (!settings.backgroundUrl) {

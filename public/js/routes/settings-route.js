@@ -28,7 +28,9 @@
         { id: "preset-glass-plate", label: "Glass Plate", preview: "static/bg/bg4.webp" },
         { id: "preset-future-city", label: "Future City", preview: "static/bg/bg5.webp" },
         { id: "preset-glint", label: "Glint", preview: "static/bg/bg6.webp" },
-        { id: "live-car", label: "Live Car (Laggy)", preview: "video", videoUrl: "static/bg/live1.mp4" }
+        { id: "live-car", label: "Live Car (Laggy)", preview: "video", videoUrl: "static/bg/live1.mp4" },
+        { id: "live-nebula", label: "Live Nebula", preview: "video", videoUrl: "static/bg/live2.mp4" },
+        { id: "live-rain", label: "Live Rain", preview: "video", videoUrl: "static/bg/live3.mp4" }
       ];
       const backgroundChoicesHtml = backgroundChoices.map((choice) => {
         const selectedClass = backgroundMode === choice.id ? " ring-2 ring-cyan-300/70 border-cyan-300/60" : "";

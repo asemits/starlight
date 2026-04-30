@@ -111,14 +111,6 @@ body.nebula-live-car-background {
   opacity: 0.5;
 }
 
-#app-content {
-  position: relative;
-  z-index: 1;
-  opacity: 1;
-  transform: none;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
 #app-content.route-exit {
   opacity: 0;
   transform: translateX(12px);
