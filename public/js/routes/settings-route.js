@@ -719,11 +719,6 @@
                     <span>Open Markdown Guide</span>
                   </a>
                 </article>
-                <article class="bg-white/5 p-6 rounded-2xl border border-white/10 sm:col-span-2">
-                  <h2 class="text-lg font-semibold mb-2">Contributors</h2>
-                  <p class="text-sm text-gray-200 leading-6">A list of people who have contributed to the project.</p>
-                  <p class="text-sm text-gray-200 leading-6">From Los Angeles, California, Anonymous.</p>
-                </article>
               </div>
             </section>
           </div>
