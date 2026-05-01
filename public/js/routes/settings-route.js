@@ -331,9 +331,9 @@
                   </select>
                 </article>
                 <article class="relative bg-white/5 p-6 rounded-2xl border border-white/10">
-                <label class="block mb-2 text-sm text-gray-300">Desktop App</label> 
+                <label class="block mb-2 text-sm text-gray-300">Desktop App Updates</label> 
                 <br>
-                <label id="desktopAppLabel" class="flex items-center gap-2 text-sm mb-4">Not available on website. Install App to access</label>
+                <label id="desktopAppLabel" class="flex items-center gap-2 text-sm mb-4">Not available on website. Install app to access.</label>
                 <button id="updateBtn" style="display:none;"><i class="fa-solid fa-sync"></i>‎  Update App</button>
                 </article>
 
