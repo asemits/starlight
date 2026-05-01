@@ -697,7 +697,6 @@
 
 .neb-status.ok { color: rgba(160,255,200,0.85); }
 
-/* Create post modal */
 .neb-create-modal-card {
   width: min(600px,100%);
 }
@@ -1241,8 +1240,8 @@ function handle(user) {
           return `
             <article class="neb-community-item">
               <div class="neb-community-item-top">
-                <p class="neb-community-item-name">${escapeHtml(community.id)}${isCustom ? ' <span style="font-size:9px;color:rgba(255,255,255,0.4);">CUSTOM</span>' : ''}</p>
-                <button class="neb-join-btn ${joined ? "j oined" : ""}" type="button" data-action="toggle-community" data-community="${escapeHtml(community.id)}">${joined ? "Joined" : "Join"}</button>
+                <p class="neb-community-item-name">${escapeHtml(community.id)}${isCustom ? ' <span style="font-size:9px;color:rgba(255,255,255,0.4);"></span>' : ''}</p>
+                <button class="neb-join-btn ${joined ? "j oined" : ""}" type="button" data-action="toggle-community" data-community="${escapeHtml(community.id)}">${joined ? "View" : "View"}</button>
               </div>
               <p class="neb-community-item-desc">${escapeHtml(community.desc)}</p>
             </article>
