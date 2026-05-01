@@ -3,9 +3,15 @@
   const AI_CLOUD_SYNC_KEY = "nebula-sync-ai-conversations";
   const AI_CUSTOM_INSTRUCTIONS_KEY = "nebula-ai-custom-instructions";
   const AI_SERVER_BASE_KEY = "nebula-ai-server-base";
+  const AI_DIRECT_MODE_KEY = "nebula-ai-direct-mode";
+  const AI_GEMINI_MODEL_KEY = "nebula-ai-model";
+  const AI_GEMINI_CONTEXT_LIMIT_KEY = "nebula-ai-context-limit";
+  const AI_QUOTA_KEY = "nebula-ai-quota-v1";
+  const AI_GEMINI_MODEL_DEFAULT = "gemini-2.5-flash";
+  const AI_GEMINI_TUNNEL_URL = "https://script.google.com/macros/s/AKfycbyUwrz4n6d58QHC1cnqzrX-c24KhnkRvNLjMbVc-9TDmE2R6kcr5WALWtjIRDGN3at32w/exec";
   const AI_CONVERSATION_LIMIT = 60;
   const AI_MESSAGE_LIMIT = 120;
-  const AI_CONTEXT_LIMIT = 30;
+  const AI_CONTEXT_LIMIT_DEFAULT = 30;
   const AI_UPLOAD_LIMIT = 4;
   const AI_UPLOAD_MAX_BYTES = 1500000;
 
@@ -106,13 +112,17 @@
       return null;
     }
     if (attachment.kind === "image") {
-      return {
+      const imageAttachment = {
         id: attachment.id,
         name: attachment.name,
         mimeType: attachment.mimeType,
         kind: "image",
         size: attachment.size
       };
+      if (attachment.base64) {
+        imageAttachment.base64 = String(attachment.base64);
+      }
+      return imageAttachment;
     }
     return {
       id: attachment.id,
@@ -240,6 +250,208 @@
       return window.location.origin;
     }
     return raw.replace(/\/+$/g, "");
+  }
+
+  function directModeEnabled() {
+    const raw = String(localStorage.getItem(AI_DIRECT_MODE_KEY) || "").trim().toLowerCase();
+    if (raw === "off" || raw === "false" || raw === "0") {
+      return false;
+    }
+    if (raw === "on" || raw === "true" || raw === "1") {
+      return true;
+    }
+    return true;
+  }
+
+  function cloudApiEnabled() {
+    return cloudSyncEnabled() && !directModeEnabled();
+  }
+
+  function getCurrentModel() {
+    const stored = String(localStorage.getItem(AI_GEMINI_MODEL_KEY) || "").trim();
+    if (stored === "gemini-2.5-flash-lite" || stored === "gemini-2.5-flash") {
+      return stored;
+    }
+    return AI_GEMINI_MODEL_DEFAULT;
+  }
+
+  function setCurrentModel(model) {
+    const valid = model === "gemini-2.5-flash-lite" ? "gemini-2.5-flash-lite" : "gemini-2.5-flash";
+    localStorage.setItem(AI_GEMINI_MODEL_KEY, valid);
+  }
+
+  function getContextLimit() {
+    const stored = Number.parseInt(String(localStorage.getItem(AI_GEMINI_CONTEXT_LIMIT_KEY) || ""), 10);
+    if (Number.isFinite(stored) && stored >= 1 && stored <= 100) {
+      return stored;
+    }
+    return AI_CONTEXT_LIMIT_DEFAULT;
+  }
+
+  function setContextLimit(limit) {
+    const valid = clampNumber(limit, 1, 100, AI_CONTEXT_LIMIT_DEFAULT);
+    localStorage.setItem(AI_GEMINI_CONTEXT_LIMIT_KEY, String(valid));
+  }
+
+  function getTodayKey() {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function readQuotaStore() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(AI_QUOTA_KEY) || "{}");
+      const today = getTodayKey();
+      const dayKey = String(parsed.dayKey || "");
+      if (dayKey !== today) {
+        return {
+          limit: 100,
+          used: 0,
+          remaining: 100,
+          dayKey: today
+        };
+      }
+      return {
+        limit: clampNumber(parsed.limit, 1, 100000, 100),
+        used: clampNumber(parsed.used, 0, 100000, 0),
+        remaining: clampNumber(parsed.remaining, 0, 100000, 100),
+        dayKey: today
+      };
+    } catch (_error) {
+      return {
+        limit: 100,
+        used: 0,
+        remaining: 100,
+        dayKey: getTodayKey()
+      };
+    }
+  }
+
+  function writeQuotaStore() {
+    try {
+      localStorage.setItem(AI_QUOTA_KEY, JSON.stringify(state.quota));
+    } catch (_error) {
+    }
+  }
+
+  function decrementQuota() {
+    if (state.quota.remaining > 0) {
+      state.quota.remaining = Math.max(0, state.quota.remaining - 1);
+      state.quota.used = Math.min(state.quota.limit, state.quota.used + 1);
+      writeQuotaStore();
+    }
+  }
+
+
+  function isQuotaErrorPayload(httpStatus, payload) {
+    if (httpStatus === 429) {
+      return true;
+    }
+    const errorObject = payload && payload.error ? payload.error : payload;
+    const codeText = String(errorObject && (errorObject.status || errorObject.code || "") || "").toUpperCase();
+    const message = String(errorObject && errorObject.message || "").toLowerCase();
+    return codeText.includes("RESOURCE_EXHAUSTED")
+      || codeText.includes("RATE_LIMIT")
+      || message.includes("quota")
+      || message.includes("rate limit")
+      || message.includes("resource exhausted");
+  }
+
+  function composeGeminiContents(messages) {
+    const output = [];
+    const list = Array.isArray(messages) ? messages : [];
+    list.forEach((message) => {
+      if (!message || typeof message !== "object") {
+        return;
+      }
+      const parts = [];
+      const text = String(message.content || "");
+      if (text.trim()) {
+        parts.push({ text });
+      }
+      const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+      attachments.forEach((attachment) => {
+        const normalized = normalizeAttachment(attachment);
+        if (!normalized) {
+          return;
+        }
+        if (normalized.kind === "image" && normalized.base64) {
+          parts.push({
+            inline_data: {
+              mime_type: normalized.mimeType || "image/png",
+              data: normalized.base64
+            }
+          });
+          return;
+        }
+        if (normalized.kind === "text" && normalized.text) {
+          parts.push({ text: `[${normalized.name}]\n${String(normalized.text || "").slice(0, 180000)}` });
+        }
+      });
+      if (!parts.length) {
+        return;
+      }
+      output.push({
+        role: message.role === "assistant" ? "model" : "user",
+        parts
+      });
+    });
+    return output;
+  }
+
+  async function requestGeminiWithRotation(payload) {
+    const contents = composeGeminiContents(payload && payload.messages ? payload.messages : []);
+    if (!contents.length) {
+      throw new Error("No valid message content to send.");
+    }
+
+    const customInstructions = String(payload && payload.customInstructions ? payload.customInstructions : "").trim();
+    const requestBody = {
+      model: getCurrentModel(),
+      contents,
+      generationConfig: {
+        temperature: 0.6,
+        topP: 0.9,
+        maxOutputTokens: 8192
+      }
+    };
+    if (customInstructions) {
+      requestBody.systemInstruction = {
+        parts: [{ text: customInstructions.slice(0, 4000) }]
+      };
+    }
+
+
+    let response;
+    let json;
+    try {
+      response = await fetch(AI_GEMINI_TUNNEL_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify(requestBody)
+      });
+      json = await response.json();
+    } catch (_error) {
+      throw new Error("Could not reach AI tunnel.");
+    }
+
+    if (!response.ok) {
+      const apiMessage = String(json && json.error && json.error.message ? json.error.message : json && json.error ? json.error : "AI tunnel request failed.");
+      throw new Error(apiMessage);
+    }
+    const candidates = Array.isArray(json && json.candidates) ? json.candidates : [];
+    const first = candidates[0] || null;
+    const parts = first && first.content && Array.isArray(first.content.parts) ? first.content.parts : [];
+    const output = parts.map((part) => String(part && part.text ? part.text : "")).join("\n").trim();
+    if (!output) {
+      throw new Error("AI tunnel returned an empty response.");
+    }
+    return {
+      assistantMessage: output,
+      title: String(payload && payload.title ? payload.title : "")
+    };
   }
 
   function getCustomInstructions() {
@@ -397,6 +609,49 @@
     if (newButton) {
       newButton.disabled = state.busy;
     }
+  }
+
+  function delayMs(ms) {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, Math.max(0, Number(ms) || 0));
+    });
+  }
+
+  async function animateAssistantTyping(conversation, messageId, finalText) {
+    const text = String(finalText || "");
+    const message = conversation && Array.isArray(conversation.messages)
+      ? conversation.messages.find((item) => item.id === messageId)
+      : null;
+    if (!message) {
+      return;
+    }
+
+    const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion || text.length < 60) {
+      message.content = text;
+      renderMessageList();
+      return;
+    }
+
+    const tokens = text.match(/(\s+|[^\s]+)/g) || [text];
+    const chunkSize = text.length > 1800 ? 6 : text.length > 1000 ? 4 : 2;
+    const stepDelay = text.length > 1800 ? 10 : text.length > 1000 ? 14 : 18;
+
+    message.content = "";
+    renderMessageList();
+
+    for (let i = 0; i < tokens.length; i += chunkSize) {
+      if (!state.mounted || !state.root) {
+        message.content = text;
+        return;
+      }
+      message.content += tokens.slice(i, i + chunkSize).join("");
+      renderMessageList();
+      await delayMs(stepDelay);
+    }
+
+    message.content = text;
+    renderMessageList();
   }
 
   function detectLanguage(code) {
@@ -697,6 +952,16 @@
 
     strip.classList.remove("hidden");
     strip.innerHTML = state.pendingAttachments.map((attachment) => {
+      if (attachment.kind === "image" && attachment.base64) {
+        const dataUrl = `data:${attachment.mimeType};base64,${attachment.base64}`;
+        return `
+          <div class="nebula-ai-attachment-chip nebula-ai-image-chip">
+            <img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(attachment.name)}" />
+            <span>${escapeHtml(attachment.name)}</span>
+            <button type="button" aria-label="Remove upload" data-remove-upload="${escapeHtml(attachment.id)}"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        `;
+      }
       return `
         <div class="nebula-ai-attachment-chip">
           <span>${escapeHtml(attachment.name)}</span>
@@ -754,7 +1019,13 @@
       const roleClass = message.role === "assistant" ? "assistant" : "user";
       const timeText = new Date(message.createdAt || nowMs()).toLocaleTimeString();
       const attachmentsHtml = message.attachments && message.attachments.length
-        ? `<div class="nebula-ai-message-attachments">${message.attachments.map((attachment) => `<span>${escapeHtml(attachment.name)}</span>`).join("")}</div>`
+        ? `<div class="nebula-ai-message-attachments">${message.attachments.map((attachment) => {
+            if (attachment.kind === "image" && attachment.base64) {
+              const dataUrl = `data:${attachment.mimeType};base64,${attachment.base64}`;
+              return `<img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(attachment.name)}" title="${escapeHtml(attachment.name)}" />`;
+            }
+            return `<span>${escapeHtml(attachment.name)}</span>`;
+          }).join("")}</div>`
         : "";
       const contentHtml = message.role === "assistant"
         ? `<div class="nebula-ai-markdown">${renderMarkdown(message.content)}</div>`
@@ -783,6 +1054,11 @@
     }
 
     state.root.innerHTML = `
+            <style>
+              .nebula-ai-header-controls { display: flex; gap: 8px; align-items: center; }
+              .nebula-ai-control { padding: 6px 10px; border: 1px solid #444; border-radius: 4px; background: #222; color: #fff; font-size: 14px; }
+              .nebula-ai-control:focus { outline: none; border-color: #666; }
+            </style>
       <section class="nebula-ai-shell">
         <aside class="nebula-ai-sidebar">
           <div class="nebula-ai-sidebar-top">
@@ -803,7 +1079,13 @@
               <p class="nebula-ai-kicker">AI Chat</p>
               <h1>${escapeHtml((activeConversation() && activeConversation().title) || "New conversation")}</h1>
             </div>
-            <button id="nebula-ai-regenerate" type="button" class="nebula-btn nebula-btn-muted">Regenerate</button>
+            <div class="nebula-ai-header-controls">
+              <select id="nebula-ai-model-select" class="nebula-ai-control">
+                <option value="gemini-2.5-flash" ${getCurrentModel() === "gemini-2.5-flash" ? "selected" : ""}>Flash</option>
+                <option value="gemini-2.5-flash-lite" ${getCurrentModel() === "gemini-2.5-flash-lite" ? "selected" : ""}>Lite</option>
+              </select>
+              <button id="nebula-ai-regenerate" type="button" class="nebula-btn nebula-btn-muted">Regenerate</button>
+            </div>
           </header>
 
           <div id="nebula-ai-messages" class="nebula-ai-messages"></div>
@@ -831,6 +1113,11 @@
   }
 
   async function loadQuota() {
+    if (directModeEnabled()) {
+      state.quota = readQuotaStore();
+      renderQuotaPanel();
+      return;
+    }
     try {
       const payload = await apiRequest("/api/ai/quota", { method: "GET" });
       const limit = clampNumber(payload.limit, 1, 100000, 100);
@@ -849,7 +1136,7 @@
   }
 
   async function syncFromCloud() {
-    if (!cloudSyncEnabled()) {
+    if (!cloudApiEnabled()) {
       return;
     }
     try {
@@ -882,7 +1169,7 @@
   }
 
   async function loadConversationMessagesFromCloud(conversationId) {
-    if (!cloudSyncEnabled()) {
+    if (!cloudApiEnabled()) {
       return;
     }
     const conversation = findConversation(conversationId);
@@ -1062,6 +1349,10 @@
       return;
     }
     const regenerate = Boolean(options && options.regenerate);
+    if (!regenerate && state.quota.remaining <= 0) {
+      setStatus("Daily message limit reached. Try again tomorrow.", false);
+      return;
+    }
     const input = state.root ? state.root.querySelector("#nebula-ai-input") : null;
     const conversation = ensureConversation();
 
@@ -1126,29 +1417,37 @@
     const syncConversation = cloudSyncEnabled();
     const contextMessages = conversation.messages
       .filter((item) => item.id !== placeholder.id)
-      .slice(-AI_CONTEXT_LIMIT)
+      .slice(-getContextLimit())
       .map(conversationToApiMessage);
 
     try {
-      const payload = await apiRequest("/api/ai/chat", {
-        method: "POST",
-        body: JSON.stringify({
-          model: "gemini-2.5-flash",
-          conversationId: conversation.id,
-          title: conversation.title,
-          messages: contextMessages,
-          customInstructions: getCustomInstructions(),
-          syncConversation,
-          regenerate
-        })
-      });
+      const payload = directModeEnabled()
+        ? await requestGeminiWithRotation({
+            conversationId: conversation.id,
+            title: conversation.title,
+            messages: contextMessages,
+            customInstructions: getCustomInstructions(),
+            regenerate
+          })
+        : await apiRequest("/api/ai/chat", {
+            method: "POST",
+            body: JSON.stringify({
+              model: getCurrentModel(),
+              conversationId: conversation.id,
+              title: conversation.title,
+              messages: contextMessages,
+              customInstructions: getCustomInstructions(),
+              syncConversation,
+              regenerate
+            })
+          });
 
       const assistantText = String(payload.assistantMessage || "").trim() || "No response generated.";
       const index = conversation.messages.findIndex((item) => item.id === placeholder.id);
       const assistantMessage = {
         id: placeholder.id,
         role: "assistant",
-        content: assistantText,
+        content: "",
         attachments: [],
         createdAt: nowMs()
       };
@@ -1158,6 +1457,9 @@
       } else {
         conversation.messages.push(assistantMessage);
       }
+
+      renderMessageList();
+      await animateAssistantTyping(conversation, assistantMessage.id, assistantText);
 
       conversation.updatedAt = assistantMessage.createdAt;
       conversation.messageCount = conversation.messages.length;
@@ -1172,6 +1474,10 @@
         state.quota.used = clampNumber(payload.quota.used, 0, state.quota.limit, state.quota.used);
         state.quota.remaining = clampNumber(payload.quota.remaining, 0, state.quota.limit, state.quota.remaining);
         state.quota.dayKey = String(payload.quota.dayKey || state.quota.dayKey || "");
+        writeQuotaStore();
+      } else if (directModeEnabled()) {
+        decrementQuota();
+        renderQuotaPanel();
       }
 
       state.store.conversations = state.store.conversations
@@ -1200,7 +1506,9 @@
       setStatus(error && error.message ? error.message : "Request failed.", false);
     } finally {
       setBusy(false);
-      loadQuota();
+      if (!directModeEnabled()) {
+        loadQuota();
+      }
     }
   }
 
@@ -1242,7 +1550,7 @@
         renderConversationList();
         render();
 
-        if (cloudSyncEnabled()) {
+        if (cloudApiEnabled()) {
           try {
             await apiRequest(`/api/ai/conversations/${encodeURIComponent(conversation.id)}`, {
               method: "PATCH",
@@ -1281,7 +1589,7 @@
         removeConversation(conversation.id);
         render();
         close();
-        if (cloudSyncEnabled()) {
+        if (cloudApiEnabled()) {
           try {
             await apiRequest(`/api/ai/conversations/${encodeURIComponent(conversation.id)}`, {
               method: "DELETE"
@@ -1328,7 +1636,7 @@
 
     state.root.addEventListener("click", async (event) => {
       const target = event.target;
-      if (!(target instanceof Element)) {
+      if (!(target instanceof Element)) { 
         return;
       }
 
@@ -1338,6 +1646,16 @@
         state.pendingAttachments = [];
         writeStore();
         render();
+        bindEvents();
+        const newInput = state.root ? state.root.querySelector("#nebula-ai-input") : null;
+        if (newInput) {
+          newInput.value = "";
+          newInput.focus();
+        }
+        const messageList = state.root ? state.root.querySelector("#nebula-ai-messages") : null;
+        if (messageList) {
+          messageList.scrollTop = 0;
+        }
         return;
       }
 
@@ -1451,14 +1769,19 @@
 
     state.root.addEventListener("change", async (event) => {
       const input = event.target;
-      if (!(input instanceof HTMLInputElement)) {
+      if (!(input instanceof HTMLInputElement) && !(input instanceof HTMLSelectElement)) {
         return;
       }
-      if (input.id !== "nebula-ai-upload-input") {
+      if (input.id === "nebula-ai-upload-input") {
+        await handleUpload(input.files || []);
+        input.value = "";
         return;
       }
-      await handleUpload(input.files || []);
-      input.value = "";
+      if (input.id === "nebula-ai-model-select") {
+        setCurrentModel(String(input.value || "gemini-2.5-flash"));
+        return;
+      }
+
     });
 
     state.root.addEventListener("keydown", async (event) => {
@@ -1496,6 +1819,7 @@
     state.statusText = "";
     state.statusOk = true;
     state.store = readStore();
+    state.quota = readQuotaStore();
 
     if (!state.root) {
       return;

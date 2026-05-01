@@ -1992,13 +1992,22 @@
           setStatus("login-status", "Authentication is unavailable.", false);
           return;
         }
-        const email = String(document.getElementById("login-email").value || "").trim();
+        const email = String(document.getElementById("login-email").value || "").trim().toLowerCase();
         const password = String(document.getElementById("login-password").value || "");
+        if (!email || !password) {
+          setStatus("login-status", "Please enter both email and password.", false);
+          return;
+        }
         try {
           const result = await instance.signInWithEmailAndPassword(email, password);
+          if (!result || !result.user) {
+            setStatus("login-status", "Login failed. Please try again.", false);
+            return;
+          }
           try {
             await ensureUserDoc(result.user, result.user.displayName || "");
-          } catch (_error) {
+          } catch (docError) {
+            console.error("Error ensuring user doc:", docError);
           }
           closeModal();
         } catch (error) {

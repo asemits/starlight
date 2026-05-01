@@ -931,10 +931,38 @@
 		}
 
 		const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+		const current = Math.max(1, Math.min(pageCount, state.page));
 		const pages = [];
-		for (let i = 1; i <= pageCount; i += 1) {
-			pages.push(`<button type="button" class="games-page-btn ${state.page === i ? "active" : ""}" data-action="page" data-page="${i}">${i}</button>`);
+		const maxVisible = 5;
+
+		const prevDisabled = current <= 1 ? "disabled" : "";
+		pages.push(`<button type="button" class="games-page-btn games-page-btn-arrow" data-action="page-prev" ${prevDisabled} aria-label="Previous page">&lsaquo;</button>`);
+
+		let start = Math.max(1, current - Math.floor(maxVisible / 2));
+		let end = Math.min(pageCount, start + maxVisible - 1);
+		start = Math.max(1, end - maxVisible + 1);
+
+		if (start > 1) {
+			pages.push(`<button type="button" class="games-page-btn" data-action="page" data-page="1">1</button>`);
+			if (start > 2) {
+				pages.push('<span class="games-page-ellipsis">&hellip;</span>');
+			}
 		}
+
+		for (let i = start; i <= end; i += 1) {
+			pages.push(`<button type="button" class="games-page-btn ${current === i ? "active" : ""}" data-action="page" data-page="${i}">${i}</button>`);
+		}
+
+		if (end < pageCount) {
+			if (end < pageCount - 1) {
+				pages.push('<span class="games-page-ellipsis">&hellip;</span>');
+			}
+			pages.push(`<button type="button" class="games-page-btn" data-action="page" data-page="${pageCount}">${pageCount}</button>`);
+		}
+
+		const nextDisabled = current >= pageCount ? "disabled" : "";
+		pages.push(`<button type="button" class="games-page-btn games-page-btn-arrow" data-action="page-next" ${nextDisabled} aria-label="Next page">&rsaquo;</button>`);
+
 		return pages.join("");
 	}
 
@@ -1520,7 +1548,7 @@
 				background: rgba(0,0,0,0.45);
 				color: var(--ink);
 				border-radius: 999px;
-				padding: 4px 8px;
+				padding: 4px 4px;
 				font-size: 11px;
 				display: inline-flex;
 				align-items: center;
@@ -1536,27 +1564,91 @@
 				display: flex;
 				gap: 5px;
 				flex-wrap: wrap;
-				margin-top: 10px;
+				margin: 0;
 				justify-content: center;
+				align-items: center;
+				position: fixed;
+				left: 0;
+				right: 0;
+				bottom: 14px;
+				z-index: 60;
+				width: 100vw;
+				max-width: none;
+				padding: 0 10px;
+				background: transparent;
+				border: 0;
+				box-shadow: none;
+				backdrop-filter: none;
+				-webkit-backdrop-filter: none;
+				pointer-events: none;
 				transition: opacity 0.24s ease, transform 0.24s ease;
 			}
 			.cards-switching {
 				opacity: 0.25;
 				transform: translateY(8px);
 			}
-			.games-page-btn {
-				border: 1px solid var(--border);
-				background: rgba(0,0,0,0.45);
-				color: var(--ink);
+			.games-page-btn {	
+				border: 1px solid rgba(255,255,255,0.35);
+				background:
+					radial-gradient(130% 120% at 50% -20%, rgba(255,255,255,0.22), rgba(255,255,255,0.04) 45%, rgba(0,0,0,0.42) 100%),
+					rgba(8, 10, 18, 0.62);
+				color: #f5f7fa;
 				border-radius: 999px;
-				padding: 5px 9px;
-				min-width: 30px;
-				font-size: 11px;
+				padding: 10px 16px;
+				min-width: 54px;
+				font-size: 15px;
+				font-weight: 600;
+				letter-spacing: 0.02em;
 				cursor: pointer;
+				backdrop-filter: blur(14px) saturate(160%);
+				-webkit-backdrop-filter: blur(14px) saturate(160%);
+				box-shadow:
+					0 12px 26px rgba(0,0,0,0.44),
+					0 0 0 1px rgba(255,255,255,0.12) inset,
+					0 0 18px rgba(255,255,255,0.08);
+				pointer-events: auto;
+				transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease;
+			}
+			.games-page-btn:hover:not(:disabled) {
+				transform: translateY(-2px);
+				border-color: rgba(255,255,255,0.72);
+				background:
+					radial-gradient(130% 120% at 50% -20%, rgba(255,255,255,0.3), rgba(255,255,255,0.07) 45%, rgba(0,0,0,0.38) 100%),
+					rgba(8, 10, 18, 0.66);
+				box-shadow:
+					0 16px 30px rgba(0,0,0,0.5),
+					0 0 0 1px rgba(255,255,255,0.16) inset,
+					0 0 24px rgba(255,255,255,0.14);
 			}
 			.games-page-btn.active {
-				background: #fff;
-				color: #000;
+				background:
+					radial-gradient(130% 120% at 50% -20%, rgba(255,255,255,0.38), rgba(255,255,255,0.14) 48%, rgba(0,0,0,0.36) 100%),
+					rgba(15, 18, 28, 0.74);
+				border-color: rgba(255,255,255,0.9);
+				color: #ffffff;
+				box-shadow:
+					0 16px 30px rgba(0,0,0,0.52),
+					0 0 0 1px rgba(255,255,255,0.24) inset,
+					0 0 28px rgba(255,255,255,0.18);
+			}
+			.games-page-btn:disabled {
+				opacity: 0.45;
+				cursor: not-allowed;
+			}
+			.games-page-btn-arrow {
+				padding: 10px 12px;
+				min-width: 54px;
+				font-size: 18px;
+				line-height: 1;
+			}
+			.games-page-ellipsis {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				min-width: 44px;
+				color: rgba(255,255,255,0.7);
+				font-size: 16px;
+				pointer-events: none;
 			}
 			.games-skeleton-grid {
 				display: grid;
@@ -1645,6 +1737,20 @@
 				.games-popular-grid,
 				.games-card-grid {
 					grid-template-columns: repeat(2, minmax(0, 1fr));
+				}
+				.games-page-nav,
+				.games-alpha-nav {
+					bottom: 8px;
+					padding: 0 6px;
+				}
+				.games-page-btn {
+					padding: 8px 13px;
+					min-width: 46px;
+					font-size: 13px;
+				}
+				.games-page-btn-arrow {
+					min-width: 46px;
+					font-size: 16px;
 				}
 			}
 			</style>
@@ -1763,6 +1869,22 @@
 			const pageButton = target.closest("[data-action='page']");
 			if (pageButton) {
 				state.page = Number(pageButton.getAttribute("data-page") || "1");
+				renderCards(root, true);
+				return;
+			}
+
+			const prevButton = target.closest("[data-action='page-prev']");
+			if (prevButton) {
+				state.page = Math.max(1, state.page - 1);
+				renderCards(root, true);
+				return;
+			}
+
+			const nextButton = target.closest("[data-action='page-next']");
+			if (nextButton) {
+				const total = currentFilteredGames().length;
+				const max = Math.max(1, Math.ceil(total / PAGE_SIZE));
+				state.page = Math.min(max, state.page + 1);
 				renderCards(root, true);
 				return;
 			}

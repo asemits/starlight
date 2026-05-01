@@ -10,13 +10,38 @@
   const ACCURACY_STROKE_LAYER_ID = "nebula-accuracy-stroke";
   const DEFAULT_CENTER = [0, 0];
   const DEFAULT_ZOOM = 2;
+  let mapLibreLoadPromise = null;
+  const routeState = {
+    map: null,
+    markers: [],
+    gpsMarker: null,
+    ipMarker: null,
+    resizeHandler: null,
+    gpsButtonHandler: null,
+    resizeTimer: null,
+    initToken: 0
+  };
+
+  function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
   function ensureMapLibreLoaded() {
+    
     if (window.maplibregl && window.maplibregl.Map) {
       return Promise.resolve(window.maplibregl);
     }
 
-    return new Promise(function loadMapLibre(resolve, reject) {
+    if (mapLibreLoadPromise) {
+      return mapLibreLoadPromise;
+    }
+
+    mapLibreLoadPromise = new Promise(function loadMapLibre(resolve, reject) {
       let css = document.getElementById(MAPLIBRE_CSS_ID);
       if (!css) {
         css = document.createElement("link");
@@ -54,7 +79,12 @@
         reject(new Error("MapLibre failed to load."));
       };
       document.head.appendChild(script);
+    }).catch(function onLoadError(error) {
+      mapLibreLoadPromise = null;
+      throw error;
     });
+
+    return mapLibreLoadPromise;
   }
 
   function addMarker(map, markers, latitude, longitude, labelText) {
@@ -64,7 +94,8 @@
       return null;
     }
 
-    const popupText = String(labelText || "Marker") + "<br>" + lat.toFixed(5) + ", " + lng.toFixed(5);
+    const safeLabel = escapeHtml(String(labelText || "Marker"));
+    const popupText = safeLabel + "<br>" + lat.toFixed(5) + ", " + lng.toFixed(5);
     const popup = new window.maplibregl.Popup({ offset: 24 }).setHTML(popupText);
     const marker = new window.maplibregl.Marker({ color: "#67f6ff" })
       .setLngLat([lng, lat])
@@ -78,11 +109,12 @@
     const steps = 64;
     const earthRadius = 6378137;
     const latRad = latitude * Math.PI / 180;
+    const safeCosLat = Math.max(Math.abs(Math.cos(latRad)), 0.000001);
     const points = [];
     for (let i = 0; i <= steps; i += 1) {
       const angle = (i / steps) * Math.PI * 2;
       const dLat = (radiusMeters / earthRadius) * Math.sin(angle);
-      const dLng = (radiusMeters / (earthRadius * Math.cos(latRad))) * Math.cos(angle);
+      const dLng = (radiusMeters / (earthRadius * safeCosLat)) * Math.cos(angle);
       const nextLat = latitude + (dLat * 180 / Math.PI);
       const nextLng = longitude + (dLng * 180 / Math.PI);
       points.push([nextLng, nextLat]);
@@ -154,6 +186,50 @@
     source.setData({ type: "FeatureCollection", features: [] });
   }
 
+  function clearLocationMarkers(state, map) {
+    if (state.gpsMarker) {
+      state.gpsMarker.remove();
+      state.gpsMarker = null;
+    }
+    if (state.ipMarker) {
+      state.ipMarker.remove();
+      state.ipMarker = null;
+    }
+    if (map) {
+      clearAccuracyRadius(map);
+    }
+  }
+
+  function disposeMap() {
+    routeState.initToken += 1;
+
+    if (routeState.resizeTimer) {
+      window.clearTimeout(routeState.resizeTimer);
+      routeState.resizeTimer = null;
+    }
+
+    if (routeState.gpsButtonHandler) {
+      const gpsButton = document.getElementById("nebula-map-gps");
+      if (gpsButton) {
+        gpsButton.removeEventListener("click", routeState.gpsButtonHandler);
+      }
+      routeState.gpsButtonHandler = null;
+    }
+
+    if (routeState.resizeHandler) {
+      window.removeEventListener("resize", routeState.resizeHandler);
+      routeState.resizeHandler = null;
+    }
+
+    if (routeState.map) {
+      clearLocationMarkers(routeState, routeState.map);
+      routeState.map.remove();
+      routeState.map = null;
+    }
+
+    routeState.markers.length = 0;
+  }
+
   function getIPLocation() {
     return fetch("https://ipapi.co/json/")
       .then(function parseIpApi(response) {
@@ -219,10 +295,7 @@
 
           map.easeTo({ center: [lng, lat], zoom: 15, duration: 700 });
 
-          if (state.gpsMarker) {
-            state.gpsMarker.remove();
-          }
-          clearAccuracyRadius(map);
+          clearLocationMarkers(state, map);
 
           state.gpsMarker = addMarker(map, markers, lat, lng, "You are here");
           if (Number.isFinite(accuracy)) {
@@ -244,20 +317,20 @@
   }
 
   function initMap() {
+    disposeMap();
+    const requestToken = routeState.initToken;
+
     const mapNode = document.getElementById("nebula-map-canvas");
     const gpsButton = document.getElementById("nebula-map-gps");
     const statusNode = document.getElementById("nebula-map-status");
+    const searchInput = document.querySelector(".nebula-map-search input");
 
     if (!mapNode) {
       return;
     }
 
-    const markers = [];
-    const state = {
-      gpsMarker: null,
-      ipMarker: null,
-      map: null
-    };
+    const markers = routeState.markers;
+    const state = routeState;
 
     function setStatus(text, isError) {
       if (!statusNode) {
@@ -269,6 +342,10 @@
 
     ensureMapLibreLoaded()
       .then(function onMapLibreReady() {
+        if (requestToken !== routeState.initToken || !mapNode || !document.body.contains(mapNode)) {
+          return;
+        }
+
         const map = new window.maplibregl.Map({
           container: mapNode,
           style: {
@@ -276,7 +353,7 @@
             sources: {
               osm: {
                 type: "raster",
-                tiles: ["https://{a,b,c}.tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                tiles: ["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"],
                 tileSize: 256,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               }
@@ -295,6 +372,11 @@
         });
         state.map = map;
 
+        if (searchInput) {
+          searchInput.disabled = true;
+          searchInput.title = "Search coming soon";
+        }
+
         map.addControl(new window.maplibregl.NavigationControl(), "top-left");
 
         map.on("load", function onMapLoad() {
@@ -310,8 +392,39 @@
           }
         });
 
+        if (searchInput) {
+        searchInput.disabled = false;
+        searchInput.placeholder = "Search a city or place...";
+        
+        routeState.searchHandler = function(e) {
+          if (e.key === "Enter") {
+const query = searchInput.value.trim();
+setStatus("Searching...", false);
+
+fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`)
+  .then(r => r.json())
+  .then(data => {
+    if (data.features && data.features.length > 0) {
+      const feature = data.features[0];
+      const [lon, lat] = feature.geometry.coordinates; // Photon returns [lng, lat]
+      const name = feature.properties.name || feature.properties.city || "Found Location";
+
+      map.flyTo({ center: [lon, lat], zoom: 15, essential: true });
+      const m = addMarker(map, routeState.markers, lat, lon, name);
+      m?.togglePopup();
+      setStatus(`Found: ${name}`, false);
+    } else {
+      setStatus("Location not found.", true);
+    }
+              })
+              .catch(() => setStatus("Search error.", true));
+          }
+        };
+        searchInput.addEventListener("keydown", routeState.searchHandler);
+      }
+
         if (gpsButton) {
-          gpsButton.addEventListener("click", function onGpsClick() {
+          state.gpsButtonHandler = function onGpsClick() {
             setStatus("Requesting GPS location...", false);
 
             getGPSLocation(map, markers, state)
@@ -325,9 +438,7 @@
                   .then(function onIpDone(location) {
                     map.easeTo({ center: [location.longitude, location.latitude], zoom: 12, duration: 700 });
 
-                    if (state.ipMarker) {
-                      state.ipMarker.remove();
-                    }
+                    clearLocationMarkers(state, map);
 
                     state.ipMarker = addMarker(
                       map,
@@ -344,27 +455,30 @@
                     setStatus("Using approximate IP location" + (location.city ? " in " + location.city : "") + ".", false);
                   })
                   .catch(function onIpFail() {
+                    clearLocationMarkers(state, map);
                     map.easeTo({ center: [DEFAULT_CENTER[1], DEFAULT_CENTER[0]], zoom: DEFAULT_ZOOM, duration: 700 });
                     addMarker(map, markers, DEFAULT_CENTER[0], DEFAULT_CENTER[1], "Default location");
                     setStatus("GPS and IP lookup failed. Showing default location.", true);
                   });
               });
-          });
+          };
+          gpsButton.addEventListener("click", state.gpsButtonHandler);
         }
 
         setStatus("Map ready. Press GPS or click map to add markers.", false);
 
-        setTimeout(function invalidateMap() {
-          if (state.map) {
+        state.resizeTimer = window.setTimeout(function invalidateMap() {
+          if (requestToken === routeState.initToken && state.map) {
             state.map.resize();
           }
         }, 120);
 
-        window.addEventListener("resize", function onResize() {
-          if (state.map) {
+        state.resizeHandler = function onResize() {
+          if (requestToken === routeState.initToken && state.map) {
             state.map.resize();
           }
-        });
+        };
+        window.addEventListener("resize", state.resizeHandler);
       })
       .catch(function onMapError() {
         setStatus("Failed to load map engine.", true);
@@ -376,20 +490,28 @@
       return `
         <style>
           .nebula-map-viewport {
-            position: fixed;
-            left: 88px;
-            right: 0;
-            top: 0;
-            bottom: 0;
-            background:
-              radial-gradient(circle at 12% 12%, rgba(86, 235, 255, 0.2), transparent 36%),
-              radial-gradient(circle at 88% 86%, rgba(13, 116, 255, 0.2), transparent 36%),
-              linear-gradient(145deg, #03060d 0%, #060f1d 48%, #03040a 100%);
-            overflow: hidden;
-          }
+  position: fixed;
+  top: 74px;
+  bottom: 24px;
+  right: 24px;
+  left: 24px; 
+  border-radius: 24px;
+  border: 1px solid rgba(103, 246, 255, 0.15);
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.7),
+    0 0 15px rgba(103, 246, 255, 0.05);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(86, 235, 255, 0.1), transparent 36%),
+    radial-gradient(circle at 88% 86%, rgba(13, 116, 255, 0.1), transparent 36%),
+    linear-gradient(145deg, #03060d 0%, #060f1d 48%, #03040a 100%);
+  overflow: hidden;
+  z-index: 10;
+}
 
           #nebula-map-canvas {
             position: absolute;
+            filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(90%);
+            background: #050a12;
             inset: 0;
             z-index: 100;
           }
@@ -541,7 +663,7 @@
 
           <div class="nebula-map-search nebula-map-glass" aria-label="Map search">
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <input type="text" placeholder="Search locations (coming soon)" aria-label="Search locations" />
+            <input type="text" placeholder="Search locations " aria-label="Search locations" />
           </div>
 
           <div id="nebula-map-status" class="nebula-map-glass" aria-live="polite">Loading map...</div>
@@ -554,6 +676,9 @@
     },
     afterRender: function afterRenderMapsRoute() {
       initMap();
+    },
+    unmount: function unmountMapsRoute() {
+      disposeMap();
     }
   };
 })();
