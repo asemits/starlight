@@ -1007,10 +1007,6 @@
     const conversation = ensureConversation();
     if (!conversation.messages.length) {
       list.innerHTML = `
-        <article class="nebula-ai-empty-state">
-          <h2>Start chatting with Gemini 2.5 Flash</h2>
-          <p>Markdown, code blocks with language labels, uploads, regenerate, and cloud-synced history are ready.</p>
-        </article>
       `;
       return;
     }
@@ -1069,7 +1065,6 @@
             <p class="nebula-ai-quota-title">Messages Left Today: <strong id="nebula-ai-quota-remaining">100</strong>/100</p>
             <div class="nebula-ai-quota-track"><span id="nebula-ai-quota-bar"></span></div>
             <p class="nebula-ai-quota-sub">Used: <span id="nebula-ai-quota-used">0</span></p>
-            <p id="nebula-ai-sync-label" class="nebula-ai-quota-sub">Cloud Sync: On</p>
           </footer>
         </aside>
 

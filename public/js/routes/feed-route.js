@@ -835,38 +835,11 @@
 
   <aside class="neb-sidebar">
     <div class="neb-card neb-side-card">
-      <div class="neb-community-header"></div>
-      <div class="neb-community-icon">◎</div>
-      <p class="neb-community-name">r/nebula</p>
-      <p class="neb-community-desc">The official Nebula community. Share what you're playing, building, or thinking about.</p>
-      <div class="neb-community-stats">
-        <div class="neb-community-stat">
-          <p id="neb-stat-members">—</p>
-          <p>Members</p>
-        </div>
-      </div>
       <div id="neb-community-list" class="neb-community-list"></div>
-    </div>
-
-    <div class="neb-card neb-side-card">
-      <h3>Community Rules</h3>
-      <ul class="neb-rules-list">
-        <li><span>1.</span><span>Be respectful to all members</span></li>
-        <li><span>2.</span><span>No spam or self-promotion</span></li>
-        <li><span>3.</span><span>Stay on topic</span></li>
-        <li><span>4.</span><span>No personal information</span></li>
-        <li><span>5.</span><span>Follow site-wide rules</span></li>
-      </ul>
-    </div>
-
-    <div class="neb-card neb-side-card">
-      <h3>Moderators</h3>
-      <p style="font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.03em;line-height:1.6;">u/nebula_admin<br>u/mod_team</p>
     </div>
   </aside>
 </section>
 
-<!-- Thread modal -->
 <div id="neb-thread-modal" class="neb-modal" aria-hidden="true">
   <div class="neb-modal-card">
     <div class="neb-modal-head">
@@ -885,7 +858,6 @@
   </div>
 </div>
 
-<!-- Create post modal -->
 <div id="neb-create-modal" class="neb-modal" aria-hidden="true">
   <div class="neb-modal-card neb-create-modal-card">
     <div class="neb-modal-head">
@@ -899,16 +871,16 @@
           <option value="r/nebula">r/nebula</option>
           <option value="r/gaming">r/gaming</option>
           <option value="r/music">r/music</option>
-          <option value="r/builds">r/builds</option>
+          <option value="r/diy">r/diy</option>
         </select>
       </div>
       <div>
         <label class="neb-input-label">Title</label>
-        <input class="neb-input" id="neb-post-title" type="text" placeholder="An interesting title…" maxlength="300" />
+        <input class="neb-input" id="neb-post-title" type="text" placeholder="Title" maxlength="300" />
       </div>
       <div>
         <label class="neb-input-label">Body (optional)</label>
-        <textarea class="neb-input neb-textarea" id="neb-post-body" placeholder="Share your thoughts…"></textarea>
+        <textarea class="neb-input neb-textarea" id="neb-post-body" placeholder="Body"></textarea>
       </div>
       <p id="neb-create-status" class="neb-status"></p>
     </div>
@@ -1026,7 +998,7 @@
 
 function handle(user) {
   const raw = String(user && (user.displayName || (user.email ? user.email.split("@")[0] : user.uid.slice(0, 8))))
-    .toLowerCase() // Ensure this is here
+    .toLowerCase()
     .replace(/[^a-z0-9_]+/g, "");
   return "@" + (raw || "member");
 }
@@ -1110,7 +1082,6 @@ function handle(user) {
         };
       }
 
-      // === CREATE TYPE HELPERS START ===
       function openCreateModal(type) {
         state.createType = type || null;
         if (!el.createModal) return;
@@ -1216,7 +1187,6 @@ function handle(user) {
         el.postBody = el.createModal.querySelector("#neb-post-body");
         el.createStatus = el.createModal.querySelector("#neb-create-status");
       }
-      // === CREATE TYPE HELPERS END ===
 
       function closeCreateModal() {
         if (!el.createModal) return;
@@ -1244,7 +1214,6 @@ function handle(user) {
         if (el.statMembers) el.statMembers.textContent = fmtCount(members);
       }
 
-      // === CUSTOM COMMUNITY START ===
       function createCustomCommunity() {
         const input = prompt("New community name (e.g., r/mygroup):");
         if (!input || !input.trim()) return;
@@ -1258,7 +1227,6 @@ function handle(user) {
         savePrefs();
         renderCommunityList();
       }
-      // === CUSTOM COMMUNITY END ===
 
       function renderCommunityList() {
         if (!el.communityList) return;
@@ -1296,14 +1264,11 @@ function handle(user) {
         }
       }
 
-      // === COMMUNITY FILTERING START ===
       function shouldShowPost(post) {
         if (state.memberships.size === 0) return true;
         return state.memberships.has(post.community);
       }
-      // === COMMUNITY FILTERING END ===
 
-      // === POST RENDERING WITH MEDIA START ===
       function renderPostContent(post) {
         let content = "";
         if (post.imageUrl) {
@@ -1441,7 +1406,6 @@ function handle(user) {
         });
       }
 
-      // === PUBLISH POST BY TYPE START ===
       async function publishPost() {
         if (!state.user) {
           setStatus(el.createStatus, "Sign in to publish a post.", "error");
@@ -1618,7 +1582,6 @@ function handle(user) {
           if (el.submitPost) el.submitPost.disabled = false;
         }
       }
-      // === PUBLISH POST BY TYPE END ===
 
       async function publishComment() {
         if (!state.user) {
@@ -1717,7 +1680,6 @@ async function summarizePost(postId) {
   const summaryEl = document.getElementById(`neb-summary-${postId}`);
   if (!btn || !summaryEl) return;
 
-  // Toggle off if already showing
   if (summaryEl.classList.contains("visible")) {
     summaryEl.classList.remove("visible");
     btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> Summarize`;
@@ -1744,7 +1706,6 @@ console.log("Sending to AI:", prompt);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    // handle common response shapes
     const text = (
       data.result ||
       data.response ||
@@ -1879,7 +1840,6 @@ console.log("Sending to AI:", prompt);
         });
       }
 
-      // === POLL VOTING START ===
       async function votePoll(postId, optionIdx) {
         if (!state.user) {
           setStatus(el.feedStatus, "Sign in to vote.", "error");
@@ -1909,8 +1869,6 @@ console.log("Sending to AI:", prompt);
           setStatus(el.feedStatus, `Vote failed: ${error.message}`, "error");
         }
       }
-      // === POLL VOTING END ===
-
       if (el.communityList) {
         el.communityList.addEventListener("click", (event) => {
           const target = event.target.closest('[data-action="toggle-community"]');
@@ -1951,7 +1909,7 @@ console.log("Sending to AI:", prompt);
         if (!state.user) {
           setStatus(el.feedStatus, "Sign in to create posts and comments.", "error");
         } else {
-          setStatus(el.feedStatus, `Signed in as ${name(state.user)} ${handle(state.user)}.`);
+          return;
         }
       });
 
@@ -1961,7 +1919,6 @@ console.log("Sending to AI:", prompt);
       subscribePosts();
       renderPosts();
 
-      // === ADD FADE ANIMATION ===
       const style = document.createElement("style");
       style.textContent = `@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`;
       document.head.appendChild(style);
