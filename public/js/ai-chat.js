@@ -25,6 +25,8 @@
     },
     pendingAttachments: [],
     busy: false,
+    voiceActive: false,
+    voiceRecognition: null,
     quota: {
       limit: 100,
       used: 0,
@@ -62,6 +64,135 @@
 
   function nowMs() {
     return Date.now();
+  }
+
+  function getSpeechRecognitionCtor() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  }
+
+  function voiceChatSupported() {
+    return Boolean(getSpeechRecognitionCtor() && window.speechSynthesis);
+  }
+
+  function updateVoiceButton() {
+    if (!state.root) {
+      return;
+    }
+    const button = state.root.querySelector("#nebula-ai-voice");
+    const pauseButton = state.root.querySelector("#nebula-ai-voice-pause");
+    if (!button) {
+      return;
+    }
+    const isSpeaking = window.speechSynthesis && window.speechSynthesis.speaking;
+    button.disabled = (state.busy && !isSpeaking) || state.voiceActive || !voiceChatSupported();
+    button.classList.toggle("active", state.voiceActive);
+    button.setAttribute("aria-pressed", state.voiceActive ? "true" : "false");
+    button.title = voiceChatSupported() ? (state.voiceActive ? "Listening..." : "Start voice chat") : "Voice chat is not supported";
+
+    if (pauseButton) {
+      pauseButton.style.display = isSpeaking ? "inline-grid" : "none";
+      const isPaused = window.speechSynthesis && window.speechSynthesis.paused;
+      pauseButton.innerHTML = isPaused ? '<i class="fa-solid fa-play"></i>' : '<i class="fa-solid fa-pause"></i>';
+      pauseButton.title = isPaused ? "Resume AI speaking" : "Pause AI speaking";
+    }
+  }
+
+  function speakText(text) {
+    return new Promise((resolve) => {
+      const synth = window.speechSynthesis;
+      const output = String(text || "").trim();
+      if (!synth || !output) {
+        resolve();
+        return;
+      }
+      synth.cancel();
+      const utterance = new SpeechSynthesisUtterance(output);
+      utterance.rate = 1.3; // Make the AI reading faster
+      utterance.onend = () => { updateVoiceButton(); resolve(); };
+      utterance.onerror = () => { updateVoiceButton(); resolve(); };
+      utterance.onstart = () => { updateVoiceButton(); };
+      utterance.onpause = () => { updateVoiceButton(); };
+      utterance.onresume = () => { updateVoiceButton(); };
+      synth.speak(utterance);
+      updateVoiceButton();
+    });
+  }
+
+  function stopVoiceSession() {
+    if (state.voiceRecognition) {
+      try {
+        state.voiceRecognition.onresult = null;
+        state.voiceRecognition.onerror = null;
+        state.voiceRecognition.onend = null;
+        state.voiceRecognition.stop();
+      } catch (_error) {}
+      state.voiceRecognition = null;
+    }
+    if (window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_error) {}
+    }
+    state.voiceActive = false;
+    updateVoiceButton();
+  }
+
+  function listenOnce() {
+    return new Promise((resolve, reject) => {
+      const Recognition = getSpeechRecognitionCtor();
+      if (!Recognition) {
+        reject(new Error("Voice chat is not supported in this browser."));
+        return;
+      }
+
+      const recognition = new Recognition();
+      state.voiceRecognition = recognition;
+      let transcript = "";
+      let settled = false;
+
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        state.voiceRecognition = null;
+        resolve(value);
+      };
+
+      const fail = (message) => {
+        if (settled) return;
+        settled = true;
+        state.voiceRecognition = null;
+        reject(new Error(message));
+      };
+
+      recognition.lang = navigator.language || "en-US";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.continuous = false;
+
+      recognition.onresult = (event) => {
+        const results = event && event.results ? Array.from(event.results) : [];
+        transcript = results.map((result) => String(result && result[0] && result[0].transcript ? result[0].transcript : "")).join(" ").trim();
+      };
+
+      recognition.onerror = (event) => {
+        const errorType = String(event && event.error ? event.error : "").trim();
+        if (errorType === "no-speech") {
+          finish(transcript);
+          return;
+        }
+        fail(errorType ? `Voice input failed: ${errorType}.` : "Voice input failed.");
+      };
+
+      recognition.onend = () => {
+        finish(transcript);
+      };
+
+      try {
+        recognition.start();
+      } catch (_error) {
+        fail("Could not start voice input.");
+      }
+    });
   }
 
   function decodeHtmlEntities(value) {
@@ -609,6 +740,7 @@
     if (newButton) {
       newButton.disabled = state.busy;
     }
+    updateVoiceButton();
   }
 
   function delayMs(ms) {
@@ -1054,6 +1186,12 @@
               .nebula-ai-header-controls { display: flex; gap: 8px; align-items: center; }
               .nebula-ai-control { padding: 6px 10px; border: 1px solid #444; border-radius: 4px; background: #222; color: #fff; font-size: 14px; }
               .nebula-ai-control:focus { outline: none; border-color: #666; }
+              .nebula-ai-input-row { display: flex; gap: 10px; align-items: center; width: 100%; }
+              .nebula-ai-voice-button { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #fff; display: inline-grid; place-items: center; font-size: 20px; transition: all 0.15s ease; cursor: pointer; }
+              .nebula-ai-voice-button:hover:not(:disabled) { transform: scale(1.05); background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.26); }
+              .nebula-ai-voice-button.active { background: rgba(108, 199, 255, 0.18); border-color: rgba(108, 199, 255, 0.5); box-shadow: 0 0 0 4px rgba(108, 199, 255, 0.08); color: #6cc7ff; }
+              .nebula-ai-voice-button:disabled { opacity: 0.5; cursor: not-allowed; }
+              .nebula-ai-input-row textarea { flex: 1 1 auto; }
             </style>
       <section class="nebula-ai-shell">
         <aside class="nebula-ai-sidebar">
@@ -1087,7 +1225,11 @@
           <div id="nebula-ai-attachment-strip" class="nebula-ai-attachment-strip hidden"></div>
 
           <form id="nebula-ai-form" class="nebula-ai-form">
-            <textarea id="nebula-ai-input" rows="3" placeholder="Type a message... Shift+Enter for a new line"></textarea>
+            <div class="nebula-ai-input-row">
+              <button id="nebula-ai-voice" type="button" class="nebula-ai-voice-button" aria-label="Start voice chat" aria-pressed="false"><i class="fa-solid fa-microphone"></i></button>
+              <button id="nebula-ai-voice-pause" type="button" class="nebula-ai-voice-button" style="display: none;" aria-label="Pause AI speaking"><i class="fa-solid fa-pause"></i></button>
+              <textarea id="nebula-ai-input" rows="3" placeholder="Type a message... Shift+Enter for a new line"></textarea>
+            </div>
             <div class="nebula-ai-form-actions">
               <input id="nebula-ai-upload-input" type="file" multiple class="hidden" />
               <button id="nebula-ai-upload" type="button" class="nebula-btn nebula-btn-muted">Upload</button>
@@ -1344,16 +1486,18 @@
       return;
     }
     const regenerate = Boolean(options && options.regenerate);
+    const speakResponse = Boolean(options && options.speakResponse);
     if (!regenerate && state.quota.remaining <= 0) {
       setStatus("Daily message limit reached. Try again tomorrow.", false);
       return;
     }
     const input = state.root ? state.root.querySelector("#nebula-ai-input") : null;
     const conversation = ensureConversation();
+    const injectedText = typeof (options && options.text) === "string" ? String(options.text) : "";
 
     let userMessage = null;
     if (!regenerate) {
-      const text = String(input && input.value ? input.value : "").trim();
+      const text = injectedText.trim() || String(input && input.value ? input.value : "").trim();
       const attachments = state.pendingAttachments.map(normalizeAttachment).filter(Boolean);
       if (!text && !attachments.length) {
         setStatus("Type a message or upload a file.", false);
@@ -1481,9 +1625,17 @@
       state.store.conversations = state.store.conversations.slice(0, AI_CONVERSATION_LIMIT);
       state.store.activeConversationId = conversation.id;
       writeStore();
+      
       renderConversationList();
       renderMessageList();
       renderQuotaPanel();
+
+      if (speakResponse) {
+        setStatus("Reading response...", true);
+        await speakText(assistantText);
+        stopVoiceSession();
+      }
+
       setStatus("", true);
     } catch (error) {
       const index = conversation.messages.findIndex((item) => item.id === placeholder.id);
@@ -1707,6 +1859,52 @@
         return;
       }
 
+      const voiceButton = target.closest("#nebula-ai-voice");
+      if (voiceButton) {
+        // If synthesis is ongoing, do not overwrite the behavior of standard voice button unless paused logic dictates it
+        if (state.busy || state.voiceActive || !voiceChatSupported()) {
+          return;
+        }
+        state.voiceActive = true;
+        updateVoiceButton();
+        setStatus("Hello...", true);
+        try {
+          await speakText("hello");
+          setStatus("Listening...", true);
+          await new Promise((r) => setTimeout(r, 100));
+          const transcript = String(await listenOnce() || "").trim();
+          if (!transcript) {
+            setStatus("No speech detected.", false);
+            return;
+          }
+          const input = state.root ? state.root.querySelector("#nebula-ai-input") : null;
+          if (input) {
+            input.value = transcript;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          await sendCurrentInput({ text: transcript, speakResponse: true });
+        } catch (error) {
+          setStatus(error && error.message ? error.message : "Voice chat failed.", false);
+        } finally {
+          stopVoiceSession();
+          render();
+          bindEvents();
+        }
+        return;
+      }
+
+      const voicePauseButton = target.closest("#nebula-ai-voice-pause");
+      if (voicePauseButton) {
+        if (!window.speechSynthesis) return;
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        } else if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.pause();
+        }
+        updateVoiceButton();
+        return;
+      }
+
       const regenerateButton = target.closest("#nebula-ai-regenerate");
       if (regenerateButton) {
         await sendCurrentInput({ regenerate: true });
@@ -1835,6 +2033,7 @@
 
   function unmount() {
     closeDialog();
+    stopVoiceSession();
     state.root = null;
     state.rootSelector = "";
     state.pendingAttachments = [];
